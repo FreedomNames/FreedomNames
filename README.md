@@ -24,3 +24,11 @@ Make it paermanent by adding to `/etc/sysctl.conf`:
 net.core.rmem_max=7500000
 net.core.wmem_max=7500000
 ```
+
+## Development
+
+Install air and run:
+
+```sh
+air
+```
