@@ -11,6 +11,7 @@ import (
 
 	libp2p "github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	record "github.com/libp2p/go-libp2p-record"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
@@ -53,8 +54,24 @@ func main() {
 	}
 	log.Printf("Libp2p host created. ID: %s", p2pHost.ID().String()) // Fixed .Pretty() issue
 
+	// Define a list of bootstrap peers.
+	bootstrapPeers := []string{
+		"/ip4/104.131.131.82/tcp/4001/p2p/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ",
+		"/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN",
+	}
+	bootstrapInfos := BootstrapPeerInfos(bootstrapPeers)
+
 	// Create a new Kademlia DHT instance using the host
-	kadDHT, err = dht.New(ctx, p2pHost)
+	kadDHT, err = dht.New(
+		ctx,
+		p2pHost,
+		dht.BucketSize(30),
+		dht.ProtocolPrefix("/freedomnames"),
+		dht.Validator(record.NamespacedValidator{
+			"fn": FreedomNameValidator{},
+		}),
+		dht.BootstrapPeers(bootstrapInfos...),
+	)
 	if err != nil {
 		log.Fatalf("Failed to create DHT instance: %v", err)
 	}
@@ -62,29 +79,6 @@ func main() {
 	// Bootstrap the DHT node
 	if err = kadDHT.Bootstrap(ctx); err != nil {
 		log.Fatalf("Failed to bootstrap DHT: %v", err)
-	}
-
-	// Connect to bootstrap peers
-	bootstrapPeers := []string{
-		"/ip4/104.131.131.82/tcp/4001/p2p/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ",
-		"/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN",
-	}
-	for _, addrStr := range bootstrapPeers {
-		addr, err := ma.NewMultiaddr(addrStr)
-		if err != nil {
-			log.Printf("Invalid bootstrap address %q: %v", addrStr, err)
-			continue
-		}
-		pi, err := peer.AddrInfoFromP2pAddr(addr)
-		if err != nil {
-			log.Printf("Failed to get peer info for %q: %v", addrStr, err)
-			continue
-		}
-		if err := p2pHost.Connect(ctx, *pi); err != nil {
-			log.Printf("Error connecting to bootstrap peer %q: %v", pi.ID.String(), err) // Fixed .Pretty() issue
-		} else {
-			log.Printf("Connected to bootstrap peer: %s", pi.ID.String()) // Fixed .Pretty() issue
-		}
 	}
 
 	// Set up HTTP API endpoints
@@ -104,6 +98,24 @@ func main() {
 	select {}
 }
 
+func BootstrapPeerInfos(addrs []string) []peer.AddrInfo {
+	var infos []peer.AddrInfo
+	for _, s := range addrs {
+		maddr, err := ma.NewMultiaddr(s)
+		if err != nil {
+			log.Printf("error parsing multiaddr %s: %v", s, err)
+			continue
+		}
+		info, err := peer.AddrInfoFromP2pAddr(maddr)
+		if err != nil {
+			log.Printf("error converting multiaddr %s to AddrInfo: %v", s, err)
+			continue
+		}
+		infos = append(infos, *info)
+	}
+	return infos
+}
+
 // addHandler stores a domain mapping
 func addHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
@@ -114,6 +126,7 @@ func addHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// TODO: Add TTL
 	// Valid request body (JSON):
 	// {
 	// 	"test.local": {
@@ -142,7 +155,7 @@ func addHandler(w http.ResponseWriter, r *http.Request) {
 			// For now we just store the first record type (A)
 
 			// Store in DHT
-			dhtKey := "/freedomnames/" + key
+			dhtKey := "/fn/" + key
 			log.Println("Store key:", dhtKey)
 			if err := kadDHT.PutValue(ctx, dhtKey, []byte(value)); err != nil {
 				http.Error(w, fmt.Sprintf("Failed to store value in DHT: %v", err), http.StatusInternalServerError)
@@ -173,13 +186,15 @@ func lookupHandler(w http.ResponseWriter, r *http.Request) {
 	if value, found := cache[key]; found {
 		cacheLock.RUnlock()
 		// PoC: Just return the A record
-		w.Write([]byte(value))
+		w.WriteHeader(http.StatusOK)
+		jsonResponse, _ := json.Marshal(map[string]string{key: value})
+		w.Write(jsonResponse)
 		return
 	}
 	cacheLock.RUnlock()
 
 	// Fetch from DHT
-	dhtKey := "/freedomnames/" + key
+	dhtKey := "/fn/" + key
 	valueBytes, err := kadDHT.GetValue(ctx, dhtKey)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to retrieve value from DHT: %v", err), http.StatusInternalServerError)
@@ -203,7 +218,7 @@ func lookupHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Key found, return JSON response
 	w.WriteHeader(http.StatusOK)
-	jsonResponse, _ := json.Marshal(map[string]string{"key": key, "value": value})
+	jsonResponse, _ := json.Marshal(map[string]string{key: value})
 	w.Write(jsonResponse)
 }
 
