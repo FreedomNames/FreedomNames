@@ -2,16 +2,19 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 
 	libp2p "github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	record "github.com/libp2p/go-libp2p-record"
+	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
@@ -21,6 +24,7 @@ import (
 // Global variables
 var (
 	serviceName = "FreedomNames/1.0.0"
+	keyFile     = "private.key"
 	cache       = make(map[string]string)
 	cacheLock   sync.RWMutex
 
@@ -35,29 +39,46 @@ func main() {
 
 	var err error
 
-	// priv, _, err := crypto.GenerateKeyPairWithReader(crypto.RSA, 2048, r)
-	// if err != nil {
-	// 	return nil, err
-	// }
+	// Generate a new private key or load it from a file
+	privKey, err := loadOrGenerateKey()
+	if err != nil {
+		fmt.Println("Failed to load key:", err)
+		return
+	}
 
-	// Create a new libp2p host with default options
-	p2pHost, err = libp2p.New(
+	// Common options
+	opts := []libp2p.Option{
 		libp2p.NATPortMap(),
 		libp2p.UserAgent(serviceName),
-		// TODO: Create a local private key once and use it: libp2p.Identity(priveKey),
-		// Security options:
+		libp2p.Identity(privKey),
 		libp2p.Security(noise.ID, noise.New),
 		libp2p.Ping(false),
-	)
+	}
+
+	// In case of the bootstrap node, we need to listen on a specific port
+	if len(os.Args) > 1 && os.Args[1] == "bootstrap" {
+		log.Println("Starting bootstrap node!")
+		opts = append(opts, []libp2p.Option{
+			libp2p.ListenAddrStrings(
+				"/ip4/0.0.0.0/tcp/4020",
+				"/ip4/0.0.0.0/udp/4020/quic-v1",
+				"/ip4/0.0.0.0/udp/4021/quic-v1/webtransport",
+				"/ip4/0.0.0.0/udp/4022/webrtc-direct",
+			),
+		}...)
+	}
+
+	p2pHost, err = libp2p.New(opts...)
 	if err != nil {
 		log.Fatalf("Failed to create libp2p host: %v", err)
 	}
-	log.Printf("Libp2p host created. ID: %s", p2pHost.ID().String()) // Fixed .Pretty() issue
+	log.Printf("Peer ID: %s", p2pHost.ID().String())
 
 	// Define a list of bootstrap peers.
 	bootstrapPeers := []string{
-		"/ip4/104.131.131.82/tcp/4001/p2p/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ",
-		"/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN",
+		"/ip4/192.168.1.204/tcp/4020/p2p/12D3KooWKsFK44rGGDuemE9cw8mkcHLM1k7x3uNDjAz3Ts29D8GZ",
+		//"/ip4/104.131.131.82/tcp/4001/p2p/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ",
+		//"/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN",
 	}
 	bootstrapInfos := BootstrapPeerInfos(bootstrapPeers)
 
@@ -65,6 +86,7 @@ func main() {
 	kadDHT, err = dht.New(
 		ctx,
 		p2pHost,
+		//dht.Mode(dht.ModeServer),
 		dht.BucketSize(30),
 		dht.ProtocolPrefix("/freedomnames"),
 		dht.Validator(record.NamespacedValidator{
@@ -114,6 +136,33 @@ func BootstrapPeerInfos(addrs []string) []peer.AddrInfo {
 		infos = append(infos, *info)
 	}
 	return infos
+}
+
+func loadOrGenerateKey() (crypto.PrivKey, error) {
+	// Check if key file exists
+	if _, err := os.Stat(keyFile); err == nil {
+		// Load key from file
+		keyData, err := os.ReadFile(keyFile)
+		if err != nil {
+			return nil, err
+		}
+		return crypto.UnmarshalPrivateKey(keyData)
+	}
+
+	// Generate a new private key
+	priv, _, err := crypto.GenerateKeyPairWithReader(crypto.Ed25519, -1, rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+
+	// Save the key to file
+	keyData, err := crypto.MarshalPrivateKey(priv)
+	if err != nil {
+		return nil, err
+	}
+	os.WriteFile(keyFile, keyData, 0600) // Store securely
+
+	return priv, nil
 }
 
 // addHandler stores a domain mapping
@@ -229,20 +278,29 @@ func allPeersHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get the routing table
 	rtb := kadDHT.RoutingTable()
 	if rtb == nil {
 		http.Error(w, "Routing table is nil", http.StatusInternalServerError)
 		return
 	}
 
-	peers := rtb.ListPeers() // Get all peers from the routing table
+	// Get all peers from the routing table
+	peers := rtb.ListPeers()
 	peerList := make([]string, len(peers))
 
 	for i, p := range peers {
-		peerList[i] = p.String() // Convert peer.ID to string
+		peerList[i] = p.String()
 	}
 
-	jsonResponse, err := json.Marshal(peerList)
+	// Get list of connected hosts
+	connectedHosts := p2pHost.Network().Peers()
+	hostList := make([]string, len(connectedHosts))
+	for i, host := range connectedHosts {
+		hostList[i] = host.String()
+	}
+
+	jsonResponse, err := json.Marshal(map[string][]string{"peers": peerList, "hosts": hostList})
 	if err != nil {
 		http.Error(w, "Failed to encode peer list", http.StatusInternalServerError)
 		return

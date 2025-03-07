@@ -20,6 +20,9 @@
 # Build temp dir
 tmp
 
+# Private key :)
+private.key
+
 # Go workspace file
 go.work
 go.work.sum

@@ -4,14 +4,15 @@ Decentralized DNS (Domain Name System) using DHT, written in Golang.
 
 ## Usage
 
-Just run:
+To run a node, just run:
 
 ```sh
 go run .
 ```
 
+## Troubleshooting
 
-Increase kernel limit receive buffers to avoid warnings:
+To avoid warnings for the Quic protocol, increase kernel limit receive buffers:
 
 ```sh
 sudo sysctl -w net.core.rmem_max=7500000
@@ -27,8 +28,16 @@ net.core.wmem_max=7500000
 
 ## Development
 
-Install air and run:
+Install [air](https://github.com/air-verse/air) and run (`air` will automatically recompile code on file changes):
 
 ```sh
 air
+```
+
+----
+
+Run a **bootstrap** node:
+
+```sh
+go run . bootstrap
 ```
