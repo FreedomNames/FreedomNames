@@ -13,17 +13,18 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
 // Global variables
 var (
-	cache     = make(map[string]string)
-	cacheLock sync.RWMutex
+	serviceName = "FreedomNames/1.0.0"
+	cache       = make(map[string]string)
+	cacheLock   sync.RWMutex
 
 	p2pHost host.Host
 	kadDHT  *dht.IpfsDHT
-	ctx     context.Context
 )
 
 func main() {
@@ -33,8 +34,20 @@ func main() {
 
 	var err error
 
+	// priv, _, err := crypto.GenerateKeyPairWithReader(crypto.RSA, 2048, r)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
 	// Create a new libp2p host with default options
-	p2pHost, err = libp2p.New()
+	p2pHost, err = libp2p.New(
+		libp2p.NATPortMap(),
+		libp2p.UserAgent(serviceName),
+		// TODO: Create a local private key once and use it: libp2p.Identity(priveKey),
+		// Security options:
+		libp2p.Security(noise.ID, noise.New),
+		libp2p.Ping(false),
+	)
 	if err != nil {
 		log.Fatalf("Failed to create libp2p host: %v", err)
 	}
