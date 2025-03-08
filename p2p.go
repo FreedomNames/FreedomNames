@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"crypto/rand"
-	"fmt"
 	"log"
 	"os"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/p2p/discovery/mdns"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	ma "github.com/multiformats/go-multiaddr"
 )
@@ -23,6 +23,22 @@ var (
 	kadDHT  *dht.IpfsDHT
 	// dualkadDHT *dual.DHT
 )
+
+// mDNSNotifee implements the mdns.Notifee interface.
+type mDNSNotifee struct {
+	host host.Host
+}
+
+// HandlePeerFound is called when a new peer is found via mDNS.
+func (n *mDNSNotifee) HandlePeerFound(pi peer.AddrInfo) {
+	log.Printf("mDNS discovered peer: %s", pi.ID.String())
+	// Attempt to connect to the discovered peer.
+	if err := n.host.Connect(context.Background(), pi); err != nil {
+		log.Printf("Error connecting to peer %s: %v", pi.ID.String(), err)
+	} else {
+		log.Printf("Successfully connected to mDNS peer: %s", pi.ID.String())
+	}
+}
 
 func BootstrapDHT() {
 	serviceName := "FreedomNames/1.0.0"
@@ -36,8 +52,7 @@ func BootstrapDHT() {
 	// Generate a new private key or load it from a file
 	privKey, err := loadOrGenerateKey()
 	if err != nil {
-		fmt.Println("Failed to load key:", err)
-		return
+		panic(err)
 	}
 
 	// In case we want to setup a dual DHT!?
@@ -78,7 +93,7 @@ func BootstrapDHT() {
 
 	p2pHost, err = libp2p.New(opts...)
 	if err != nil {
-		log.Fatalf("Failed to create libp2p host: %v", err)
+		panic(err)
 	}
 
 	log.Printf("Peer ID: %s", p2pHost.ID().String())
@@ -88,11 +103,18 @@ func BootstrapDHT() {
 		log.Printf("  %s/p2p/%s", addr, p2pHost.ID().String())
 	}
 
+	// Set up mDNS discovery to find peers on the local network.
+	mdnsService := mdns.NewMdnsService(p2pHost, "localfreedomnames", &mDNSNotifee{host: p2pHost})
+	if err := mdnsService.Start(); err != nil {
+		panic(err)
+	} else {
+		log.Println("mDNS service started")
+	}
+
 	// Define a list of bootstrap peers.
 	bootstrapPeers := []string{
 		"/ip4/192.168.1.204/tcp/4020/p2p/12D3KooWKsFK44rGGDuemE9cw8mkcHLM1k7x3uNDjAz3Ts29D8GZ",
-		//"/ip4/104.131.131.82/tcp/4001/p2p/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ",
-		//"/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN",
+		// "/dnsaddr/domain.name/p2p/aaaa"
 	}
 	bootstrapInfos := BootstrapPeerInfos(bootstrapPeers)
 
@@ -118,18 +140,14 @@ func BootstrapDHT() {
 	}
 
 	// Create a new Kademlia DHT instance using the host
-	kadDHT, err = dht.New(
-		ctx,
-		p2pHost,
-		dhtOpts...,
-	)
+	kadDHT, err = dht.New(ctx, p2pHost, dhtOpts...)
 	if err != nil {
-		log.Fatalf("Failed to create DHT instance: %v", err)
+		panic(err)
 	}
 
 	// Bootstrap the DHT node
 	if err = kadDHT.Bootstrap(ctx); err != nil {
-		log.Fatalf("Failed to bootstrap DHT: %v", err)
+		panic(err)
 	}
 }
 
