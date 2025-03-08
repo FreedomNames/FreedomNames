@@ -80,7 +80,13 @@ func BootstrapDHT() {
 	if err != nil {
 		log.Fatalf("Failed to create libp2p host: %v", err)
 	}
+
 	log.Printf("Peer ID: %s", p2pHost.ID().String())
+	log.Printf("Connect to me on:")
+	hostAddrs := p2pHost.Addrs()
+	for _, addr := range hostAddrs {
+		log.Printf("  %s/p2p/%s", addr, p2pHost.ID().String())
+	}
 
 	// Define a list of bootstrap peers.
 	bootstrapPeers := []string{
