@@ -121,6 +121,7 @@ func BootstrapDHT() {
 		dht.BucketSize(10),
 		dht.ProtocolPrefix("/freedomnames"),
 		dht.Concurrency(15),
+		dht.EnableOptimisticProvide(), // Enable experimental optimistic provide, which will store the provider record that has a even closer peer.
 		dht.Resiliency(2),
 		dht.Validator(record.NamespacedValidator{
 			"fn": FreedomNameValidator{},
