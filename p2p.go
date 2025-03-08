@@ -21,6 +21,7 @@ import (
 var (
 	p2pHost host.Host
 	kadDHT  *dht.IpfsDHT
+	// dualkadDHT *dual.DHT
 )
 
 func BootstrapDHT() {
@@ -39,8 +40,22 @@ func BootstrapDHT() {
 		return
 	}
 
+	// In case we want to setup a dual DHT!?
+	// routing := libp2p.Routing(func(host host.Host) (routing.PeerRouting, error) {
+	// 	dhtOpts := dual.DHTOption(
+	// 		dht.Mode(dht.ModeServer),
+	// 		dht.Concurrency(10),
+	// 		dht.ProtocolPrefix("/freedomnames"),
+	// 	)
+
+	// 	var err error
+	// 	dualkadDHT, err = dual.New(ctx, host, dhtOpts)
+	// 	return dualkadDHT, err
+	// })
+
 	// Common options
 	opts := []libp2p.Option{
+		// routing,
 		libp2p.NATPortMap(),
 		libp2p.UserAgent(serviceName),
 		libp2p.Identity(privKey),
