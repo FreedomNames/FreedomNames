@@ -16,6 +16,7 @@ type Response struct {
 	PeerID          string   `json:"peerID"`
 	ListenAddresses []string `json:"listenAddresses"`
 	Peers           []string `json:"peers"`
+	NetworkSize     int32    `json:"networkSize"`
 }
 
 func StartHTTPServer(cache Cache) {
@@ -218,6 +219,10 @@ func InfoHandler(w http.ResponseWriter, r *http.Request) {
 	for i, listenAddr := range hostListenAddrs {
 		listenAddrList[i] = listenAddr.String()
 	}
+	networkSize, err := kadDHT.NetworkSize()
+	if err != nil {
+		networkSize = 0
+	}
 
 	// Get the routing table
 	rtb := kadDHT.RoutingTable()
@@ -238,6 +243,7 @@ func InfoHandler(w http.ResponseWriter, r *http.Request) {
 		PeerID:          peerID,
 		ListenAddresses: listenAddrList,
 		Peers:           infoList,
+		NetworkSize:     networkSize,
 	}
 	jsonResponse, err := json.Marshal(response)
 	if err != nil {
