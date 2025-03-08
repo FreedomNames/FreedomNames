@@ -77,8 +77,10 @@ func BootstrapDHT() {
 
 	// DHT options
 	dhtOpts := []dht.Option{
-		dht.BucketSize(30),
+		dht.BucketSize(10),
 		dht.ProtocolPrefix("/freedomnames"),
+		dht.Concurrency(15),
+		dht.Resiliency(2),
 		dht.Validator(record.NamespacedValidator{
 			"fn": FreedomNameValidator{},
 		}),
