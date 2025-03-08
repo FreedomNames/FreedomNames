@@ -75,17 +75,30 @@ func BootstrapDHT() {
 	}
 	bootstrapInfos := BootstrapPeerInfos(bootstrapPeers)
 
-	// Create a new Kademlia DHT instance using the host
-	kadDHT, err = dht.New(
-		ctx,
-		p2pHost,
-		//dht.Mode(dht.ModeServer),
+	// DHT options
+	dhtOpts := []dht.Option{
 		dht.BucketSize(30),
 		dht.ProtocolPrefix("/freedomnames"),
 		dht.Validator(record.NamespacedValidator{
 			"fn": FreedomNameValidator{},
 		}),
-		dht.BootstrapPeers(bootstrapInfos...),
+	}
+
+	// If in bootstrap mode become server and do not bootstrap
+	if len(os.Args) > 1 && os.Args[1] == "bootstrap" {
+		// Start the DHT in server mode
+		dhtOpts = append(dhtOpts, dht.Mode(dht.ModeServer))
+	} else {
+		// Start the DHT in client mode we will use bootstrap peers.
+		// And use the default Auto DHT mode.
+		dhtOpts = append(dhtOpts, dht.BootstrapPeers(bootstrapInfos...))
+	}
+
+	// Create a new Kademlia DHT instance using the host
+	kadDHT, err = dht.New(
+		ctx,
+		p2pHost,
+		dhtOpts...,
 	)
 	if err != nil {
 		log.Fatalf("Failed to create DHT instance: %v", err)
