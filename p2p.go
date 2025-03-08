@@ -31,12 +31,10 @@ type mDNSNotifee struct {
 
 // HandlePeerFound is called when a new peer is found via mDNS.
 func (n *mDNSNotifee) HandlePeerFound(pi peer.AddrInfo) {
-	log.Printf("mDNS discovered peer: %s", pi.ID.String())
+	//log.Printf("mDNS discovered peer: %s", pi.ID.String())
 	// Attempt to connect to the discovered peer.
 	if err := n.host.Connect(context.Background(), pi); err != nil {
 		log.Printf("Error connecting to peer %s: %v", pi.ID.String(), err)
-	} else {
-		log.Printf("Successfully connected to mDNS peer: %s", pi.ID.String())
 	}
 }
 
