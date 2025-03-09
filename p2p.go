@@ -93,6 +93,8 @@ func BootstrapDHT() {
 	if err != nil {
 		panic(err)
 	}
+	// TODO: Implement a nice way to close the connection (we can't do it like this below, it will just close right away)
+	// defer p2pHost.Close()
 
 	log.Printf("Peer ID: %s", p2pHost.ID().String())
 	log.Printf("Connect to me on:")
@@ -108,6 +110,8 @@ func BootstrapDHT() {
 	} else {
 		log.Println("mDNS service started")
 	}
+	// TODO: Implement a nice way to close the service (we can't do it like this below, it will just close right away)
+	// defer mdnsService.Close()
 
 	// Define a list of bootstrap peers.
 	bootstrapPeers := []string{
