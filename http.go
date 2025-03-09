@@ -146,10 +146,12 @@ func LookupHandler(freedomDht FreedomDHT, cache Cache) http.HandlerFunc {
 		}
 		value := string(valueBytes)
 
+		log.Println("Value:", value)
+
 		w.Header().Set("Content-Type", "application/json")
 
 		// Key not found, return a 404 JSON response
-		if value != "" {
+		if value == "" {
 			// http error no response found
 			http.Error(w, "Key not found", http.StatusNotFound)
 			return

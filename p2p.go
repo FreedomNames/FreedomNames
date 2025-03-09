@@ -101,6 +101,7 @@ func NewDHT() *FreedomName {
 				"/ip4/0.0.0.0/udp/4021/quic-v1/webtransport",
 				"/ip4/0.0.0.0/udp/4022/webrtc-direct",
 			),
+			libp2p.ForceReachabilityPublic(), // Ignore auto detection NAT, assuming you are opening your ports in your router/firewall.
 		}...)
 	}
 
