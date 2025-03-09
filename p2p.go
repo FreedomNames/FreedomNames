@@ -3,26 +3,40 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"log"
 	"os"
 
 	libp2p "github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	kbucket "github.com/libp2p/go-libp2p-kbucket"
 	record "github.com/libp2p/go-libp2p-record"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/discovery/mdns"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
-	ma "github.com/multiformats/go-multiaddr"
+	"github.com/multiformats/go-multiaddr"
 )
 
-// Global variables
-var (
-	p2pHost host.Host
-	kadDHT  *dht.IpfsDHT
+type FreedomDHT interface {
+	IsInitialized() bool
+	ShutdownDHT()
+	PutValue(key string, value []byte) error
+	GetValue(key string) ([]byte, error)
+	GetMode() string
+	GetPeerInfos() []kbucket.PeerInfo
+	GetRoutingPeers() []peer.ID
+	GetNetworkPeers() []peer.ID
+	GetPeerID() string
+	GetListenAddresses() []multiaddr.Multiaddr
+	GetNetworkSize() (int32, error)
+}
+
+type FreedomName struct {
+	kadDHT *dht.IpfsDHT
 	// dualkadDHT *dual.DHT
-)
+}
 
 // mDNSNotifee implements the mdns.Notifee interface.
 type mDNSNotifee struct {
@@ -38,7 +52,8 @@ func (n *mDNSNotifee) HandlePeerFound(pi peer.AddrInfo) {
 	}
 }
 
-func BootstrapDHT() {
+func NewDHT() *FreedomName {
+	freedomName := new(FreedomName)
 	serviceName := "FreedomNames/1.0.0"
 
 	// Create a cancellable context
@@ -89,12 +104,10 @@ func BootstrapDHT() {
 		}...)
 	}
 
-	p2pHost, err = libp2p.New(opts...)
+	p2pHost, err := libp2p.New(opts...)
 	if err != nil {
 		panic(err)
 	}
-	// TODO: Implement a nice way to close the connection (we can't do it like this below, it will just close right away)
-	// defer p2pHost.Close()
 
 	log.Printf("Peer ID: %s", p2pHost.ID().String())
 	log.Printf("Connect to me on:")
@@ -110,8 +123,6 @@ func BootstrapDHT() {
 	} else {
 		log.Println("mDNS service started")
 	}
-	// TODO: Implement a nice way to close the service (we can't do it like this below, it will just close right away)
-	// defer mdnsService.Close()
 
 	// Define a list of bootstrap peers.
 	bootstrapPeers := []string{
@@ -143,21 +154,137 @@ func BootstrapDHT() {
 	}
 
 	// Create a new Kademlia DHT instance using the host
-	kadDHT, err = dht.New(ctx, p2pHost, dhtOpts...)
+	freedomName.kadDHT, err = dht.New(ctx, p2pHost, dhtOpts...)
 	if err != nil {
 		panic(err)
 	}
 
 	// Bootstrap the DHT node
-	if err = kadDHT.Bootstrap(ctx); err != nil {
+	if err = freedomName.kadDHT.Bootstrap(ctx); err != nil {
 		panic(err)
 	}
+	return freedomName
 }
+
+// Check if DHT & host are initialized, true if both are initialized
+func (freedomName *FreedomName) IsInitialized() bool {
+	return freedomName.kadDHT != nil && freedomName.kadDHT.Host() != nil
+}
+
+// ShutdownDHT shuts down the host and the DHT
+func (freedomName *FreedomName) ShutdownDHT() {
+	// Close the host
+	if host := freedomName.kadDHT.Host(); host != nil {
+		host.Close()
+	}
+
+	if freedomName.kadDHT != nil {
+		// Close the DHT
+		if err := freedomName.kadDHT.Close(); err != nil {
+			log.Printf("Error closing DHT: %v", err)
+		}
+	}
+}
+
+// Get mode
+func (freedomName *FreedomName) GetMode() string {
+	if freedomName.kadDHT != nil {
+		modeStr := "Unknown"
+		switch freedomName.kadDHT.Mode() {
+		case dht.ModeAuto:
+			modeStr = "Auto"
+		case dht.ModeClient:
+			modeStr = "Client"
+		case dht.ModeServer:
+			modeStr = "Server"
+		case dht.ModeAutoServer:
+			modeStr = "AutoServer"
+		default:
+			modeStr = "Unknown"
+		}
+		return modeStr
+	}
+	return "Not initialized"
+}
+
+// Get routing peer infos
+func (freedomName *FreedomName) GetPeerInfos() []kbucket.PeerInfo {
+	if freedomName.kadDHT != nil {
+		return freedomName.kadDHT.RoutingTable().GetPeerInfos()
+	}
+	return nil
+}
+
+// Get all routing peers
+func (freedomName *FreedomName) GetRoutingPeers() []peer.ID {
+	if freedomName.kadDHT != nil {
+		return freedomName.kadDHT.RoutingTable().ListPeers()
+	}
+	return nil
+}
+
+// Get all network peers
+func (freedomName *FreedomName) GetNetworkPeers() []peer.ID {
+	if freedomName.kadDHT != nil {
+		return freedomName.kadDHT.Host().Network().Peers()
+	}
+	return nil
+}
+
+// PutValue add value to DHT
+func (freedomName *FreedomName) PutValue(key string, value []byte) error {
+	if freedomName.kadDHT != nil {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		return freedomName.kadDHT.PutValue(ctx, key, value)
+	}
+	return errors.New("DHT not initialized")
+}
+
+// GetValue get value from DHT
+func (freedomName *FreedomName) GetValue(key string) ([]byte, error) {
+	if freedomName.kadDHT != nil {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		return freedomName.kadDHT.GetValue(ctx, key)
+	}
+	return nil, errors.New("DHT not initialized")
+}
+
+// Get peer ID
+func (freedomName *FreedomName) GetPeerID() string {
+	if freedomName.kadDHT != nil {
+		return freedomName.kadDHT.PeerID().String()
+	}
+	return ""
+}
+
+// Get all listen addresses
+func (freedomName *FreedomName) GetListenAddresses() []multiaddr.Multiaddr {
+	if freedomName.kadDHT != nil {
+		return freedomName.kadDHT.Host().Network().ListenAddresses()
+	}
+	return nil
+}
+
+// Get approximate size of the DHT
+func (freedomName *FreedomName) GetNetworkSize() (int32, error) {
+	if freedomName.kadDHT != nil {
+		return freedomName.kadDHT.NetworkSize()
+	}
+	return 0, errors.New("DHT not initialized")
+}
+
+// -----------------------------------------------------------
+// Private functions
+// -----------------------------------------------------------
 
 func BootstrapPeerInfos(addrs []string) []peer.AddrInfo {
 	var infos []peer.AddrInfo
 	for _, s := range addrs {
-		maddr, err := ma.NewMultiaddr(s)
+		maddr, err := multiaddr.NewMultiaddr(s)
 		if err != nil {
 			log.Printf("error parsing multiaddr %s: %v", s, err)
 			continue

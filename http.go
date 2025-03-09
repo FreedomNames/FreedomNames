@@ -1,14 +1,11 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
-
-	dht "github.com/libp2p/go-libp2p-kad-dht"
 )
 
 type Response struct {
@@ -19,12 +16,12 @@ type Response struct {
 	NetworkSize     int32    `json:"networkSize"`
 }
 
-func StartHTTPServer(cache Cache) {
+func StartHTTPServer(freedomDht FreedomDHT, cache Cache) {
 	// Set up HTTP API endpoints
-	http.HandleFunc("/add", AddHandler(cache))
-	http.HandleFunc("/lookup", LookupHandler(cache))
-	http.HandleFunc("/peers", AllPeersHandler)
-	http.HandleFunc("/info", InfoHandler)
+	http.HandleFunc("/add", AddHandler(freedomDht, cache))
+	http.HandleFunc("/lookup", LookupHandler(freedomDht, cache))
+	http.HandleFunc("/peers", AllPeersHandler(freedomDht))
+	http.HandleFunc("/info", InfoHandler(freedomDht))
 
 	// Run the HTTP server
 	go func() {
@@ -39,9 +36,9 @@ func StartHTTPServer(cache Cache) {
 }
 
 // AddHandler stores a domain mapping
-func AddHandler(cache Cache) http.HandlerFunc {
+func AddHandler(freedomDht FreedomDHT, cache Cache) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if kadDHT == nil {
+		if !freedomDht.IsInitialized() {
 			http.Error(w, "DHT not initialized", http.StatusInternalServerError)
 			return
 		}
@@ -50,9 +47,6 @@ func AddHandler(cache Cache) http.HandlerFunc {
 			http.Error(w, "Only POST allowed", http.StatusMethodNotAllowed)
 			return
 		}
-
-		ctx, cancel := context.WithCancel(r.Context())
-		defer cancel()
 
 		// TODO: Add TTL
 		// Valid request body (JSON):
@@ -83,7 +77,7 @@ func AddHandler(cache Cache) http.HandlerFunc {
 				// Store in DHT
 				dhtKey := "/fn/" + key
 				log.Println("Store key:", dhtKey)
-				if err := kadDHT.PutValue(ctx, dhtKey, []byte(value)); err != nil {
+				if err := freedomDht.PutValue(dhtKey, []byte(value)); err != nil {
 					http.Error(w, fmt.Sprintf("Failed to store value in DHT: %v", err), http.StatusInternalServerError)
 					return
 				}
@@ -96,9 +90,9 @@ func AddHandler(cache Cache) http.HandlerFunc {
 }
 
 // LookupHandler retrieves the value from the local cache or DHT
-func LookupHandler(cache Cache) http.HandlerFunc {
+func LookupHandler(freedomDht FreedomDHT, cache Cache) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if kadDHT == nil {
+		if !freedomDht.IsInitialized() {
 			http.Error(w, "DHT not initialized", http.StatusInternalServerError)
 			return
 		}
@@ -108,9 +102,6 @@ func LookupHandler(cache Cache) http.HandlerFunc {
 			http.Error(w, "Missing key parameter", http.StatusBadRequest)
 			return
 		}
-
-		ctx, cancel := context.WithCancel(r.Context())
-		defer cancel()
 
 		log.Println("Check for key:", key)
 
@@ -125,7 +116,7 @@ func LookupHandler(cache Cache) http.HandlerFunc {
 
 		// Fetch from DHT
 		dhtKey := "/fn/" + key
-		valueBytes, err := kadDHT.GetValue(ctx, dhtKey)
+		valueBytes, err := freedomDht.GetValue(dhtKey)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Failed to retrieve value from DHT: %v", err), http.StatusInternalServerError)
 			return
@@ -152,105 +143,81 @@ func LookupHandler(cache Cache) http.HandlerFunc {
 }
 
 // AllPeersHandler retrieves a list of connected peers from the DHT routing table
-func AllPeersHandler(w http.ResponseWriter, r *http.Request) {
-	if kadDHT == nil {
-		http.Error(w, "DHT not initialized", http.StatusInternalServerError)
-		return
+func AllPeersHandler(freedomDht FreedomDHT) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !freedomDht.IsInitialized() {
+			http.Error(w, "DHT not initialized", http.StatusInternalServerError)
+			return
+		}
+
+		// Get all peers from the routing table
+		peers := freedomDht.GetRoutingPeers()
+		peerList := make([]string, len(peers))
+
+		for i, p := range peers {
+			peerList[i] = p.String()
+		}
+
+		// Get list of connected hosts
+		connectedHosts := freedomDht.GetNetworkPeers()
+		hostList := make([]string, len(connectedHosts))
+		for i, host := range connectedHosts {
+			hostList[i] = host.String()
+		}
+
+		jsonResponse, err := json.Marshal(map[string][]string{"peers": peerList, "hosts": hostList})
+		if err != nil {
+			http.Error(w, "Failed to encode peer list", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(jsonResponse)
 	}
-
-	// Get the routing table
-	rtb := kadDHT.RoutingTable()
-	if rtb == nil {
-		http.Error(w, "Routing table is nil", http.StatusInternalServerError)
-		return
-	}
-
-	// Get all peers from the routing table
-	peers := rtb.ListPeers()
-	peerList := make([]string, len(peers))
-
-	for i, p := range peers {
-		peerList[i] = p.String()
-	}
-
-	// Get list of connected hosts
-	connectedHosts := p2pHost.Network().Peers()
-	hostList := make([]string, len(connectedHosts))
-	for i, host := range connectedHosts {
-		hostList[i] = host.String()
-	}
-
-	jsonResponse, err := json.Marshal(map[string][]string{"peers": peerList, "hosts": hostList})
-	if err != nil {
-		http.Error(w, "Failed to encode peer list", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(jsonResponse)
 }
 
 // InfoHandler returns general information about the DHT
-func InfoHandler(w http.ResponseWriter, r *http.Request) {
-	if kadDHT == nil {
-		http.Error(w, "DHT not initialized", http.StatusInternalServerError)
-		return
-	}
+func InfoHandler(freedomDht FreedomDHT) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !freedomDht.IsInitialized() {
+			http.Error(w, "DHT not initialized", http.StatusInternalServerError)
+			return
+		}
 
-	// DHT
-	mode := kadDHT.Mode()
-	modeStr := "Unknown"
-	switch mode {
-	case dht.ModeAuto:
-		modeStr = "Auto"
-	case dht.ModeClient:
-		modeStr = "Client"
-	case dht.ModeServer:
-		modeStr = "Server"
-	case dht.ModeAutoServer:
-		modeStr = "AutoServer"
-	default:
-		modeStr = "Unknown"
-	}
+		// DHT
+		mode := freedomDht.GetMode()
+		peerID := freedomDht.GetPeerID()
+		hostListenAddrs := freedomDht.GetListenAddresses()
+		listenAddrList := make([]string, len(hostListenAddrs))
+		for i, listenAddr := range hostListenAddrs {
+			listenAddrList[i] = listenAddr.String()
+		}
+		networkSize, err := freedomDht.GetNetworkSize()
+		if err != nil {
+			networkSize = 0
+		}
 
-	peerID := kadDHT.PeerID().String()
-	hostListenAddrs := kadDHT.Host().Addrs()
-	listenAddrList := make([]string, len(hostListenAddrs))
-	for i, listenAddr := range hostListenAddrs {
-		listenAddrList[i] = listenAddr.String()
-	}
-	networkSize, err := kadDHT.NetworkSize()
-	if err != nil {
-		networkSize = 0
-	}
+		// Peer info
+		peerInfos := freedomDht.GetPeerInfos()
+		infoList := make([]string, len(peerInfos))
+		for i, p := range peerInfos {
+			infoList[i] = p.Id.String()
+		}
 
-	// Get the routing table
-	rtb := kadDHT.RoutingTable()
-	if rtb == nil {
-		http.Error(w, "Routing table is nil", http.StatusInternalServerError)
-		return
-	}
+		response := Response{
+			Mode:            mode,
+			PeerID:          peerID,
+			ListenAddresses: listenAddrList,
+			Peers:           infoList,
+			NetworkSize:     networkSize,
+		}
+		jsonResponse, err := json.Marshal(response)
+		if err != nil {
+			http.Error(w, "Failed to encode peer list", http.StatusInternalServerError)
+			return
+		}
 
-	// Peer info
-	peerInfos := rtb.GetPeerInfos()
-	infoList := make([]string, len(peerInfos))
-	for i, p := range peerInfos {
-		infoList[i] = p.Id.String()
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(jsonResponse)
 	}
-
-	response := Response{
-		Mode:            modeStr,
-		PeerID:          peerID,
-		ListenAddresses: listenAddrList,
-		Peers:           infoList,
-		NetworkSize:     networkSize,
-	}
-	jsonResponse, err := json.Marshal(response)
-	if err != nil {
-		http.Error(w, "Failed to encode peer list", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(jsonResponse)
 }

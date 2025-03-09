@@ -1,7 +1,9 @@
 package main
 
 func main() {
-	BootstrapDHT()
+	freedomDht := NewDHT()
+	defer freedomDht.ShutdownDHT()
+
 	cache := NewMemoryCache()
-	StartHTTPServer(cache)
+	StartHTTPServer(freedomDht, cache)
 }
