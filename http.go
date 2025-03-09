@@ -1,11 +1,15 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"sync"
 )
 
 type Response struct {
@@ -22,17 +26,36 @@ func StartHTTPServer(freedomDht FreedomDHT, cache Cache) {
 	http.HandleFunc("/lookup", LookupHandler(freedomDht, cache))
 	http.HandleFunc("/peers", AllPeersHandler(freedomDht))
 	http.HandleFunc("/info", InfoHandler(freedomDht))
+	server := &http.Server{Addr: ":8080", Handler: nil}
 
-	// Run the HTTP server
+	var wg sync.WaitGroup
+	wg.Add(1)
+
 	go func() {
-		log.Println("HTTP API server listening on :8080")
-		if err := http.ListenAndServe(":8080", nil); err != nil {
-			log.Fatalf("HTTP server error: %v", err)
+		// Creating a channel to listen for signals, like SIGINT
+		stop := make(chan os.Signal, 1)
+		// Subscribing to interruption signals
+		signal.Notify(stop, os.Interrupt)
+		// Blocks until the signal is received
+		<-stop
+		err := server.Shutdown(context.Background())
+		if err != nil {
+			log.Printf("Error during shutdown: %v\n", err)
 		}
+		// Notifying the main goroutine that we are done
+		wg.Done()
 	}()
 
-	// Keep the program running
-	select {}
+	log.Println("HTTP API server listening on :8080")
+	// Blocking until the server is done
+	err := server.ListenAndServe()
+	if err == http.ErrServerClosed {
+		// Graceful shutdown the HTTP server
+		wg.Wait()
+		//log.Println("Server was gracefully shut down.")
+	} else if err != nil {
+		log.Fatalf("HTTP server error: %v", err)
+	}
 }
 
 // AddHandler stores a domain mapping

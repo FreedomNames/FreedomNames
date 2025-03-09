@@ -21,7 +21,7 @@ import (
 
 type FreedomDHT interface {
 	IsInitialized() bool
-	ShutdownDHT()
+	Shutdown()
 	PutValue(key string, value []byte) error
 	GetValue(key string) ([]byte, error)
 	GetMode() string
@@ -171,8 +171,8 @@ func (freedomName *FreedomName) IsInitialized() bool {
 	return freedomName.kadDHT != nil && freedomName.kadDHT.Host() != nil
 }
 
-// ShutdownDHT shuts down the host and the DHT
-func (freedomName *FreedomName) ShutdownDHT() {
+// Shutdown shuts down the host and the DHT
+func (freedomName *FreedomName) Shutdown() {
 	// Close the host
 	if host := freedomName.kadDHT.Host(); host != nil {
 		host.Close()
