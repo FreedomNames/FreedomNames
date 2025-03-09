@@ -264,7 +264,7 @@ func (freedomName *FreedomName) GetPeerID() string {
 // Get all listen addresses
 func (freedomName *FreedomName) GetListenAddresses() []multiaddr.Multiaddr {
 	if freedomName.kadDHT != nil {
-		return freedomName.kadDHT.Host().Network().ListenAddresses()
+		return freedomName.kadDHT.Host().Addrs()
 	}
 	return nil
 }
