@@ -1,7 +1,12 @@
 package main
 
+import "context"
+
 func main() {
-	freedomDht := NewDHT()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	freedomDht := NewNode(ctx)
 	defer freedomDht.Shutdown()
 
 	cache := NewMemoryCache()

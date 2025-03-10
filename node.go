@@ -13,6 +13,7 @@ import (
 	record "github.com/libp2p/go-libp2p-record"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/metrics"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/discovery/mdns"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
@@ -33,8 +34,19 @@ type FreedomDHT interface {
 	GetNetworkSize() (int32, error)
 }
 
-type FreedomName struct {
+type FreedomNameNode struct {
+	// DHT interface
 	kadDHT *dht.IpfsDHT
+
+	// Runtime context
+	ctx context.Context
+
+	// used to control all the different sub processes of the FreedomName Node
+	cancel context.CancelFunc
+
+	// Bandwidth counter
+	bandwidthCounter *metrics.BandwidthCounter
+
 	// dualkadDHT *dual.DHT
 }
 
@@ -52,16 +64,9 @@ func (n *mDNSNotifee) HandlePeerFound(pi peer.AddrInfo) {
 	}
 }
 
-func NewDHT() *FreedomName {
-	freedomName := new(FreedomName)
+// NewNode creates a new libp2p node with DHT and mDNS discovery
+func NewNode(ctx context.Context) *FreedomNameNode {
 	serviceName := "FreedomNames/1.0.0"
-
-	// Create a cancellable context
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	var err error
-
 	// Generate a new private key or load it from a file
 	privKey, err := loadOrGenerateKey()
 	if err != nil {
@@ -81,11 +86,16 @@ func NewDHT() *FreedomName {
 	// 	return dualkadDHT, err
 	// })
 
+	// Q: We could also create our own peer manager? I doubt whether we really need that.
+
+	bwctr := metrics.NewBandwidthCounter()
+
 	// Common options
 	opts := []libp2p.Option{
 		// routing,
 		libp2p.NATPortMap(),
 		libp2p.UserAgent(serviceName),
+		libp2p.BandwidthReporter(bwctr),
 		libp2p.Identity(privKey),
 		libp2p.Security(noise.ID, noise.New),
 		libp2p.Ping(false),
@@ -135,7 +145,7 @@ func NewDHT() *FreedomName {
 	// DHT options
 	dhtOpts := []dht.Option{
 		dht.BucketSize(10),
-		dht.ProtocolPrefix("/freedomnames"),
+		dht.ProtocolPrefix("/freedomnames/1.0.0"),
 		dht.Concurrency(15),
 		dht.EnableOptimisticProvide(), // Enable experimental optimistic provide, which will store the provider record that has a even closer peer.
 		dht.Resiliency(2),
@@ -155,25 +165,42 @@ func NewDHT() *FreedomName {
 	}
 
 	// Create a new Kademlia DHT instance using the host
-	freedomName.kadDHT, err = dht.New(ctx, p2pHost, dhtOpts...)
+	dht, err := dht.New(ctx, p2pHost, dhtOpts...)
 	if err != nil {
 		panic(err)
 	}
 
 	// Bootstrap the DHT node
-	if err = freedomName.kadDHT.Bootstrap(ctx); err != nil {
+	if err = dht.Bootstrap(ctx); err != nil {
 		panic(err)
 	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	freedomName := &FreedomNameNode{
+		ctx:              ctx,
+		cancel:           cancel,
+		kadDHT:           dht,
+		bandwidthCounter: bwctr,
+	}
+
+	// Start additional services now
+	go freedomName.eventLoop()
+	go freedomName.statsLoop()
+
 	return freedomName
 }
 
+// ------------------------------------------------------------
+// TODO: Move all the methods below to `stats.go` or something? Then we can also rename FreedomDHT interface to Stats or something.
+// ------------------------------------------------------------
+
 // Check if DHT & host are initialized, true if both are initialized
-func (freedomName *FreedomName) IsInitialized() bool {
+func (freedomName *FreedomNameNode) IsInitialized() bool {
 	return freedomName.kadDHT != nil && freedomName.kadDHT.Host() != nil
 }
 
 // Shutdown shuts down the host and the DHT
-func (freedomName *FreedomName) Shutdown() {
+func (freedomName *FreedomNameNode) Shutdown() {
 	// Close the host
 	if host := freedomName.kadDHT.Host(); host != nil {
 		host.Close()
@@ -188,7 +215,7 @@ func (freedomName *FreedomName) Shutdown() {
 }
 
 // Get mode
-func (freedomName *FreedomName) GetMode() string {
+func (freedomName *FreedomNameNode) GetMode() string {
 	if freedomName.kadDHT != nil {
 		modeStr := "Unknown"
 		switch freedomName.kadDHT.Mode() {
@@ -209,7 +236,7 @@ func (freedomName *FreedomName) GetMode() string {
 }
 
 // Get routing peer infos
-func (freedomName *FreedomName) GetPeerInfos() []kbucket.PeerInfo {
+func (freedomName *FreedomNameNode) GetPeerInfos() []kbucket.PeerInfo {
 	if freedomName.kadDHT != nil {
 		return freedomName.kadDHT.RoutingTable().GetPeerInfos()
 	}
@@ -217,7 +244,7 @@ func (freedomName *FreedomName) GetPeerInfos() []kbucket.PeerInfo {
 }
 
 // Get all routing peers
-func (freedomName *FreedomName) GetRoutingPeers() []peer.ID {
+func (freedomName *FreedomNameNode) GetRoutingPeers() []peer.ID {
 	if freedomName.kadDHT != nil {
 		return freedomName.kadDHT.RoutingTable().ListPeers()
 	}
@@ -225,7 +252,7 @@ func (freedomName *FreedomName) GetRoutingPeers() []peer.ID {
 }
 
 // Get all network peers
-func (freedomName *FreedomName) GetNetworkPeers() []peer.ID {
+func (freedomName *FreedomNameNode) GetNetworkPeers() []peer.ID {
 	if freedomName.kadDHT != nil {
 		return freedomName.kadDHT.Host().Network().Peers()
 	}
@@ -233,7 +260,7 @@ func (freedomName *FreedomName) GetNetworkPeers() []peer.ID {
 }
 
 // PutValue add value to DHT
-func (freedomName *FreedomName) PutValue(key string, value []byte) error {
+func (freedomName *FreedomNameNode) PutValue(key string, value []byte) error {
 	if freedomName.kadDHT != nil {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -244,7 +271,7 @@ func (freedomName *FreedomName) PutValue(key string, value []byte) error {
 }
 
 // GetValue get value from DHT
-func (freedomName *FreedomName) GetValue(key string) ([]byte, error) {
+func (freedomName *FreedomNameNode) GetValue(key string) ([]byte, error) {
 	if freedomName.kadDHT != nil {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -255,7 +282,7 @@ func (freedomName *FreedomName) GetValue(key string) ([]byte, error) {
 }
 
 // Get peer ID
-func (freedomName *FreedomName) GetPeerID() string {
+func (freedomName *FreedomNameNode) GetPeerID() string {
 	if freedomName.kadDHT != nil {
 		return freedomName.kadDHT.PeerID().String()
 	}
@@ -263,7 +290,7 @@ func (freedomName *FreedomName) GetPeerID() string {
 }
 
 // Get all listen addresses
-func (freedomName *FreedomName) GetListenAddresses() []multiaddr.Multiaddr {
+func (freedomName *FreedomNameNode) GetListenAddresses() []multiaddr.Multiaddr {
 	if freedomName.kadDHT != nil {
 		return freedomName.kadDHT.Host().Addrs()
 	}
@@ -271,7 +298,7 @@ func (freedomName *FreedomName) GetListenAddresses() []multiaddr.Multiaddr {
 }
 
 // Get approximate size of the DHT
-func (freedomName *FreedomName) GetNetworkSize() (int32, error) {
+func (freedomName *FreedomNameNode) GetNetworkSize() (int32, error) {
 	if freedomName.kadDHT != nil {
 		return freedomName.kadDHT.NetworkSize()
 	}
