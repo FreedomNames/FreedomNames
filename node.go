@@ -8,6 +8,7 @@ import (
 	"os"
 
 	libp2p "github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-core/network"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	kbucket "github.com/libp2p/go-libp2p-kbucket"
 	record "github.com/libp2p/go-libp2p-record"
@@ -59,10 +60,12 @@ type mDNSNotifee struct {
 
 // HandlePeerFound is called when a new peer is found via mDNS.
 func (n *mDNSNotifee) HandlePeerFound(pi peer.AddrInfo) {
-	//log.Printf("mDNS discovered peer: %s", pi.ID.String())
-	// Attempt to connect to the discovered peer.
-	if err := n.host.Connect(context.Background(), pi); err != nil {
-		log.Printf("Error connecting to peer %s: %v", pi.ID.String(), err)
+	// Check if the host is not yet connected
+	if n.host.Network().Connectedness(pi.ID) == network.NotConnected {
+		// Attempt to connect to the discovered peer
+		if err := n.host.Connect(context.Background(), pi); err != nil {
+			log.Printf("Error connecting to peer %s: %v", pi.ID.String(), err)
+		}
 	}
 }
 
