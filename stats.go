@@ -5,13 +5,6 @@ import (
 	"time"
 )
 
-// TODO: Merged with existing GetNetworkPeers()?
-func (freedomName *FreedomNameNode) connectionStats() int {
-	peers := freedomName.kadDHT.Host().Network().Peers()
-	numConnected := len(peers)
-	return numConnected
-}
-
 func (freedomName *FreedomNameNode) statsLoop() {
 	// Collect stats every 30 seconds
 	ticker := time.NewTicker(30 * time.Second)
@@ -19,8 +12,9 @@ func (freedomName *FreedomNameNode) statsLoop() {
 		select {
 		case <-ticker.C:
 			// Collect peer stats
-			peersConnected := freedomName.connectionStats()
-			log.Printf("Stats: Number of peers connected: %d", peersConnected)
+			hosts := freedomName.GetNetworkPeers()
+			peersConnected := len(hosts)
+			log.Printf("Stats: Number of host peers connected: %d", peersConnected)
 
 			// Collect bandwidth stats
 			bandwidth := freedomName.bandwidthCounter.GetBandwidthTotals()

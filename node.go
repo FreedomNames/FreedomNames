@@ -15,6 +15,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/metrics"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/p2p/discovery/mdns"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	"github.com/multiformats/go-multiaddr"
@@ -32,6 +33,7 @@ type FreedomDHT interface {
 	GetPeerID() string
 	GetListenAddresses() []multiaddr.Multiaddr
 	GetNetworkSize() (int32, error)
+	GetProtocols() []protocol.ID
 }
 
 type FreedomNameNode struct {
@@ -93,7 +95,7 @@ func NewNode(ctx context.Context) *FreedomNameNode {
 	// Common options
 	opts := []libp2p.Option{
 		// routing,
-		libp2p.NATPortMap(),
+		libp2p.NATPortMap(), // UPnP enabled
 		libp2p.UserAgent(serviceName),
 		libp2p.BandwidthReporter(bwctr),
 		libp2p.Identity(privKey),
@@ -112,6 +114,8 @@ func NewNode(ctx context.Context) *FreedomNameNode {
 				"/ip4/0.0.0.0/udp/4022/webrtc-direct",
 			),
 			libp2p.ForceReachabilityPublic(), // Ignore auto detection NAT, assuming you are opening your ports in your router/firewall.
+			libp2p.EnableRelayService(),      // Enable relay service
+			libp2p.EnableHolePunching(),      // Enable hole punching
 		}...)
 	}
 
@@ -145,7 +149,7 @@ func NewNode(ctx context.Context) *FreedomNameNode {
 	// DHT options
 	dhtOpts := []dht.Option{
 		dht.BucketSize(10),
-		dht.ProtocolPrefix("/freedomnames/1.0.0"),
+		dht.ProtocolPrefix(protocol.ID("/freedomnames")),
 		dht.Concurrency(15),
 		dht.EnableOptimisticProvide(), // Enable experimental optimistic provide, which will store the provider record that has a even closer peer.
 		dht.Resiliency(2),
@@ -233,6 +237,14 @@ func (freedomName *FreedomNameNode) GetMode() string {
 		return modeStr
 	}
 	return "Not initialized"
+}
+
+// Get active protocols
+func (freedomName *FreedomNameNode) GetProtocols() []protocol.ID {
+	if freedomName.kadDHT != nil {
+		return freedomName.kadDHT.Host().Mux().Protocols()
+	}
+	return nil
 }
 
 // Get routing peer infos

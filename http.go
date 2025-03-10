@@ -17,7 +17,9 @@ type Response struct {
 	PeerID          string   `json:"peerID"`
 	ListenAddresses []string `json:"listenAddresses"`
 	Peers           []string `json:"peers"`
+	HostsConnected  int      `json:"hostsConnected"`
 	NetworkSize     int32    `json:"networkSize"`
+	Protocols       []string `json:"protocols"`
 }
 
 func StartHTTPServer(freedomDht FreedomDHT, cache Cache) {
@@ -215,6 +217,12 @@ func InfoHandler(freedomDht FreedomDHT) http.HandlerFunc {
 		for i, listenAddr := range hostListenAddrs {
 			listenAddrList[i] = listenAddr.String()
 		}
+
+		// Get connected hosts
+		hosts := freedomDht.GetNetworkPeers()
+		hostsConnected := len(hosts)
+
+		// Network size estimation
 		networkSize, err := freedomDht.GetNetworkSize()
 		if err != nil {
 			networkSize = 0
@@ -227,12 +235,22 @@ func InfoHandler(freedomDht FreedomDHT) http.HandlerFunc {
 			infoList[i] = p.Id.String()
 		}
 
+		// Get protocols
+		protocols := freedomDht.GetProtocols()
+		protocolList := make([]string, len(protocols))
+		for i, protocol := range protocols {
+			// protocol.ID type is just a string
+			protocolList[i] = string(protocol)
+		}
+
 		response := Response{
 			Mode:            mode,
 			PeerID:          peerID,
 			ListenAddresses: listenAddrList,
 			Peers:           infoList,
+			HostsConnected:  hostsConnected,
 			NetworkSize:     networkSize,
+			Protocols:       protocolList,
 		}
 		jsonResponse, err := json.Marshal(response)
 		if err != nil {
