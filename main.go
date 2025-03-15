@@ -9,6 +9,9 @@ func main() {
 	freedomDht := NewNode(ctx)
 	defer freedomDht.Shutdown()
 
-	cache := NewMemoryCache()
+	cache, err := NewMemoryCache()
+	if err != nil {
+		panic(err)
+	}
 	StartHTTPServer(freedomDht, cache)
 }

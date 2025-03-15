@@ -28,6 +28,7 @@ func StartHTTPServer(freedomDht FreedomDHT, cache Cache) {
 	http.HandleFunc("/lookup", LookupHandler(freedomDht, cache))
 	http.HandleFunc("/peers", AllPeersHandler(freedomDht))
 	http.HandleFunc("/info", InfoHandler(freedomDht))
+	http.HandleFunc("/clear_cache", ClearCacheHandler(cache))
 	server := &http.Server{Addr: ":8080", Handler: nil}
 
 	var wg sync.WaitGroup
@@ -95,7 +96,7 @@ func AddHandler(freedomDht FreedomDHT, cache Cache) http.HandlerFunc {
 			for _, value := range records {
 				// Store in local cache
 				// PoC: For now we just ignore recordType (A)
-				cache.Set(key, value)
+				cache.Add(key, value)
 				// TODO: Combine the record types and store them as a single value in the DHT
 				// For now we just store the first record type (A)
 
@@ -133,6 +134,7 @@ func LookupHandler(freedomDht FreedomDHT, cache Cache) http.HandlerFunc {
 		// Fist check local cache
 		if value, found := cache.Get(key); found {
 			// PoC: Just return the A record
+			log.Println("Found value in local cache:", value)
 			w.WriteHeader(http.StatusOK)
 			jsonResponse, _ := json.Marshal(map[string]string{key: value})
 			w.Write(jsonResponse)
@@ -158,7 +160,7 @@ func LookupHandler(freedomDht FreedomDHT, cache Cache) http.HandlerFunc {
 		}
 
 		// Store in local cache
-		cache.Set(key, value)
+		cache.Add(key, value)
 
 		// Key found, return JSON response
 		w.WriteHeader(http.StatusOK)
@@ -260,5 +262,18 @@ func InfoHandler(freedomDht FreedomDHT) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(jsonResponse)
+	}
+}
+
+// ClearCacheHandler clears the local cache using a DELETE request
+func ClearCacheHandler(cache Cache) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Check if the request method is DELETE
+		if r.Method != http.MethodDelete {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		// Clear the full cache
+		cache.Clear()
 	}
 }
