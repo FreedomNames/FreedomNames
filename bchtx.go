@@ -26,8 +26,14 @@ const (
 	sigHashDefault = sigHashAll | sigHashForkID
 )
 
-// dustLimit is the minimum satoshi value for a standard output.
+// dustLimit is the minimum satoshi value for a standard P2PKH output.
 const dustLimit = 546
+
+// tokenDustLimit is a safe minimum for an output carrying a CashTokens NFT
+// prefix. The BCH dust threshold scales with the serialized output size
+// (~3*(size+148)); a P2PKH output with a token prefix + 20-byte commitment is
+// ~89 bytes, giving ~711 sat. 1000 clears it with margin.
+const tokenDustLimit = 1000
 
 // Script opcodes we emit.
 const (
@@ -38,6 +44,7 @@ const (
 	opEqual       = 0x87
 	opReturn      = 0x6a
 	opPushData1   = 0x4c
+	opPushData2   = 0x4d
 )
 
 // CashTokens token-prefix constants (per the CashTokens CHIP).
@@ -144,16 +151,43 @@ func opReturnScript(pushes ...[]byte) []byte {
 	return s
 }
 
-// appendPush appends a minimal data push for p (supports 0..520 bytes, which
-// covers everything we emit).
+// appendPush appends a minimal data push for p, supporting the full standard
+// push range (0..520 bytes) via direct pushes, OP_PUSHDATA1 and OP_PUSHDATA2,
+// so a larger (e.g. RSA) key can never be silently truncated.
 func appendPush(s, p []byte) []byte {
 	switch {
 	case len(p) < int(opPushData1):
 		s = append(s, byte(len(p)))
-	default:
+	case len(p) <= 0xff:
 		s = append(s, opPushData1, byte(len(p)))
+	default:
+		s = append(s, opPushData2, byte(len(p)), byte(len(p)>>8))
 	}
 	return append(s, p...)
+}
+
+// maxCommitmentLen is the CashTokens consensus limit on NFT commitment length.
+const maxCommitmentLen = 40
+
+// validate checks a token prefix against the CashTokens consensus rules so we
+// never serialize (and broadcast) a token that a node would reject.
+func (t *tokenInfo) validate() error {
+	if len(t.CategoryID) != 32 {
+		return fmt.Errorf("token category must be 32 bytes, got %d", len(t.CategoryID))
+	}
+	if len(t.Commitment) > maxCommitmentLen {
+		return fmt.Errorf("token commitment %d bytes exceeds max %d", len(t.Commitment), maxCommitmentLen)
+	}
+	hasNFT := t.Capability != tokenCapabilityNone || len(t.Commitment) > 0
+	if !hasNFT && t.Amount == 0 {
+		return errors.New("token prefix has neither an NFT nor a fungible amount")
+	}
+	switch t.Capability {
+	case tokenCapabilityNone, tokenCapabilityMutable, tokenCapabilityMinting:
+	default:
+		return fmt.Errorf("invalid token capability 0x%x", t.Capability)
+	}
+	return nil
 }
 
 // encodeTokenPrefix serializes a CashTokens token prefix (without the leading
@@ -279,6 +313,15 @@ func (tx *transaction) signInput(i int, priv *secp256k1.PrivateKey) []byte {
 func (tx *transaction) Serialize(privs []*secp256k1.PrivateKey) ([]byte, error) {
 	if len(privs) != len(tx.Inputs) {
 		return nil, fmt.Errorf("have %d keys for %d inputs", len(privs), len(tx.Inputs))
+	}
+	// Reject invalid token outputs before signing so we never broadcast a tx a
+	// node would reject as a malformed token.
+	for i, o := range tx.Outputs {
+		if o.Token != nil {
+			if err := o.Token.validate(); err != nil {
+				return nil, fmt.Errorf("output %d token: %w", i, err)
+			}
+		}
 	}
 	unlocking := make([][]byte, len(tx.Inputs))
 	for i := range tx.Inputs {
@@ -408,11 +451,22 @@ func splitTokenPrefix(wrapped []byte) (*tokenInfo, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	t := &tokenInfo{CategoryID: category, Capability: bitfield & 0x0f}
+	// The reserved high bit must be unset; the NFT-capability nibble is only
+	// meaningful when HAS_NFT is set.
+	if bitfield&0x80 != 0 {
+		return nil, nil, errors.New("token bitfield reserved bit set")
+	}
+	t := &tokenInfo{CategoryID: category}
+	if bitfield&tokenHasNFT != 0 {
+		t.Capability = bitfield & 0x0f
+	}
 	if bitfield&tokenHasCommitmentLen != 0 {
 		n, err := r.readVarInt()
 		if err != nil {
 			return nil, nil, err
+		}
+		if n == 0 || n > maxCommitmentLen {
+			return nil, nil, fmt.Errorf("invalid token commitment length %d", n)
 		}
 		commitment, err := r.readBytes(int(n))
 		if err != nil {
@@ -464,8 +518,18 @@ func parseOpReturn(script []byte) [][]byte {
 				return pushes
 			}
 			n = int(b)
+		case op == opPushData2:
+			lo, err := r.readByte()
+			if err != nil {
+				return pushes
+			}
+			hi, err := r.readByte()
+			if err != nil {
+				return pushes
+			}
+			n = int(lo) | int(hi)<<8
 		default:
-			return pushes // OP_PUSHDATA2/4 not used by us
+			return pushes // OP_PUSHDATA4 not used by us
 		}
 		data, err := r.readBytes(n)
 		if err != nil {

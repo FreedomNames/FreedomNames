@@ -126,7 +126,8 @@ func (w *bchWallet) Balance(ctx context.Context) (int64, error) {
 
 // selectFunding picks plain (non-token) UTXOs covering `need` satoshis, largest
 // first. It never selects token-bearing UTXOs, so a name NFT can never be
-// accidentally spent as fee.
+// accidentally spent as fee. `need` must already include the fee the caller
+// budgeted; prefer selectToCover for fee-aware selection.
 func selectFunding(utxos []walletUTXO, need int64) ([]walletUTXO, int64, error) {
 	plain := make([]walletUTXO, 0, len(utxos))
 	for _, u := range utxos {
@@ -194,44 +195,41 @@ var errNoWalletKey = errors.New("no BCH wallet key")
 
 // buildClaimTx builds (and signs) an FN01 claim: it mints a mutable name NFT to
 // the wallet's own address with commitment = hash160(ownerPub), attaches the
-// FN01 OP_RETURN, and pays the discovery-marker dust output. The NFT category
-// is this transaction's own id (a genesis input spending vout 0).
+// FN01 OP_RETURN, and pays the discovery-marker dust output.
+//
+// Per the CashTokens genesis rule, the NFT's category id equals the prevout
+// txid of an input that spends output index 0. selectFundingGenesis guarantees
+// input 0 is such an outpoint, so the category is known up-front: it is
+// inputs[0].PrevTxID. No serialization round-trip is needed.
 func (w *bchWallet) buildClaimTx(ctx context.Context, label string, ownerPub []byte) ([]byte, error) {
 	utxos, err := w.utxos(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// The NFT mint (dust) + marker (dust) + fee must be funded. A genesis input
-	// must spend an outpoint with index 0, so prefer such a UTXO for input 0.
-	need := int64(dustLimit*2) + estimateFee(2, 3)
-	selected, total, err := selectFundingGenesis(utxos, need)
+	// Non-change outputs: the token mint (token dust) + OP_RETURN (0) + marker.
+	outValue := int64(tokenDustLimit + dustLimit)
+	selected, total, err := selectFundingGenesis(utxos, outValue, 4) // +1 output for change
 	if err != nil {
 		return nil, err
 	}
 
-	tx, privs := w.newTx(selected)
+	// The category is the genesis input's prevout txid (internal order).
+	category := append([]byte(nil), selected[0].txid...)
 
-	// Placeholder category; set to our own txid after first serialization.
+	tx, privs := w.newTx(selected)
 	tx.Outputs = []txOutput{
-		{Value: dustLimit, Script: w.script(), Token: &tokenInfo{
+		{Value: tokenDustLimit, Script: w.script(), Token: &tokenInfo{
+			CategoryID: category,
 			Capability: tokenCapabilityMutable,
 			Commitment: hash160(ownerPub),
 		}},
 		{Value: 0, Script: opReturnScript([]byte(fnClaimTag), []byte(label), ownerPub)},
 		{Value: dustLimit, Script: markerScript(label)},
 	}
-	// Change back to the wallet.
-	change := total - dustLimit*2 - estimateFee(len(selected), 3)
-	if change >= dustLimit {
+	if change := total - outValue - estimateFee(len(selected), 4); change >= dustLimit {
 		tx.Outputs = append(tx.Outputs, txOutput{Value: change, Script: w.script()})
 	}
-
-	raw, err := tx.Serialize(privs)
-	if err != nil {
-		return nil, err
-	}
-	tx.Outputs[0].Token.CategoryID = txID(raw)
 	return tx.Serialize(privs)
 }
 
@@ -246,7 +244,11 @@ func (w *bchWallet) buildRebindTx(ctx context.Context, label string, category, n
 	if !ok {
 		return nil, fmt.Errorf("this wallet does not hold the %q name NFT", label)
 	}
-	funding, total, err := selectFunding(utxos, estimateFee(2, 3)+dustLimit)
+
+	// The NFT input itself carries token dust; extra funding covers the marker
+	// dust + fee (the token output re-uses the NFT's value).
+	outValue := int64(dustLimit)
+	funding, fundingTotal, err := selectFunding(utxos, outValue+estimateFee(3, 4))
 	if err != nil {
 		return nil, err
 	}
@@ -254,7 +256,7 @@ func (w *bchWallet) buildRebindTx(ctx context.Context, label string, category, n
 	inputs := append([]walletUTXO{nftUTXO}, funding...)
 	tx, privs := w.newTx(inputs)
 	tx.Outputs = []txOutput{
-		{Value: dustLimit, Script: w.script(), Token: &tokenInfo{
+		{Value: tokenDustLimit, Script: w.script(), Token: &tokenInfo{
 			CategoryID: category,
 			Capability: tokenCapabilityMutable,
 			Commitment: hash160(newOwnerPub),
@@ -262,8 +264,10 @@ func (w *bchWallet) buildRebindTx(ctx context.Context, label string, category, n
 		{Value: 0, Script: opReturnScript([]byte(fnRebindTag), []byte(label), newOwnerPub)},
 		{Value: dustLimit, Script: markerScript(label)},
 	}
-	change := total - dustLimit - estimateFee(len(inputs), 3)
-	if change >= dustLimit {
+	// Total spendable = the NFT's own value + funding. Outputs consume the token
+	// dust + marker dust; the rest (minus fee) returns as change.
+	total := nftUTXO.value + fundingTotal
+	if change := total - tokenDustLimit - dustLimit - estimateFee(len(inputs), 4); change >= dustLimit {
 		tx.Outputs = append(tx.Outputs, txOutput{Value: change, Script: w.script()})
 	}
 	return tx.Serialize(privs)
@@ -288,10 +292,12 @@ func (w *bchWallet) newTx(inputs []walletUTXO) (*transaction, []*secp256k1.Priva
 	return tx, privs
 }
 
-// selectFundingGenesis is like selectFunding but guarantees the first selected
-// UTXO spends outpoint index 0, so the tx is eligible to mint a new token
-// category (the CashTokens genesis rule).
-func selectFundingGenesis(utxos []walletUTXO, need int64) ([]walletUTXO, int64, error) {
+// selectFundingGenesis selects plain UTXOs to cover outValue plus the mining
+// fee, guaranteeing the first selected UTXO spends outpoint index 0 (the
+// CashTokens genesis rule, so the tx can mint a new token category). numOutputs
+// is the transaction's output count (used to size the fee). Fee is recomputed
+// as inputs are added, so multi-input claims are never underpaid.
+func selectFundingGenesis(utxos []walletUTXO, outValue int64, numOutputs int) ([]walletUTXO, int64, error) {
 	var genesis *walletUTXO
 	for i := range utxos {
 		if utxos[i].token == nil && utxos[i].index == 0 {
@@ -300,11 +306,13 @@ func selectFundingGenesis(utxos []walletUTXO, need int64) ([]walletUTXO, int64, 
 		}
 	}
 	if genesis == nil {
-		return nil, 0, errors.New("no eligible genesis UTXO (need a plain coin at output index 0; send yourself a little BCH and retry)")
+		return nil, 0, errors.New("no eligible genesis coin (registering a name needs a plain coin whose output index is 0). Send a little BCH to your own wallet address and retry; the received coin is usually at index 0")
 	}
+
 	selected := []walletUTXO{*genesis}
 	total := genesis.value
-	if total >= need {
+	need := func(n int) int64 { return outValue + estimateFee(n, numOutputs) }
+	if total >= need(len(selected)) {
 		return selected, total, nil
 	}
 	for i := range utxos {
@@ -314,11 +322,11 @@ func selectFundingGenesis(utxos []walletUTXO, need int64) ([]walletUTXO, int64, 
 		}
 		selected = append(selected, u)
 		total += u.value
-		if total >= need {
+		if total >= need(len(selected)) {
 			return selected, total, nil
 		}
 	}
-	return nil, 0, fmt.Errorf("insufficient funds: need %d sat, have %d", need, total)
+	return nil, 0, fmt.Errorf("insufficient funds: need ~%d sat, have %d", need(len(selected)), total)
 }
 
 // findNFT returns the wallet UTXO holding the NFT of the given category.

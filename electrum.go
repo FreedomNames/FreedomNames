@@ -258,6 +258,19 @@ func (c *electrumClient) RelayFee(ctx context.Context) (float64, error) {
 	return fee, err
 }
 
+// BlockHeight returns the current chain tip height, used to compute how many
+// confirmations a claim has. It subscribes to headers (the standard way to get
+// the tip) and reads the returned tip height.
+func (c *electrumClient) BlockHeight(ctx context.Context) (int64, error) {
+	var tip struct {
+		Height int64 `json:"height"`
+	}
+	if err := c.call(ctx, "blockchain.headers.subscribe", nil, &tip); err != nil {
+		return 0, err
+	}
+	return tip.Height, nil
+}
+
 // scriptHash computes the Electrum protocol identifier for a locking script:
 // hex of sha256(script) with the byte order reversed.
 func scriptHash(script []byte) string {

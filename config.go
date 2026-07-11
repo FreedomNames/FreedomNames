@@ -54,8 +54,10 @@ func LoadConfig() *Config {
 }
 
 // defaultBCHElectrum is a public chipnet Fulcrum server used when
-// FREEDOM_BCH_ELECTRUM is unset. Users can point at their own server. (Verify
-// this endpoint is live during chipnet testing; swap if needed.)
+// FREEDOM_BCH_ELECTRUM is unset, so Layer 2 works out of the box for testing.
+// NOTE: relying on one public server is a privacy and availability trade-off
+// (that operator sees every bare name you resolve). For real use, point
+// FREEDOM_BCH_ELECTRUM at your own Fulcrum server.
 const defaultBCHElectrum = "ssl://chipnet.bch.ninja:50002"
 
 func envOr(key, fallback string) string {

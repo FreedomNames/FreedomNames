@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -8,6 +9,15 @@ import (
 	"sync"
 	"time"
 )
+
+// reverseBytesHex decodes a display-order hex hash and returns internal order.
+func reverseBytesHex(h string) []byte {
+	b, err := hex.DecodeString(h)
+	if err != nil {
+		return nil
+	}
+	return reverseBytes(b)
+}
 
 // bchRegistry resolves bare names ("mysite.fn") to their controlling owner's
 // Ed25519 public key by reading the Bitcoin Cash chain via an Electrum server.
@@ -31,16 +41,22 @@ type bchRegistry struct {
 }
 
 type ownerCacheEntry struct {
-	pubKey    []byte
+	pubKey    []byte // nil for a negative (not-found) entry
+	notFound  bool
 	expiresAt time.Time
 }
 
-// ownerCacheTTL bounds how long a resolved owner is cached (reorg tolerance).
-const ownerCacheTTL = 5 * time.Minute
+// Cache TTLs. Positive results are cached briefly for reorg tolerance; negative
+// results are cached even more briefly, just enough to blunt a random-name
+// lookup flood without delaying a legitimate new claim for long.
+const (
+	ownerCacheTTL    = 5 * time.Minute
+	notFoundCacheTTL = 30 * time.Second
+)
 
-// maxCustodyHops caps the NFT custody-chain walk to avoid unbounded work on a
-// pathological (or malicious) history.
-const maxCustodyHops = 200
+// maxCustodyHops caps the NFT custody-chain walk so a name whose NFT was moved
+// through many hops cannot make one lookup do unbounded work.
+const maxCustodyHops = 64
 
 // NewBCHRegistry builds a registry over the given electrum client.
 func NewBCHRegistry(client *electrumClient, minConf int64) *bchRegistry {
@@ -64,6 +80,9 @@ func (r *bchRegistry) ResolveOwner(name string) ([]byte, error) {
 	r.mu.Lock()
 	if e, ok := r.cache[label]; ok && time.Now().Before(e.expiresAt) {
 		r.mu.Unlock()
+		if e.notFound {
+			return nil, ErrRegistryNotFound
+		}
 		return e.pubKey, nil
 	}
 	r.mu.Unlock()
@@ -75,6 +94,13 @@ func (r *bchRegistry) ResolveOwner(name string) ([]byte, error) {
 
 	pubKey, err := r.resolve(ctx, label)
 	if err != nil {
+		// Negative-cache a definitive not-found to blunt random-name floods.
+		// Transient failures (timeouts, server errors) are not cached.
+		if errors.Is(err, ErrRegistryNotFound) {
+			r.mu.Lock()
+			r.cache[label] = ownerCacheEntry{notFound: true, expiresAt: time.Now().Add(notFoundCacheTTL)}
+			r.mu.Unlock()
+		}
 		return nil, err
 	}
 
@@ -84,23 +110,36 @@ func (r *bchRegistry) ResolveOwner(name string) ([]byte, error) {
 	return pubKey, nil
 }
 
-// categoryFor returns the NFT category (== earliest confirmed FN01 claim txid,
-// internal order) for a normalized label, or an error if the name is unclaimed.
+// categoryFor returns the NFT category for a normalized label (the category of
+// the earliest confirmed FN01 claim), or an error if the name is unclaimed.
 func (r *bchRegistry) categoryFor(ctx context.Context, label string) ([]byte, error) {
+	_, category, err := r.winningClaim(ctx, label)
+	return category, err
+}
+
+// winningClaim finds the authoritative FN01 claim for a name: the earliest
+// confirmed one (deterministic tiebreak on smaller txid). It returns the parsed
+// claim tx and its NFT category (the genesis input's prevout txid).
+func (r *bchRegistry) winningClaim(ctx context.Context, label string) (*parsedTx, []byte, error) {
+	tip, err := r.client.BlockHeight(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("chain tip: %w", err)
+	}
 	history, err := r.client.GetHistory(ctx, scriptHash(markerScript(label)))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	tip := maxHeight(history)
-	var category []byte
-	var bestHeight int64
+
+	var claimTx *parsedTx
+	var claimTxID []byte
+	var claimHeight int64 = -1
 	for _, h := range history {
 		if !confirmed(h.Height, tip, r.minConf) {
 			continue
 		}
 		raw, err := r.client.GetRawTransaction(ctx, h.TxHash)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		tx, err := parseTx(raw)
 		if err != nil {
@@ -109,30 +148,28 @@ func (r *bchRegistry) categoryFor(ctx context.Context, label string) ([]byte, er
 		if tag, _, ok := parseFNMetadata(tx, label); !ok || tag != fnClaimTag {
 			continue
 		}
-		if category == nil || h.Height < bestHeight {
-			txid, err := hex.DecodeString(h.TxHash)
-			if err != nil {
-				continue
-			}
-			category = reverseBytes(txid)
-			bestHeight = h.Height
+		txid := reverseBytesHex(h.TxHash)
+		if claimHeight == -1 || h.Height < claimHeight ||
+			(h.Height == claimHeight && bytes.Compare(txid, claimTxID) < 0) {
+			claimTx, claimTxID, claimHeight = tx, txid, h.Height
 		}
 	}
-	if category == nil {
-		return nil, ErrRegistryNotFound
+	if claimTx == nil {
+		return nil, nil, ErrRegistryNotFound
 	}
-	return category, nil
-}
-
-// binding is a name->pubkey binding revealed by an FN01/FN02 OP_RETURN.
-type binding struct {
-	pubKey []byte // marshaled Ed25519 pubkey
-	height int64
-	tag    string
+	category := genesisCategory(claimTx)
+	if category == nil {
+		return nil, nil, ErrRegistryNotFound
+	}
+	return claimTx, category, nil
 }
 
 // resolve performs the full chain lookup for a normalized label.
 func (r *bchRegistry) resolve(ctx context.Context, label string) ([]byte, error) {
+	tip, err := r.client.BlockHeight(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("chain tip: %w", err)
+	}
 	history, err := r.client.GetHistory(ctx, scriptHash(markerScript(label)))
 	if err != nil {
 		return nil, fmt.Errorf("marker history for %q: %w", label, err)
@@ -141,23 +178,20 @@ func (r *bchRegistry) resolve(ctx context.Context, label string) ([]byte, error)
 		return nil, ErrRegistryNotFound
 	}
 
-	tipHeight := maxHeight(history)
-
-	// Collect all valid FN01/FN02 bindings for this name, in block order.
-	var claim *binding // earliest confirmed FN01
+	// Collect every valid FN01/FN02 binding for this name, keyed by the
+	// hash160 of its revealed pubkey. The map is the ONLY way a pubkey becomes
+	// authoritative: it must match the live NFT commitment. There is no
+	// height-based fallback, so a stranger who merely pays the marker dust and
+	// posts an FN02 (without holding the NFT) can never hijack the name.
+	bindings := make(map[string][]byte) // hex(hash160(pubkey)) -> pubkey
+	var claimTx *parsedTx
 	var claimTxID []byte
-	bindings := make(map[string]*binding) // by hex(pubkey hash160) for commitment matching
-	var ordered []*binding
+	var claimHeight int64 = -1
 
 	for _, h := range history {
-		if !confirmed(h.Height, tipHeight, r.minConf) {
-			continue // ignore unconfirmed for authority
-		}
-		txid, err := hex.DecodeString(h.TxHash)
-		if err != nil {
+		if !confirmed(h.Height, tip, r.minConf) {
 			continue
 		}
-		txid = reverseBytes(txid) // internal order
 		raw, err := r.client.GetRawTransaction(ctx, h.TxHash)
 		if err != nil {
 			return nil, fmt.Errorf("fetch tx %s: %w", h.TxHash, err)
@@ -170,62 +204,86 @@ func (r *bchRegistry) resolve(ctx context.Context, label string) ([]byte, error)
 		if !ok {
 			continue
 		}
-		b := &binding{pubKey: pubKey, height: h.Height, tag: tag}
-		bindings[hex.EncodeToString(hash160(pubKey))] = b
-		ordered = append(ordered, b)
+		bindings[hex.EncodeToString(hash160(pubKey))] = pubKey
 
-		if tag == fnClaimTag && (claim == nil || h.Height < claim.height) {
-			claim = b
-			claimTxID = txid
+		if tag == fnClaimTag {
+			txid := reverseBytesHex(h.TxHash)
+			// Earliest confirmed claim wins; deterministic tiebreak on the
+			// smaller txid so every resolver agrees even for same-block claims.
+			if claimHeight == -1 || h.Height < claimHeight ||
+				(h.Height == claimHeight && bytes.Compare(txid, claimTxID) < 0) {
+				claimTx, claimTxID, claimHeight = tx, txid, h.Height
+			}
 		}
 	}
 
-	if claim == nil {
+	if claimTx == nil {
 		return nil, ErrRegistryNotFound
 	}
 
-	// Walk the NFT custody chain from the genesis (claim) tx to the current
-	// UTXO and read its commitment. The category is the claim tx's id.
-	category := claimTxID
-	commitment, err := r.currentCommitment(ctx, category)
+	// The NFT category is the prevout txid of the claim's genesis input (the
+	// input spending output index 0), per the CashTokens genesis rule.
+	category := genesisCategory(claimTx)
+	if category == nil {
+		return nil, ErrRegistryNotFound
+	}
+
+	// Walk the NFT from the claim's mint output to the current UTXO, reading the
+	// live commitment.
+	commitment, err := r.currentCommitment(ctx, claimTxID, category)
 	if err != nil {
-		// If the custody walk fails (e.g. NFT not found), fall back to the
-		// claim's own binding — the name is at least claimed.
-		if errors.Is(err, ErrRegistryNotFound) {
-			return claim.pubKey, nil
-		}
 		return nil, err
 	}
 
-	// The owner is the revealed pubkey whose hash160 matches the live
-	// commitment. If none matches (plain wallet transfer, not yet adopted),
-	// fall back to the latest valid binding.
-	if b, ok := bindings[hex.EncodeToString(commitment)]; ok {
-		return b.pubKey, nil
+	// The owner is the revealed pubkey whose hash160 equals the live commitment.
+	// If none matches (e.g. the NFT was moved by a plain wallet transfer and not
+	// yet re-bound via `freedom adopt`), the name has no resolvable owner.
+	if pub, ok := bindings[hex.EncodeToString(commitment)]; ok {
+		return pub, nil
 	}
-	return latestBinding(ordered).pubKey, nil
+	return nil, ErrRegistryNotFound
 }
 
-// currentCommitment follows the name NFT (identified by category) from its
-// genesis output to the current UTXO and returns its commitment.
-func (r *bchRegistry) currentCommitment(ctx context.Context, category []byte) ([]byte, error) {
-	// The genesis output is vout 0 of the claim tx (the mint output).
-	raw, err := r.client.GetRawTransaction(ctx, hex.EncodeToString(reverseBytes(category)))
+// genesisCategory returns the CashTokens category a claim tx mints: the prevout
+// txid of its first input that spends output index 0.
+func genesisCategory(tx *parsedTx) []byte {
+	for _, in := range tx.Inputs {
+		if in.PrevIndex == 0 {
+			return append([]byte(nil), in.PrevTxID...)
+		}
+	}
+	return nil
+}
+
+// currentCommitment follows the name NFT from the mint output of the claim
+// transaction (claimTxID) to the current UTXO and returns its live commitment.
+// category is the NFT's token category (used to identify the token at each hop).
+func (r *bchRegistry) currentCommitment(ctx context.Context, claimTxID, category []byte) ([]byte, error) {
+	raw, err := r.client.GetRawTransaction(ctx, hex.EncodeToString(reverseBytes(claimTxID)))
 	if err != nil {
-		return nil, fmt.Errorf("fetch genesis tx: %w", err)
+		return nil, fmt.Errorf("fetch claim tx: %w", err)
 	}
 	tx, err := parseTx(raw)
 	if err != nil {
 		return nil, err
 	}
-	if len(tx.Outputs) == 0 || tx.Outputs[0].Token == nil {
+
+	// Find the mint output: the output carrying our category token.
+	mintVout := -1
+	for i, o := range tx.Outputs {
+		if o.Token != nil && bytesEqual(o.Token.CategoryID, category) {
+			mintVout = i
+			break
+		}
+	}
+	if mintVout < 0 {
 		return nil, ErrRegistryNotFound
 	}
 
-	curTxID := category
-	curVout := uint32(0)
-	commitment := tx.Outputs[0].Token.Commitment
-	curScript := tx.Outputs[0].Script
+	curTxID := claimTxID
+	curVout := uint32(mintVout)
+	commitment := tx.Outputs[mintVout].Token.Commitment
+	curScript := tx.Outputs[mintVout].Script
 
 	for hop := 0; hop < maxCustodyHops; hop++ {
 		// Is (curTxID, curVout) still unspent at the holder address? If so, we
@@ -315,26 +373,6 @@ func confirmed(height, tip, minConf int64) bool {
 		return false
 	}
 	return tip-height+1 >= minConf
-}
-
-func maxHeight(history []electrumHistoryItem) int64 {
-	var m int64
-	for _, h := range history {
-		if h.Height > m {
-			m = h.Height
-		}
-	}
-	return m
-}
-
-func latestBinding(bs []*binding) *binding {
-	best := bs[0]
-	for _, b := range bs {
-		if b.height >= best.height {
-			best = b
-		}
-	}
-	return best
 }
 
 func bytesEqual(a, b []byte) bool {

@@ -84,6 +84,9 @@ func (m *mockElectrum) dispatch(method string, params []any) any {
 	switch method {
 	case "server.version":
 		return []string{"mock", "1.5.3"}
+	case "blockchain.headers.subscribe":
+		// A tip far above any test height so claims count as confirmed.
+		return map[string]any{"height": 1000000}
 	case "blockchain.scripthash.get_history":
 		sh, _ := params[0].(string)
 		if h, ok := m.history[sh]; ok {
@@ -108,23 +111,24 @@ func (m *mockElectrum) dispatch(method string, params []any) any {
 }
 
 // makeClaimTx builds a valid FN01 claim transaction that mints a mutable name
-// NFT to holderScript and reveals ownerPub. The NFT category equals this tx's
-// own id (genesis: input 0 spends vout 0 of some funding outpoint).
+// NFT to holderScript and reveals ownerPub. Per the CashTokens genesis rule the
+// NFT category is the prevout txid of input 0 (which spends output index 0),
+// i.e. fundingTxID.
 func makeClaimTx(t *testing.T, label string, ownerPub []byte, holderScript []byte, fundingKey *secp256k1.PrivateKey, fundingTxID []byte) []byte {
 	t.Helper()
 	tx := &transaction{
 		Version: 2,
 		Inputs: []txInput{{
 			PrevTxID:   fundingTxID,
-			PrevIndex:  0, // vout 0 -> eligible genesis input
+			PrevIndex:  0, // vout 0 -> eligible genesis input; category = fundingTxID
 			PrevScript: p2pkhScript(hash160(fundingKey.PubKey().SerializeCompressed())),
 			PrevValue:  100000,
 			Sequence:   0xffffffff,
 		}},
 		Outputs: []txOutput{
-			// vout 0: the name NFT (category filled in after we know our txid;
-			// but category == our txid, so we set it below via a placeholder).
-			{Value: dustLimit, Script: holderScript, Token: &tokenInfo{
+			// vout 0: the name NFT, category = the genesis input's prevout txid.
+			{Value: tokenDustLimit, Script: holderScript, Token: &tokenInfo{
+				CategoryID: fundingTxID,
 				Capability: tokenCapabilityMutable,
 				Commitment: hash160(ownerPub),
 			}},
@@ -134,22 +138,9 @@ func makeClaimTx(t *testing.T, label string, ownerPub []byte, holderScript []byt
 			{Value: dustLimit, Script: markerScript(label)},
 		},
 	}
-	// The category is our own txid. We must compute the txid, which depends on
-	// the serialized (signed) tx, then set the token category to that id. Since
-	// the token category is inside the signed data, we compute the id first
-	// with a zero category, then set it — for the mock this is acceptable
-	// because resolution derives the category from the claim txid, and the
-	// custody walk reads whatever category the genesis output carries. To keep
-	// them consistent, set category = txid of the signed tx.
 	raw, err := tx.Serialize([]*secp256k1.PrivateKey{fundingKey})
 	if err != nil {
 		t.Fatalf("serialize claim: %v", err)
-	}
-	category := txID(raw)
-	tx.Outputs[0].Token.CategoryID = category
-	raw, err = tx.Serialize([]*secp256k1.PrivateKey{fundingKey})
-	if err != nil {
-		t.Fatalf("re-serialize claim: %v", err)
 	}
 	return raw
 }
@@ -253,5 +244,68 @@ func TestBCHRegistryIgnoresUnconfirmed(t *testing.T) {
 
 	if _, err := reg.ResolveOwner("pending.fn"); err == nil {
 		t.Fatal("expected an unconfirmed-only claim to be not-found")
+	}
+}
+
+// makeFakeRebind builds a tx that pays the marker dust and carries an FN02
+// OP_RETURN for a name, but does NOT hold or spend the name NFT. This models an
+// attacker trying to hijack resolution by publishing metadata alone.
+func makeFakeRebind(t *testing.T, label string, attackerPub []byte, key *secp256k1.PrivateKey, fundingTxID []byte) []byte {
+	t.Helper()
+	tx := &transaction{
+		Version: 2,
+		Inputs: []txInput{{
+			PrevTxID:   fundingTxID,
+			PrevIndex:  1,
+			PrevScript: p2pkhScript(hash160(key.PubKey().SerializeCompressed())),
+			PrevValue:  100000,
+			Sequence:   0xffffffff,
+		}},
+		Outputs: []txOutput{
+			{Value: 0, Script: opReturnScript([]byte(fnRebindTag), []byte(label), attackerPub)},
+			{Value: dustLimit, Script: markerScript(label)},
+		},
+	}
+	raw, err := tx.Serialize([]*secp256k1.PrivateKey{key})
+	if err != nil {
+		t.Fatalf("serialize fake rebind: %v", err)
+	}
+	return raw
+}
+
+// TestBCHRegistryRejectsMetadataHijack proves a stranger who pays the marker
+// dust and posts an FN02 with their own pubkey, without holding the NFT, cannot
+// steal name resolution. The owner is decided solely by the NFT commitment.
+func TestBCHRegistryRejectsMetadataHijack(t *testing.T) {
+	m := newMockElectrum(t)
+	ownerKey := newTestKey(t)
+	ownerPub := ownerPubBytes(t, ownerKey)
+	attackerKey := newTestKey(t)
+	attackerPub := ownerPubBytes(t, attackerKey)
+
+	fk, _ := secp256k1.GeneratePrivateKey()
+	holder := p2pkhScript(hash160(fk.PubKey().SerializeCompressed()))
+	ak, _ := secp256k1.GeneratePrivateKey()
+
+	// Legitimate claim at height 100.
+	claim := makeClaimTx(t, "target", ownerPub, holder, fk, mustHex(t, repeat("aa", 32)))
+	m.addTx(claim, 100, markerScript("target"), holder)
+	// Attacker's later FN02 (height 200), marker-only, no NFT.
+	hijack := makeFakeRebind(t, "target", attackerPub, ak, mustHex(t, repeat("bb", 32)))
+	m.addTx(hijack, 200, markerScript("target"))
+
+	client := newElectrumClient(m.endpoint())
+	defer client.Close()
+	reg := NewBCHRegistry(client, 1)
+
+	got, err := reg.ResolveOwner("target.fn")
+	if err != nil {
+		t.Fatalf("ResolveOwner: %v", err)
+	}
+	if !bytesEqual(got, ownerPub) {
+		t.Fatal("metadata-only FN02 hijacked the name: resolution must follow the NFT commitment, not the latest marker tx")
+	}
+	if bytesEqual(got, attackerPub) {
+		t.Fatal("attacker pubkey was returned")
 	}
 }

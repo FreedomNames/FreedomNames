@@ -149,6 +149,48 @@ func TestTokenSignatureVerifies(t *testing.T) {
 	}
 }
 
+// TestAppendPushLargeData checks pushes over 255 bytes use OP_PUSHDATA2 and
+// round-trip through parseOpReturn without truncation (e.g. a large RSA key).
+func TestAppendPushLargeData(t *testing.T) {
+	big := make([]byte, 300)
+	for i := range big {
+		big[i] = byte(i)
+	}
+	script := opReturnScript([]byte("FN01"), big)
+	pushes := parseOpReturn(script)
+	if len(pushes) != 2 {
+		t.Fatalf("expected 2 pushes, got %d", len(pushes))
+	}
+	if !bytes.Equal(pushes[1], big) {
+		t.Fatal("large push did not round-trip (truncated?)")
+	}
+}
+
+// TestTokenValidate rejects malformed token prefixes before serialization.
+func TestTokenValidate(t *testing.T) {
+	cat := mustHex(t, repeat("11", 32))
+	cases := []struct {
+		name string
+		tok  tokenInfo
+		ok   bool
+	}{
+		{"valid nft", tokenInfo{CategoryID: cat, Capability: tokenCapabilityMutable, Commitment: []byte("x")}, true},
+		{"short category", tokenInfo{CategoryID: cat[:20], Capability: tokenCapabilityMutable, Commitment: []byte("x")}, false},
+		{"oversized commitment", tokenInfo{CategoryID: cat, Commitment: make([]byte, 41)}, false},
+		{"empty prefix", tokenInfo{CategoryID: cat}, false},
+		{"bad capability", tokenInfo{CategoryID: cat, Capability: 0x07, Commitment: []byte("x")}, false},
+	}
+	for _, c := range cases {
+		err := c.tok.validate()
+		if c.ok && err != nil {
+			t.Errorf("%s: expected valid, got %v", c.name, err)
+		}
+		if !c.ok && err == nil {
+			t.Errorf("%s: expected invalid, got nil", c.name)
+		}
+	}
+}
+
 // TestParseTxRoundTrip serializes a tx (with a token output), parses it back,
 // and checks the token prefix and scripts survive.
 func TestParseTxRoundTrip(t *testing.T) {
