@@ -2,20 +2,20 @@
 
 ## Is Freedom Names a blockchain?
 
-No. Layer 1 — self-certifying names — has **no consensus at all** and no chain. It
+No. Layer 1 (self-certifying names) has **no consensus at all** and no chain. It
 doesn't need one, because names are derived from public keys and therefore can't
 collide. Records live in a peer-to-peer DHT, ordered per-name by a sequence number.
 
 The optional [Layer 2](/guide/layer2) *does* borrow a blockchain (Bitcoin Cash)
 to decide who owns a globally-unique bare name, but that's a separate, planned
-layer that reads the chain — it doesn't make Layer 1 a blockchain.
+layer that reads the chain; it doesn't make Layer 1 a blockchain.
 
 ## Can someone squat or steal my name?
 
 No. A self-certifying name is `label.<pubKeyID>.fn`, where `<pubKeyID>` is derived
 from *your* public key. Someone else's `mysite` is a **different name** because
 their key suffix differs. And nobody can overwrite your records without producing a
-valid signature from your key — which they don't have.
+valid signature from your key, which they don't have.
 
 ## What if I lose my key?
 
@@ -25,7 +25,7 @@ self-certifying name. Back it up like you would any critical secret.
 
 Layer 2 adds a **transfer** operation that lets an owner rotate the Layer 1 keypair
 a *bare* name points at (useful after a key compromise) while keeping the human
-name — but that only applies to Layer 2 bare names, not the raw
+name, but that only applies to Layer 2 bare names, not the raw
 `label.<pubKeyID>.fn` form.
 
 ## What record types are supported?
@@ -57,16 +57,16 @@ global uniqueness with on-chain consensus.
 ## Is it production-ready?
 
 Treat it as early and actively developed. The design is deliberate and the Layer 1
-guarantees are solid, but this is a young project — expect sharp edges.
+guarantees are solid, but this is a young project, so expect sharp edges.
 
 ## How is this different from ENS / Handshake / IPNS / GNS?
 
-- **IPNS / GNS** — Freedom Names' Layer 1 uses the same *self-certifying* idea (the
+- **IPNS / GNS**: Freedom Names' Layer 1 uses the same *self-certifying* idea (the
   key hashes into the name). Freedom Names wraps it in **DNS-style records and a DNS
   server**, so `.fn` works with ordinary tooling.
-- **ENS / Handshake** — those put the whole namespace on a blockchain. Freedom
+- **ENS / Handshake**: those put the whole namespace on a blockchain. Freedom
   Names keeps Layer 1 **chain-free**, and only reaches for a chain (BCH) at
-  [Layer 2](/guide/layer2), for *bare* names — and even then, only the name→owner
+  [Layer 2](/guide/layer2), for *bare* names, and even then, only the name→owner
   binding is on-chain, never the records.
 
 ## Where's the code?

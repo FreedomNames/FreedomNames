@@ -6,7 +6,7 @@ hero:
   text: DNS without gatekeepers.
   tagline: >-
     Own a human-readable name with no central authority and no consensus.
-    The key <em>is</em> the name — so nobody can take it, squat it, or overwrite it.
+    The key <em>is</em> the name, so nobody can take it, squat it, or overwrite it.
   image:
     src: /logo.svg
     alt: Freedom Names
@@ -38,7 +38,7 @@ features:
     title: Cryptographically signed
     details: >-
       Every record is signed by its owner. A validator verifies the signature and
-      the key→name binding before accepting any update — nobody can overwrite a
+      the key→name binding before accepting any update. Nobody can overwrite a
       name they don’t own. Newest signed record wins.
   - icon: 🌐
     title: Just works with DNS
@@ -55,7 +55,7 @@ features:
     title: Clean names, later
     details: >-
       Bare names like <code>mysite.fn</code> are a planned Layer&nbsp;2 over a
-      Bitcoin&nbsp;Cash registry — consensus stays on-chain while Layer&nbsp;1
+      Bitcoin&nbsp;Cash registry, so consensus stays on-chain while Layer&nbsp;1
       remains pure DHT.
 ---
 
@@ -66,14 +66,14 @@ features:
 Today, a domain name is a **lease** from a registrar, ultimately backed by a
 handful of root operators and registries. Miss a payment, fall foul of a policy,
 or land in the wrong jurisdiction, and the name can be suspended, transferred, or
-seized — regardless of who actually built the site behind it.
+seized, regardless of who actually built the site behind it.
 
 Freedom Names removes the middleman. A name is a **cryptographic fact**, not a
 permission someone grants you:
 
 - **You generate a keypair.** The public key hashes into the name, so the name is
-  yours the moment the key exists — no registration, no approval, no fee.
-- **You sign your records.** IP addresses, text, aliases — all signed by your key
+  yours the moment the key exists: no registration, no approval, no fee.
+- **You sign your records.** IP addresses, text, aliases, all signed by your key
   and stored in a peer-to-peer DHT.
 - **Everyone can verify them.** Any node checks the signature and the key→name
   binding independently. There is no authority to trust, only math.
@@ -94,7 +94,7 @@ freedom name mysite
 # 4. Sign the records and publish them to a running node
 freedom publish mysite --api http://localhost:8080
 
-# 5. Resolve it — from anywhere on the network
+# 5. Resolve it, from anywhere on the network
 dig @127.0.0.1 -p 53 mysite.<pubKeyID>.fn A
 ```
 

@@ -2,7 +2,7 @@
 
 Changing what a name points at is just publishing a new signed record. The network
 keeps the one with the **highest sequence number**, and the CLI derives that number
-from wall-clock time — so a later publish always wins.
+from wall-clock time, so a later publish always wins.
 
 ## Change an IP address
 
@@ -40,14 +40,14 @@ freedom lookup blog.<pubKeyID>.fn --type A
 - Every record carries a `seq` (and an `eol` expiry used as a tiebreaker).
 - The DHT **validator** on every node selects the record with the higher `seq`.
 - A competing update is only accepted if it carries a **valid signature from the
-  same key** — so an attacker can't win the race without your private key.
+  same key**, so an attacker can't win the race without your private key.
 
 That's the whole update model: no registrar to notify, no propagation delay through
-a hierarchy — just a newer signed record.
+a hierarchy, just a newer signed record.
 
 ## Rotating the key itself
 
 Rotating the *keypair* behind a self-certifying name would change `<pubKeyID>`, and
-therefore the name — so it's effectively a new name. Keeping the **same human name**
+therefore the name, so it's effectively a new name. Keeping the **same human name**
 while changing the underlying key is a Layer 2 feature (the covenant **transfer**
 operation for bare names). See [Layer 2](/guide/layer2).

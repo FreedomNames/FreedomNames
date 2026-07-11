@@ -1,4 +1,4 @@
-# Freedom Names — website
+# Freedom Names website
 
 The marketing + documentation site for [Freedom Names](https://gitlab.melroy.org/freedom-names/freedom-names),
 built with [VitePress](https://vitepress.dev).
@@ -32,5 +32,5 @@ docs/
     └── theme/                  # brand colors (teal) on the default theme
 ```
 
-Content is plain Markdown — edit the files under `docs/` and the dev server
+Content is plain Markdown. Edit the files under `docs/` and the dev server
 hot-reloads.

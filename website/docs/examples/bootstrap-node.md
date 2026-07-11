@@ -44,7 +44,7 @@ A full bootstrap multiaddr combines a listen address with the peer ID:
 ```
 
 ::: tip
-Use a **publicly reachable** address for a bootstrap node — other machines must be
+Use a **publicly reachable** address for a bootstrap node; other machines must be
 able to open a connection to it. Make sure the relevant TCP/UDP ports are open.
 :::
 

@@ -28,12 +28,12 @@ Running `go run .` starts all of these at once:
                        └───────────────────────────────┘
 ```
 
-- **libp2p DHT peer** — the decentralized storage and resolution network. Signed
+- **libp2p DHT peer**: the decentralized storage and resolution network. Signed
   records are stored under `/fn/<pubKeyID>` and served to other peers.
-- **DNS server** (default `:53`) — resolves `.fn` names through the resolver and
+- **DNS server** (default `:53`): resolves `.fn` names through the resolver and
   transparently forwards everything else to an upstream resolver. Point your OS at
   it and `.fn` works everywhere.
-- **HTTP API** (default `:8080`) — publish signed records and resolve names
+- **HTTP API** (default `:8080`): publish signed records and resolve names
   programmatically. See the [HTTP API reference](/guide/http-api).
 
 A **bootstrap** node (`go run . bootstrap`) is a server-mode peer that others
@@ -41,14 +41,14 @@ connect to in order to join the network.
 
 ## The resolver and cache
 
-Every surface — DNS, HTTP, CLI — funnels through **one** `Resolver`. The resolver
+Every surface (DNS, HTTP, CLI) funnels through **one** `Resolver`. The resolver
 checks a local cache first, then the DHT, caching any hit. Sharing one resolver
 keeps behavior identical no matter how a name is looked up.
 
 For a self-certifying name (`label.<pubKeyID>.fn`), the resolver derives the DHT
 key directly from the `<pubKeyID>` suffix. For a bare name (`mysite.fn`), it
 routes through the optional Layer 2 registry to find the owner's public key first
-— see below.
+(see below).
 
 ## The validator
 
@@ -84,7 +84,7 @@ type NameRegistry interface {
 
 Today the registry is a stub that returns *not implemented*, so bare-name lookups
 fall back cleanly and self-certifying resolution is entirely unaffected. Crucially,
-**record data never lives on-chain** — only the name→owner binding does. Read the
+**record data never lives on-chain**; only the name→owner binding does. Read the
 full design in [Layer 2](/guide/layer2).
 
 ## Portability

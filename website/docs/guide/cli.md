@@ -41,7 +41,7 @@ Generated key for "mysite"
 Your name: mysite.<pubKeyID>.fn
 ```
 
-Fails if a key for that label already exists — it will not overwrite your key.
+Fails if a key for that label already exists; it will not overwrite your key.
 
 ## `freedom set <label> <TYPE> <VALUE> [ttl]`
 

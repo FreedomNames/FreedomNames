@@ -1,6 +1,6 @@
 # Publish a TXT record
 
-`TXT` records hold arbitrary UTF-8 text under a name — useful for verification
+`TXT` records hold arbitrary UTF-8 text under a name, useful for verification
 tokens, SPF policies, public notes, or small machine-readable metadata.
 
 ## Stage and publish

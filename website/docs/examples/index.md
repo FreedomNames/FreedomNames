@@ -6,20 +6,20 @@ Practical, end-to-end recipes. Each one assumes you have a
 
 <div class="fn-examples">
 
-- [**Host a website on `.fn`**](/examples/host-a-website) — point a name at a web
+- [**Host a website on `.fn`**](/examples/host-a-website): point a name at a web
   server and open it in a browser.
-- [**Publish a TXT record**](/examples/txt-record) — store arbitrary text (SPF,
+- [**Publish a TXT record**](/examples/txt-record): store arbitrary text (SPF,
   verification tokens, a message) under a name.
-- [**Rotate your records**](/examples/rotate-records) — change what a name points
+- [**Rotate your records**](/examples/rotate-records): change what a name points
   at, and understand how the newest signed record wins.
-- [**Run a bootstrap node**](/examples/bootstrap-node) — stand up a peer others
+- [**Run a bootstrap node**](/examples/bootstrap-node): stand up a peer others
   join the network through.
 
 </div>
 
 ::: tip New to the CLI?
-Walk through [**your first name**](/guide/your-first-name) first — these examples
-build on the same `keygen → set → publish → lookup` flow.
+Walk through [**your first name**](/guide/your-first-name) first, since these
+examples build on the same `keygen → set → publish → lookup` flow.
 :::
 
 <style>

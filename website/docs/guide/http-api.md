@@ -14,11 +14,11 @@ records and for inspecting the node. The CLI talks to this same API.
 ## POST `/publish`
 
 Stores a **pre-signed** `FNRecord` (JSON body) in the DHT. The client is expected
-to have signed the record with the owner's private key — the `freedom publish`
+to have signed the record with the owner's private key; the `freedom publish`
 command does this for you. The node verifies the record before storing it and
 rejects anything unowned, forged, expired, or malformed.
 
-**Request body** — a signed `FNRecord`:
+**Request body**, a signed `FNRecord`:
 
 ```json
 {
@@ -43,7 +43,7 @@ rejects anything unowned, forged, expired, or malformed.
 `500` if the DHT isn't initialized or storage fails.
 
 ::: tip
-You rarely POST this by hand — signing requires the private key. Use
+You rarely POST this by hand, since signing requires the private key. Use
 [`freedom publish`](/guide/cli#freedom-publish-label-api-url), which builds and
 signs the record for you.
 :::
@@ -126,4 +126,4 @@ Returns `200 OK` with an empty body.
 ## Next
 
 - The [**CLI**](/guide/cli) that wraps this API.
-- [**Configuration**](/guide/configuration) — change the listen address and more.
+- [**Configuration**](/guide/configuration) to change the listen address and more.

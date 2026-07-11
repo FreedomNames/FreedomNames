@@ -5,7 +5,7 @@ It assumes you have a [node running](/guide/running-a-node) on
 `http://localhost:8080`.
 
 ::: tip
-Invoke the CLI via the built binary — `./freedom-names freedom keygen mysite` —
+Invoke the CLI via the built binary (`./freedom-names freedom keygen mysite`)
 or, during development, `go run . freedom keygen mysite`. On this page we write it
 as `freedom …` for brevity.
 :::
@@ -22,7 +22,7 @@ Your name: mysite.<pubKeyID>.fn
 ```
 
 This creates an Ed25519 keypair under `~/.freedom/keys/mysite.key`. The
-`<pubKeyID>` in the output is derived from the public key — that's your
+`<pubKeyID>` in the output is derived from the public key; that's your
 self-certifying name. Keep the key file safe: **it is the name.**
 
 ## 2. Stage some records
@@ -71,7 +71,7 @@ Published mysite.<pubKeyID>.fn (seq 1720713600, 2 record(s))
 Under the hood the CLI signs the staged records with your private key, derives a
 sequence number from the current time (so republishes always supersede older
 ones), and POSTs the signed record to the node's `/publish` endpoint. The node
-**verifies** it before storing it in the DHT — if the signature or key binding
+**verifies** it before storing it in the DHT. If the signature or key binding
 were wrong, it would be rejected.
 
 ::: info
@@ -97,14 +97,14 @@ Either way you get back the `A` record you published. 🎉
 
 ## Republishing after a change
 
-Edit your records and publish again — the new sequence number wins:
+Edit your records and publish again, and the new sequence number wins:
 
 ```sh
 freedom set mysite A 10.0.0.9 300
 freedom publish mysite
 ```
 
-No re-registration, no waiting for propagation through a registrar — the update is
+No re-registration, no waiting for propagation through a registrar. The update is
 a new signed record that supersedes the old one across the network.
 
 ## Next

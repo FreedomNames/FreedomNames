@@ -4,7 +4,7 @@ Goal: make `blog.<pubKeyID>.fn` open your web server in a browser.
 
 ## 1. Have a web server somewhere
 
-Anything that serves HTTP works — a box at `203.0.113.20`, a home server, a VPS.
+Anything that serves HTTP works: a box at `203.0.113.20`, a home server, a VPS.
 Note its IP address.
 
 ## 2. Create a name for it
@@ -38,7 +38,7 @@ freedom publish blog
 
 For a browser to open the name, your machine has to send `.fn` queries to a
 Freedom Names node. Follow [Resolving from your
-system](/guide/resolving) — for a quick check without changing system settings:
+system](/guide/resolving). For a quick check without changing system settings:
 
 ```sh
 dig @127.0.0.1 -p 53 blog.<pubKeyID>.fn A
@@ -53,7 +53,7 @@ Once your system resolver is pointed at the node, visit:
 http://blog.<pubKeyID>.fn
 ```
 
-Your web server sees a normal HTTP request — Freedom Names only handled the
+Your web server sees a normal HTTP request; Freedom Names only handled the
 name→IP resolution.
 
 ::: warning HTTPS

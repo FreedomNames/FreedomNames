@@ -23,7 +23,7 @@ go run .
 
 That single command starts:
 
-- a **libp2p DHT peer** — the decentralized storage/resolution network,
+- a **libp2p DHT peer**, the decentralized storage/resolution network,
 - a **DNS server** (default `:53`) that resolves `.fn` names and forwards
   everything else upstream,
 - an **HTTP API** (default `:8080`) for publishing and resolving.
@@ -41,7 +41,7 @@ go run . bootstrap
 ```
 
 Point other nodes at it with the `FREEDOM_BOOTSTRAP` environment variable (a
-comma-separated list of multiaddrs) — see [Configuration](/guide/configuration).
+comma-separated list of multiaddrs). See [Configuration](/guide/configuration).
 
 ## The `:53` port
 

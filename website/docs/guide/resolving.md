@@ -6,7 +6,7 @@ you can make `.fn` "just work" system-wide by pointing your machine at the node.
 
 ## Query the node directly
 
-The simplest test — ask the node by hand with `dig`:
+The simplest test, asking the node by hand with `dig`:
 
 ```sh
 dig @127.0.0.1 -p 53 mysite.<pubKeyID>.fn A

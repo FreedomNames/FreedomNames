@@ -15,7 +15,7 @@ mysite . <pubKeyID> . fn
 ```
 
 - **`mysite`** is the label you choose. You can have many labels under one key.
-- **`<pubKeyID>`** is derived from your public key — it is *not* chosen. It is the
+- **`<pubKeyID>`** is derived from your public key; it is *not* chosen. It is the
   lowercase base36 encoding of the SHA-256 multihash of your marshaled Ed25519
   public key.
 - **`.fn`** is the top-level domain Freedom Names answers for.
@@ -32,7 +32,7 @@ Records for a name are bundled into a single signed structure, the `FNRecord`:
 | --- | --- |
 | `label` | the human label, e.g. `mysite` |
 | `records` | the resource records (`A` / `AAAA` / `TXT` / `CNAME`) |
-| `seq` | monotonic sequence number — **higher wins** |
+| `seq` | monotonic sequence number (**higher wins**) |
 | `eol` | expiry (unix seconds); the record is invalid after this |
 | `pubKey` | the marshaled Ed25519 public key |
 | `sig` | Ed25519 signature over a canonical serialization |
@@ -77,14 +77,14 @@ To resolve `mysite.<pubKeyID>.fn`:
 2. Check the local cache; on a miss, fetch the signed record from the DHT.
 3. Verify the signature and return the requested resource records.
 
-Resolution is shared by every surface — the DNS server, the HTTP API, and the CLI
+Resolution is shared by every surface: the DNS server, the HTTP API, and the CLI
 all funnel through one resolver.
 
 ## Conflict resolution: newest signed wins
 
 Two valid updates to the same name are ordered by `seq` (with `eol` as a
 tiebreaker). The CLI derives `seq` from wall-clock time on each publish, so a
-later republish always supersedes an earlier one — but only if it carries a valid
+later republish always supersedes an earlier one, but only if it carries a valid
 signature from the same key. An attacker can't win the race without the key.
 
 ## Why squatting is impossible
@@ -92,7 +92,7 @@ signature from the same key. An attacker can't win the race without the key.
 There is no global namespace to grab. `mysite.<aliceKey>.fn` and
 `mysite.<bobKey>.fn` are simply **different names**, because the key suffix
 differs. Alice can't "take" Bob's `mysite`, and neither of them registered
-`mysite` in any shared registry — they each just hold a key.
+`mysite` in any shared registry. They each just hold a key.
 
 The trade-off is the visible key suffix. Making `mysite.fn` (no suffix) globally
 unique is the job of [Layer 2](/guide/layer2), which *does* need consensus and

@@ -1,6 +1,6 @@
 # Configuration
 
-All configuration is via **environment variables** — nothing is hardcoded, so a
+All configuration is via **environment variables**; nothing is hardcoded, so a
 node is entirely driven by its environment.
 
 | Variable | Default | Purpose |
@@ -12,7 +12,7 @@ node is entirely driven by its environment.
 
 ## Examples
 
-**Local development** — use unprivileged ports so you don't need `sudo`:
+**Local development**, using unprivileged ports so you don't need `sudo`:
 
 ```sh
 FREEDOM_DNS_ADDR=127.0.0.1:15353 \
@@ -20,7 +20,7 @@ FREEDOM_HTTP_ADDR=127.0.0.1:8080 \
 go run .
 ```
 
-**Different upstream resolver** — forward non-`.fn` queries elsewhere:
+**Different upstream resolver**, forwarding non-`.fn` queries elsewhere:
 
 ```sh
 FREEDOM_UPSTREAM_DNS=9.9.9.9:53 go run .
@@ -50,7 +50,7 @@ Two kinds of keys, kept separate on purpose:
   network.
 - Your **name keys** live under `~/.freedom/keys/` and own your `.fn` names.
 
-Because they're separate, your names are **portable** — you can publish them from
+Because they're separate, your names are **portable**: you can publish them from
 any node, and replacing a node doesn't change who owns your names.
 
 ## Kernel buffers (optional)

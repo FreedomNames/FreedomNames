@@ -1,11 +1,11 @@
 import { defineConfig } from 'vitepress'
 
-// Freedom Names — https://gitlab.melroy.org/freedom-names/freedom-names
+// Freedom Names: https://gitlab.melroy.org/freedom-names/freedom-names
 export default defineConfig({
   lang: 'en-US',
   title: 'Freedom Names',
   description:
-    'Decentralized DNS on a libp2p Kademlia DHT. Own a human-readable name with no central authority and no consensus — the key is the name.',
+    'Decentralized DNS on a libp2p Kademlia DHT. Own a human-readable name with no central authority and no consensus: the key is the name.',
 
   cleanUrls: true,
   lastUpdated: true,
@@ -14,13 +14,13 @@ export default defineConfig({
     ['link', { rel: 'icon', type: 'image/png', href: '/logo.png' }],
     ['meta', { name: 'theme-color', content: '#1abc9c' }],
     ['meta', { property: 'og:type', content: 'website' }],
-    ['meta', { property: 'og:title', content: 'Freedom Names — decentralized DNS' }],
+    ['meta', { property: 'og:title', content: 'Freedom Names: decentralized DNS' }],
     [
       'meta',
       {
         property: 'og:description',
         content:
-          'Own a human-readable name with no central authority and no consensus. Records are cryptographically signed — nobody can overwrite a name they don’t own.',
+          'Own a human-readable name with no central authority and no consensus. Records are cryptographically signed, so nobody can overwrite a name they don’t own.',
       },
     ],
     ['meta', { property: 'og:image', content: '/logo.png' }],
@@ -112,7 +112,7 @@ export default defineConfig({
 
     footer: {
       message: 'Released under the AGPL-3.0 License.',
-      copyright: 'Freedom Names — no central authority, no consensus.',
+      copyright: 'Freedom Names. No central authority, no consensus.',
     },
   },
 })
