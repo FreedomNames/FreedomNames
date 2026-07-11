@@ -1,0 +1,46 @@
+/**
+ * Freedom Names brand theme: teal, echoing the released-bird logo.
+ */
+
+:root {
+  --vp-c-brand-1: #0e9f85;
+  --vp-c-brand-2: #14b8a6;
+  --vp-c-brand-3: #1abc9c;
+  --vp-c-brand-soft: rgba(26, 188, 156, 0.14);
+
+  --vp-c-tip-1: var(--vp-c-brand-1);
+  --vp-c-tip-2: var(--vp-c-brand-2);
+  --vp-c-tip-3: var(--vp-c-brand-3);
+  --vp-c-tip-soft: var(--vp-c-brand-soft);
+}
+
+.dark {
+  --vp-c-brand-1: #2dd4bf;
+  --vp-c-brand-2: #1abc9c;
+  --vp-c-brand-3: #14b8a6;
+  --vp-c-brand-soft: rgba(45, 212, 191, 0.16);
+}
+
+/* Home hero: brand gradient on the name + a soft glow behind the logo. */
+:root {
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(120deg, #14b8a6 30%, #22d3ee);
+
+  --vp-home-hero-image-background-image: linear-gradient(
+    -45deg,
+    rgba(26, 188, 156, 0.5) 40%,
+    rgba(34, 211, 238, 0.45) 60%
+  );
+  --vp-home-hero-image-filter: blur(48px);
+}
+
+@media (min-width: 640px) {
+  :root {
+    --vp-home-hero-image-filter: blur(64px);
+  }
+}
+
+/* Feature-card icons a touch bigger for the emoji set we use. */
+.VPFeature .icon {
+  font-size: 22px;
+}
