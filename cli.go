@@ -158,7 +158,21 @@ func cliSet(args []string) error {
 	if err != nil {
 		return err
 	}
-	records = append(records, RR{Type: rtype, Value: value, TTL: ttl})
+
+	// Dedupe by (type, value): re-setting the same record updates its TTL in
+	// place rather than staging a duplicate.
+	newRR := RR{Type: rtype, Value: value, TTL: ttl}
+	updated := false
+	for i := range records {
+		if records[i].Type == newRR.Type && records[i].Value == newRR.Value {
+			records[i].TTL = ttl
+			updated = true
+			break
+		}
+	}
+	if !updated {
+		records = append(records, newRR)
+	}
 
 	// Validate the whole set eagerly so mistakes surface now, not at publish.
 	tmp := &FNRecord{Label: label, Records: records}
@@ -168,7 +182,12 @@ func cliSet(args []string) error {
 	if err := saveStaged(label, records); err != nil {
 		return err
 	}
-	fmt.Printf("Staged %s %s (ttl %d) for %q (%d record(s) staged)\n", rtype, value, ttl, label, len(records))
+
+	action := "Staged"
+	if updated {
+		action = "Updated"
+	}
+	fmt.Printf("%s %s %s (ttl %d) for %q (%d record(s) staged)\n", action, rtype, value, ttl, label, len(records))
 	return nil
 }
 
