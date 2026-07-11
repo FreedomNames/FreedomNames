@@ -7,8 +7,8 @@ doesn't need one, because names are derived from public keys and therefore can't
 collide. Records live in a peer-to-peer DHT, ordered per-name by a sequence number.
 
 The optional [Layer 2](/guide/layer2) *does* borrow a blockchain (Bitcoin Cash)
-to decide who owns a globally-unique bare name, but that's a separate, planned
-layer that reads the chain; it doesn't make Layer 1 a blockchain.
+to decide who owns a globally-unique bare name, but that's a separate layer that
+only reads the chain; it doesn't make Layer 1 a blockchain.
 
 ## Can someone squat or steal my name?
 

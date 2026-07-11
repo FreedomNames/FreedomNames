@@ -2,29 +2,30 @@
 
 Layer 1 gives every owner an unforgeable name, but it carries a key suffix
 (`mysite.<pubKeyID>.fn`). To offer clean, globally-unique **bare** names like
-`mysite.fn`, Freedom Names needs a way for a decentralized network to agree on
-*who owns `mysite`*. That requires consensus. Rather than build a new chain,
-Layer 2 leans on an existing one: **Bitcoin Cash**.
+`mysite.fn`, a decentralized network has to agree on *who owns `mysite`*. That
+needs consensus. Rather than build a new chain, Layer 2 leans on an existing
+one: **Bitcoin Cash**.
 
 ::: info Status
-Layer 2 is **planned**. Today the registry is a stub: bare-name lookups return
-*not implemented* and fall back cleanly, while self-certifying (Layer 1) names
-resolve fully.
+Layer 2 is **beta**, tested on **chipnet**. A claimed name is a real,
+tradeable CashTokens NFT. Set `FREEDOM_BCH_ELECTRUM` to enable it; without it,
+self-certifying (Layer 1) names still resolve fully.
 :::
 
 ## Why a second layer
 
 Layer 1 (key-based records) has **no consensus** because self-certifying names
-can't collide: `mysite.<aliceKey>.fn` and `mysite.<bobKey>.fn` are just different
-names. The trade-off is the visible key suffix.
+cannot collide: `mysite.<aliceKey>.fn` and `mysite.<bobKey>.fn` are just
+different names. The trade-off is the visible key suffix.
 
 A bare name has no suffix, so two people *can* both want `mysite`. Deciding who
-wins is a consensus problem. Layer 2 borrows Bitcoin Cash's consensus using
-**CashTokens** (native NFTs) and **CashScript** covenants, mirroring how
-[LBRY](https://lbry.tech) resolves names via an on-chain *controlling claim*.
+wins is a consensus problem. Layer 2 borrows Bitcoin Cash's consensus: the
+first confirmed claim wins, and the claim is a **CashTokens NFT** you actually
+hold in your wallet.
 
-The node treats BCH as an **off-chain resolver**: it *reads* the chain to answer
-"who owns `mysite`?". Consensus stays entirely on BCH; Layer 1 stays pure-DHT.
+The node treats BCH as an **off-chain resolver**: it *reads* the chain to
+answer "who owns `mysite`?". Consensus stays entirely on BCH; Layer 1 stays
+pure-DHT.
 
 ## The seam in code
 
@@ -37,77 +38,81 @@ type NameRegistry interface {
 ```
 
 - The resolver sends **self-certifying** names straight to the DHT.
-- For **bare** names it calls `ResolveOwner` to get the owner's public key, derives
-  the DHT key from it, and then follows the *exact same* Layer 1 path.
+- For **bare** names it calls `ResolveOwner` to get the owner's public key,
+  derives the DHT key from it, and then follows the *exact same* Layer 1 path.
 
 `ResolveOwner` returns a **marshaled public key**, byte-identical to
-`FNRecord.PubKey`. So once the owner is known, resolution (derive DHT key → fetch
-signed record → validate → return records) is identical to Layer 1. **The record
-data never lives on-chain**; only the name→owner binding does. That keeps chain
-writes tiny and record edits free and instant.
+`FNRecord.PubKey`. So once the owner is known, resolution (derive DHT key, fetch
+signed record, validate, return records) is identical to Layer 1. **The record
+data never lives on-chain**; only the name-to-owner binding does. That keeps
+chain writes tiny and record edits free and instant.
 
-## On-chain data model
+## The on-chain protocol (FN v1)
 
-Each claimed name is an **NFT** (a CashTokens non-fungible token):
+A name is a **mutable CashTokens NFT**. Two transaction types anchor it, each
+identified by a tag in an `OP_RETURN` output:
 
-- **Token category**: a single category minted by the registry covenant, so all
-  name NFTs share a lineage and can be validated as genuine.
-- **NFT commitment** (≤40 bytes) holds a compact binding: `hash160(name)` and
-  `hash160(owner pubkey)`. The full name and full owner pubkey go in an
-  **OP_RETURN** in the same transaction (and/or in
-  [BCMR](https://cashtokens.org/docs/bcmr/chip/) metadata), so a resolver can
-  recover and verify them against the hashes.
+**Claim (`FN01`)** registers a name. The transaction:
 
-A name is **claimed** iff a UTXO exists holding a registry-category NFT whose name
-hash matches.
+1. **mints a mutable NFT** whose commitment is `hash160(ownerPubKey)`, sent to
+   your own address. This NFT *is* the name deed.
+2. carries `OP_RETURN FN01 <name> <ownerPubKey>`, revealing the full Ed25519
+   owner key the commitment hashes.
+3. pays a small **dust marker** to `hash160("FN:" + name)`, an address nobody
+   controls. Every claim/rebind pays this same marker, so all activity for a
+   name is discoverable with a single query, and the burned dust is a tiny
+   anti-spam registration cost.
 
-## Conflict resolution (LBRY-style)
+**Rebind (`FN02`)** points an existing name NFT at a new owner key. You spend
+the NFT, set its commitment to `hash160(newOwnerPubKey)`, and attach
+`OP_RETURN FN02 <name> <newOwnerPubKey>`. Because the NFT is a standard token,
+you can also **send it in any token-aware wallet**; the new holder then runs
+`freedom adopt <name>` once to bind it to their own key.
 
-If two people claim `mysite`, the winner is decided by **effective stake**:
+## Resolution
 
-- A claim's weight = the BCH locked in its claim UTXO plus any *supports*.
-- The **controlling claim** is the active claim with the highest effective amount
-  at the current chain tip (deterministic tie-break by outpoint).
-- Names are **normalized** before comparison so `Mysite` and `mysite` compete for
-  the same slot.
+`ResolveOwner("mysite.fn")`:
 
-So `ResolveOwner("mysite.fn")` normalizes the label, asks a BCH indexer for active
-claims with that name hash, picks the controlling claim, recovers the owner pubkey
-from the OP_RETURN, verifies it against the commitment, and returns it.
+1. queries the name's marker script history for claim/rebind transactions,
+2. takes the **earliest confirmed** valid `FN01` as authoritative (first come,
+   first served). Its transaction id is the NFT category.
+3. follows the NFT from its mint output to the current holder and reads the live
+   commitment,
+4. returns the revealed owner pubkey whose `hash160` matches that commitment
+   (falling back to the last valid binding if the NFT was moved by a plain
+   wallet transfer that has not been adopted yet).
 
-## Covenant rules (CashScript)
-
-A `NameRegistry.cash` covenant enforces, via BCH native introspection:
-
-- **Claim**: mint one registry-category NFT with the correct commitment and a
-  consistent OP_RETURN.
-- **Support**: attach more value to an existing claim without changing it.
-- **Transfer**: spend the claim to a new owner-key hash, authorized by the
-  *current* owner key. This lets an owner **rotate the Layer 1 keypair** a name
-  points at (e.g. after key compromise) while keeping the human name.
-- **Renewal / expiry** *(optional)*: encode a `heightExpires` so abandoned names
-  free up.
+Results are cached for a few minutes for reorg tolerance.
 
 ## Name normalization
 
-To prevent homograph/collision games, names are normalized before hashing: Unicode
-NFC + case-fold, restricted to `[a-z0-9-]` (no leading/trailing `-`, bounded
-length), then `hash160`. Normalization is **identical** on the client and in every
-resolver, so it lives in one shared function.
+Names are normalized before use: lowercased, restricted to `[a-z0-9-]` with no
+leading or trailing `-` and a length of 1 to 63. The **same** function runs on
+the client (when claiming) and in every resolver, so a name means exactly one
+thing everywhere.
 
 ## How the two layers compose
 
 A bare name always *also* resolves via its owner's Layer 1 records; Layer 2 only
-supplies the name→owner binding, and Layer 1 supplies the records. The two layers
-**compose rather than conflict**.
+supplies the name-to-owner binding, and Layer 1 supplies the records. The two
+layers **compose rather than conflict**: `freedom whois mysite.fn` even prints
+the equivalent self-certifying `mysite.<pubKeyID>.fn` name.
 
-## Open questions
+## Trying it on chipnet
 
-- **Indexer trust**: a light client can be fooled by a lying indexer. Mitigate
-  with SPV proofs of the claim UTXO, or by querying multiple indexers.
-- **Fee/spam economics**: minimum stake to claim, and whether supports can be
-  withdrawn.
+```sh
+export FREEDOM_BCH_ELECTRUM=ssl://chipnet.bch.ninja:50002
+export FREEDOM_BCH_NETWORK=chipnet
 
-For the full design and the phase-2 build checklist, see
-[`docs/layer2-bch-registry.md`](https://gitlab.melroy.org/freedom-names/freedom-names/-/blob/main/docs/layer2-bch-registry.md)
-in the repository.
+freedom keygen mysite            # your Layer 1 owner key
+freedom wallet                   # shows a bchtest: address to fund
+# fund that address from a chipnet faucet, then:
+freedom claim mysite             # mints the name NFT on-chain
+freedom whois mysite.fn          # once confirmed, shows the owner
+```
+
+## Reserved for later
+
+The design leaves room for a v2 that adds tradeable-name marketplaces and
+stake-weighted conflict resolution (LBRY-style). v1 keeps it minimal: a name is
+a token, first confirmed claim wins.

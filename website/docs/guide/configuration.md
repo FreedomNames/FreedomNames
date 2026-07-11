@@ -9,6 +9,14 @@ node is entirely driven by its environment.
 | `FREEDOM_DNS_ADDR` | `:8053` | DNS server listen address |
 | `FREEDOM_UPSTREAM_DNS` | `1.1.1.1:53` | Upstream resolver for non-`.fn` queries |
 | `FREEDOM_BOOTSTRAP` | *(none)* | Comma-separated bootstrap peer multiaddrs |
+| `FREEDOM_BCH_ELECTRUM` | *(chipnet server)* | Electrum server for Layer 2 bare names (`ssl://host:port`) |
+| `FREEDOM_BCH_NETWORK` | `chipnet` | BCH network: `chipnet` or `mainnet` |
+| `FREEDOM_BCH_MINCONF` | `1` | Confirmations before a name claim counts |
+
+The `FREEDOM_BCH_*` variables enable [Layer 2](/guide/layer2) (globally-unique
+bare names on Bitcoin Cash). Point `FREEDOM_BCH_ELECTRUM` at any Electrum Cash
+(Fulcrum) server, including your own. Leave it empty to disable Layer 2; Layer 1
+names always resolve.
 
 The DNS server defaults to the high port **`:8053`**, so a node runs **without
 root**. If the DNS port can't be bound, the node logs a warning and keeps running;
