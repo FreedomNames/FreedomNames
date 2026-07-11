@@ -75,7 +75,30 @@ curl "http://localhost:8420/resolve?name=mysite.<pubKeyID>.fn&type=A"
 }
 ```
 
-**Errors:** `400` if `name` is missing; `404` if the name can't be resolved.
+**Errors:** `400` if `name` is missing or malformed; `404` if the name does not
+exist; `502` if the lookup infrastructure failed (DHT timeout, no peers), which
+means: retry later, the name may still exist.
+
+## GET `/record`
+
+Returns the raw signed record for a name, including its sequence number and
+expiry. Bypasses the resolution cache. The CLI uses this to pick the next
+sequence number when publishing an update.
+
+**Query parameters:**
+
+| Param | Required | Meaning |
+| --- | --- | --- |
+| `name` | yes | the full name to fetch |
+
+```sh
+curl "http://localhost:8420/record?name=mysite.<pubKeyID>.fn"
+```
+
+**Response** `200 OK`: the full `FNRecord` JSON (`label`, `records`, `seq`,
+`eol`, `pubKey`, `sig`).
+
+**Errors:** same status mapping as `/resolve`.
 
 ## GET `/peers`
 

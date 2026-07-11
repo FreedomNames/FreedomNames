@@ -212,10 +212,33 @@ func (r *FNRecord) FullName() (string, error) {
 	return r.Label + "." + id + "." + tld, nil
 }
 
+// CanonicalName normalizes a name for use as a cache or comparison key:
+// lowercase with any trailing dot (DNS FQDN form) stripped. Every surface (DNS,
+// HTTP, CLI) must key caches on this form so "MySite.<id>.fn." and
+// "mysite.<id>.fn" share one entry.
+func CanonicalName(name string) string {
+	return strings.TrimSuffix(strings.ToLower(name), ".")
+}
+
+// IsPubKeyID reports whether s is a well-formed self-certifying pubkey id:
+// the base36 encoding of a sha2-256 multihash. This is the authoritative test
+// for Layer 1 vs Layer 2 routing — no length heuristics.
+func IsPubKeyID(s string) bool {
+	raw, err := base36.DecodeString(s)
+	if err != nil {
+		return false
+	}
+	decoded, err := mh.Decode(raw)
+	if err != nil {
+		return false
+	}
+	return decoded.Code == mh.SHA2_256
+}
+
 // ParseName splits a "label.<pubKeyID>.fn" name into its label and pubkey-id.
 // It tolerates a trailing dot (as DNS fully-qualified names carry).
 func ParseName(name string) (label, keyID string, err error) {
-	trimmed := strings.TrimSuffix(strings.ToLower(name), ".")
+	trimmed := CanonicalName(name)
 	parts := strings.Split(trimmed, ".")
 	if len(parts) < 3 || parts[len(parts)-1] != tld {
 		return "", "", fmt.Errorf("not a %s name: %q", tld, name)

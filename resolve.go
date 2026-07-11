@@ -32,13 +32,16 @@ func (r *Resolver) WithRegistry(registry NameRegistry) *Resolver {
 }
 
 // Resolve returns the resource records for a full "label.<pubKeyID>.fn" name.
-// It checks the cache first, then the DHT, caching any DHT hit.
+// It checks the cache first, then the DHT, caching any DHT hit. Cache keys use
+// the canonical (lowercased, no trailing dot) form so the DNS FQDN spelling and
+// the HTTP/CLI spelling share one entry.
 func (r *Resolver) Resolve(name string) ([]RR, error) {
-	if records, ok := r.cache.Get(name); ok {
+	canonical := CanonicalName(name)
+	if records, ok := r.cache.Get(canonical); ok {
 		return records, nil
 	}
 
-	key, err := r.dhtKeyForName(name)
+	key, err := r.dhtKeyForName(canonical)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +50,8 @@ func (r *Resolver) Resolve(name string) ([]RR, error) {
 		return nil, err
 	}
 
-	r.cache.Add(name, rec.Records)
+	// Cache expiry honors both the RR TTLs and the record's signed EOL.
+	r.cache.Add(canonical, rec.Records, rec.EOL)
 	return rec.Records, nil
 }
 

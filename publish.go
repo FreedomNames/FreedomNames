@@ -7,11 +7,14 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 )
 
-// defaultRecordTTL is how long a published FNRecord stays valid before it must be
-// republished. libp2p DHT records expire in ~36h, so we refresh well before that.
-const defaultRecordTTL = 24 * time.Hour
+// defaultRecordTTL is how long a signed FNRecord stays valid (its EOL horizon).
+// The node can only re-put the original signed bytes — it never holds the
+// owner's private key, so it cannot extend the EOL. The owner must re-publish
+// (re-sign) before this expires; the CLI surfaces the expiry date at publish.
+const defaultRecordTTL = 7 * 24 * time.Hour
 
-// republishInterval is how often the node re-publishes owned records.
+// republishInterval is how often the node re-puts owned records into the DHT.
+// libp2p DHT records expire in ~36h, so this must stay comfortably below that.
 const republishInterval = 8 * time.Hour
 
 // BuildAndSignRecord constructs an FNRecord for the given label and resource
@@ -77,21 +80,26 @@ func (freedomName *FreedomNameNode) republishLoop() {
 	}
 }
 
-// republishOwned bumps the expiry of each owned record and re-stores it.
+// republishOwned re-puts each still-valid owned record into the DHT so it does
+// not fall out at the DHT's ~36h record expiry. It cannot extend a record's
+// signed EOL (the node has no owner keys): records whose EOL has passed are
+// pruned from the owned set with a warning telling the owner to re-publish.
 func (freedomName *FreedomNameNode) republishOwned() {
+	now := time.Now().Unix()
+
 	freedomName.ownedMu.Lock()
-	records := make([]*FNRecord, 0, len(freedomName.owned))
-	for _, rec := range freedomName.owned {
-		records = append(records, rec)
+	live := make(map[string]*FNRecord, len(freedomName.owned))
+	for key, rec := range freedomName.owned {
+		if rec.EOL != 0 && now > rec.EOL {
+			log.Printf("WARNING: record %s (label %q) passed its signed EOL and was dropped from republishing — the owner must re-publish (re-sign) it", key, rec.Label)
+			delete(freedomName.owned, key)
+			continue
+		}
+		live[key] = rec
 	}
 	freedomName.ownedMu.Unlock()
 
-	for _, rec := range records {
-		key, err := rec.DHTKey()
-		if err != nil {
-			log.Printf("republish: bad key: %v", err)
-			continue
-		}
+	for key, rec := range live {
 		value, err := rec.Marshal()
 		if err != nil {
 			log.Printf("republish: marshal %s: %v", key, err)

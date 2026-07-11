@@ -81,8 +81,11 @@ freedom name mysite
 ## `freedom publish <label> [--api URL]`
 
 Signs the staged records with the label's private key and POSTs the signed record
-to a node's `/publish` endpoint. The sequence number is derived from the current
-time so republishes monotonically increase and supersede older records.
+to a node's `/publish` endpoint. The sequence number is chosen strictly above the
+name's current record (fetched via `/record`, falling back to the current time)
+so updates always supersede older records, even for same-second publishes or a
+clock that stepped backwards. Records stay valid for 7 days; re-run publish
+before then to renew (the CLI prints the expiry).
 
 ```sh
 freedom publish mysite --api http://localhost:8420

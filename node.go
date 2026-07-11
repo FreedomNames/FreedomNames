@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"sync"
+	"time"
 
 	libp2p "github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -280,10 +281,15 @@ func (freedomName *FreedomNameNode) GetNetworkPeers() []peer.ID {
 	return nil
 }
 
+// dhtOpTimeout bounds a single DHT put/get so slow or partitioned networks
+// cannot hang HTTP/DNS handler goroutines indefinitely.
+const dhtOpTimeout = 60 * time.Second
+
 // PutValue add value to DHT
 func (freedomName *FreedomNameNode) PutValue(key string, value []byte) error {
 	if freedomName.kadDHT != nil {
-		ctx, cancel := context.WithCancel(context.Background())
+		// Derived from the node context so operations are cancelled at shutdown.
+		ctx, cancel := context.WithTimeout(freedomName.ctx, dhtOpTimeout)
 		defer cancel()
 
 		return freedomName.kadDHT.PutValue(ctx, key, value)
@@ -294,7 +300,8 @@ func (freedomName *FreedomNameNode) PutValue(key string, value []byte) error {
 // GetValue get value from DHT
 func (freedomName *FreedomNameNode) GetValue(key string) ([]byte, error) {
 	if freedomName.kadDHT != nil {
-		ctx, cancel := context.WithCancel(context.Background())
+		// Derived from the node context so operations are cancelled at shutdown.
+		ctx, cancel := context.WithTimeout(freedomName.ctx, dhtOpTimeout)
 		defer cancel()
 
 		return freedomName.kadDHT.GetValue(ctx, key)

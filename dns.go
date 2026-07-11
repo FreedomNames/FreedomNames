@@ -146,7 +146,7 @@ func (s *DNSServer) handleForward(ctx context.Context, w dns.ResponseWriter, r *
 }
 
 // toDNSRR converts a Freedom Names RR into a wire DNS RR for the given query
-// type. It returns nil if the record type does not match the query type.
+// type. It returns nil if the record does not answer the query type.
 func toDNSRR(name string, rr RR, qtype uint16) dns.RR {
 	hdr := dns.Header{Name: name, TTL: rr.TTL, Class: dns.ClassINET}
 	switch rr.Type {
@@ -155,7 +155,13 @@ func toDNSRR(name string, rr RR, qtype uint16) dns.RR {
 			return nil
 		}
 		addr, err := netip.ParseAddr(rr.Value)
-		if err != nil || !addr.Is4() {
+		if err != nil {
+			return nil
+		}
+		// Unmap accepts the IPv4-mapped IPv6 form ("::ffff:1.2.3.4") that
+		// record validation also accepts, normalizing it to plain IPv4.
+		addr = addr.Unmap()
+		if !addr.Is4() {
 			return nil
 		}
 		return &dns.A{Hdr: hdr, A: rdata.A{Addr: addr}}
@@ -174,7 +180,10 @@ func toDNSRR(name string, rr RR, qtype uint16) dns.RR {
 		}
 		return &dns.TXT{Hdr: hdr, TXT: rdata.TXT{Txt: []string{rr.Value}}}
 	case RecordTypeCNAME:
-		if qtype != dns.TypeCNAME {
+		// Per RFC 1034 §3.6.2 a CNAME answers queries for other types too:
+		// return the CNAME for A/AAAA (and CNAME) queries so CNAME-only names
+		// stay reachable through normal clients, which chase the target.
+		if qtype != dns.TypeCNAME && qtype != dns.TypeA && qtype != dns.TypeAAAA {
 			return nil
 		}
 		return &dns.CNAME{Hdr: hdr, CNAME: rdata.CNAME{Target: dnsutil.Fqdn(rr.Value)}}
