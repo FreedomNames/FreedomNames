@@ -12,7 +12,7 @@ Invoke it via the built binary or during development with `go run .`:
 go run . freedom keygen mysite
 ```
 
-The default node API is `http://localhost:8080` (override with `--api`).
+The default node API is `http://localhost:8420` (override with `--api`).
 
 ## Commands at a glance
 
@@ -85,7 +85,7 @@ to a node's `/publish` endpoint. The sequence number is derived from the current
 time so republishes monotonically increase and supersede older records.
 
 ```sh
-freedom publish mysite --api http://localhost:8080
+freedom publish mysite --api http://localhost:8420
 ```
 
 ```

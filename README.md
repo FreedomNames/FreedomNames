@@ -37,7 +37,7 @@ A node runs three things at once:
 - a **DNS server** (default `:8053`) that resolves `.fn` names and forwards
   everything else upstream — point your OS/browser at it (or bridge it to `:53`,
   see below) and `.fn` just works,
-- an **HTTP API** (default `:8080`) for publishing and resolving.
+- an **HTTP API** (default `:8420`) for publishing and resolving.
 
 Run a **bootstrap** (server) node that others can connect to:
 
@@ -51,7 +51,7 @@ All configuration is via environment variables (nothing is hardcoded):
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `FREEDOM_HTTP_ADDR` | `:8080` | HTTP API listen address |
+| `FREEDOM_HTTP_ADDR` | `:8420` | HTTP API listen address |
 | `FREEDOM_DNS_ADDR` | `:8053` | DNS server listen address |
 | `FREEDOM_UPSTREAM_DNS` | `1.1.1.1:53` | Upstream resolver for non-`.fn` queries |
 | `FREEDOM_BOOTSTRAP` | (none) | Comma-separated bootstrap peer multiaddrs |
@@ -83,7 +83,7 @@ freedom set mysite TXT "hello world"
 freedom name mysite
 
 # Sign the staged records and publish them to a running node
-freedom publish mysite --api http://localhost:8080
+freedom publish mysite --api http://localhost:8420
 
 # Resolve a name via a running node
 freedom lookup mysite.<pubKeyID>.fn --type A

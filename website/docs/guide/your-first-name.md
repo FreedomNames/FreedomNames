@@ -2,7 +2,7 @@
 
 This walkthrough takes you from nothing to a resolvable `.fn` name in five steps.
 It assumes you have a [node running](/guide/running-a-node) on
-`http://localhost:8080`.
+`http://localhost:8420`.
 
 ::: tip
 Invoke the CLI via the built binary (`./freedom-names freedom keygen mysite`)
@@ -61,7 +61,7 @@ You'll use this full name to resolve. Copy it somewhere handy.
 ## 4. Sign and publish
 
 ```sh
-freedom publish mysite --api http://localhost:8080
+freedom publish mysite --api http://localhost:8420
 ```
 
 ```
@@ -75,7 +75,7 @@ ones), and POSTs the signed record to the node's `/publish` endpoint. The node
 were wrong, it would be rejected.
 
 ::: info
-`--api` defaults to `http://localhost:8080`, so you can omit it when publishing to
+`--api` defaults to `http://localhost:8420`, so you can omit it when publishing to
 a local node.
 :::
 

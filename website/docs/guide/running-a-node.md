@@ -27,7 +27,7 @@ That single command starts:
 - a **libp2p DHT peer**, the decentralized storage/resolution network,
 - a **DNS server** (default `:8053`) that resolves `.fn` names and forwards
   everything else upstream,
-- an **HTTP API** (default `:8080`) for publishing and resolving.
+- an **HTTP API** (default `:8420`) for publishing and resolving.
 
 You now have a working node. Leave it running in a terminal; the CLI and your
 system resolver talk to it.
@@ -70,7 +70,7 @@ DHT and HTTP API are unaffected.
 Ask the node about itself over the HTTP API:
 
 ```sh
-curl http://localhost:8080/info
+curl http://localhost:8420/info
 ```
 
 You'll get JSON describing the node's mode, peer ID, listen addresses, and an

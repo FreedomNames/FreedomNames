@@ -58,6 +58,9 @@ func StartHTTPServer(freedomDht FreedomDHT, resolver *Resolver, cache Cache, add
 		wg.Wait()
 		//log.Println("Server was gracefully shut down.")
 	} else if err != nil {
+		if isPrivilegedPortErr(err) || isAddrInUseErr(err) {
+			log.Fatalf("HTTP API could not bind %s: %v\n  Set FREEDOM_HTTP_ADDR to a free port, e.g. FREEDOM_HTTP_ADDR=:8421", addr, err)
+		}
 		log.Fatalf("HTTP server error: %v", err)
 	}
 }

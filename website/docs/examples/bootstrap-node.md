@@ -22,7 +22,7 @@ Other nodes need this node's **multiaddr** (address + peer ID). Ask the node abo
 itself:
 
 ```sh
-curl http://localhost:8080/info
+curl http://localhost:8420/info
 ```
 
 ```json
@@ -69,7 +69,7 @@ go run .
 On any node, check the peers it knows about:
 
 ```sh
-curl http://localhost:8080/peers
+curl http://localhost:8420/peers
 ```
 
 You should see the bootstrap node's peer ID appear in the routing table and

@@ -23,7 +23,7 @@ var defaultBootstrapPeers = []string{
 // LoadConfig reads configuration from the environment with defaults.
 func LoadConfig() *Config {
 	cfg := &Config{
-		HTTPAddr: envOr("FREEDOM_HTTP_ADDR", ":8080"),
+		HTTPAddr: envOr("FREEDOM_HTTP_ADDR", ":8420"),
 		// Default to the high port :8053 so nodes run without root. (We avoid
 		// :5353, which collides with mDNS/avahi on most desktops.) Set
 		// FREEDOM_DNS_ADDR=:53 (with setcap or a :53->:8053 forwarder) for

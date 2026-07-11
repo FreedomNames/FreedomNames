@@ -31,7 +31,7 @@ Nodes cache resolutions, so right after publishing you may still see the cached
 answer. Clear a node's cache to force a fresh DHT read:
 
 ```sh
-curl -X DELETE http://localhost:8080/clear_cache
+curl -X DELETE http://localhost:8420/clear_cache
 freedom lookup blog.<pubKeyID>.fn --type A
 ```
 

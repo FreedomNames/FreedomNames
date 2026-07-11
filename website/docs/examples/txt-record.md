@@ -32,7 +32,7 @@ dig @127.0.0.1 -p 8053 notes.<pubKeyID>.fn TXT
 Or straight over the HTTP API:
 
 ```sh
-curl "http://localhost:8080/resolve?name=notes.<pubKeyID>.fn&type=TXT"
+curl "http://localhost:8420/resolve?name=notes.<pubKeyID>.fn&type=TXT"
 ```
 
 ```json

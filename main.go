@@ -6,12 +6,18 @@ import (
 	"log"
 	"os"
 	"strings"
+	"syscall"
 )
 
 // isPrivilegedPortErr reports whether err is a permission-denied bind, which for
 // a DNS server almost always means the configured port is privileged (<1024).
 func isPrivilegedPortErr(err error) bool {
 	return errors.Is(err, os.ErrPermission) || strings.Contains(err.Error(), "permission denied")
+}
+
+// isAddrInUseErr reports whether err is an "address already in use" bind failure.
+func isAddrInUseErr(err error) bool {
+	return errors.Is(err, syscall.EADDRINUSE) || strings.Contains(err.Error(), "address already in use")
 }
 
 func main() {
@@ -43,10 +49,13 @@ func main() {
 	// API are the core, and DNS is one optional resolution surface.
 	dnsServer := NewDNSServer(cfg.DNSAddr, cfg.UpstreamDNS, resolver)
 	if err := dnsServer.Start(); err != nil {
-		log.Printf("WARNING: DNS server disabled: %v", err)
-		if isPrivilegedPortErr(err) {
-			log.Printf("  %s is a privileged port. Use a high port, e.g. FREEDOM_DNS_ADDR=127.0.0.1:15353,", cfg.DNSAddr)
-			log.Printf("  or grant the capability once: sudo setcap cap_net_bind_service=+ep ./freedom-names")
+		log.Printf("WARNING: DNS server disabled (DHT and HTTP API still running): %v", err)
+		switch {
+		case isPrivilegedPortErr(err):
+			log.Printf("  %s is a privileged port. Use the default high port, or", cfg.DNSAddr)
+			log.Printf("  grant the capability once: sudo setcap cap_net_bind_service=+ep ./freedom-names")
+		case isAddrInUseErr(err):
+			log.Printf("  %s is already in use. Set FREEDOM_DNS_ADDR to a free port, e.g. FREEDOM_DNS_ADDR=:8054", cfg.DNSAddr)
 		}
 	} else {
 		defer dnsServer.Shutdown()

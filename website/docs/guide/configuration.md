@@ -5,7 +5,7 @@ node is entirely driven by its environment.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `FREEDOM_HTTP_ADDR` | `:8080` | HTTP API listen address |
+| `FREEDOM_HTTP_ADDR` | `:8420` | HTTP API listen address |
 | `FREEDOM_DNS_ADDR` | `:8053` | DNS server listen address |
 | `FREEDOM_UPSTREAM_DNS` | `1.1.1.1:53` | Upstream resolver for non-`.fn` queries |
 | `FREEDOM_BOOTSTRAP` | *(none)* | Comma-separated bootstrap peer multiaddrs |
@@ -19,7 +19,7 @@ root**. If the DNS port can't be bound, the node logs a warning and keeps runnin
 **Local development** works out of the box on the default `:8053` — no `sudo`:
 
 ```sh
-FREEDOM_HTTP_ADDR=127.0.0.1:8080 \
+FREEDOM_HTTP_ADDR=127.0.0.1:8420 \
 go run .
 ```
 
