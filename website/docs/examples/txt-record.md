@@ -26,7 +26,7 @@ freedom lookup notes.<pubKeyID>.fn --type TXT
 Or over DNS:
 
 ```sh
-dig @127.0.0.1 -p 53 notes.<pubKeyID>.fn TXT
+dig @127.0.0.1 -p 8053 notes.<pubKeyID>.fn TXT
 ```
 
 Or straight over the HTTP API:

@@ -41,7 +41,7 @@ Freedom Names node. Follow [Resolving from your
 system](/guide/resolving). For a quick check without changing system settings:
 
 ```sh
-dig @127.0.0.1 -p 53 blog.<pubKeyID>.fn A
+dig @127.0.0.1 -p 8053 blog.<pubKeyID>.fn A
 # should return 203.0.113.20
 ```
 

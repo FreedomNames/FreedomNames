@@ -6,16 +6,19 @@ node is entirely driven by its environment.
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `FREEDOM_HTTP_ADDR` | `:8080` | HTTP API listen address |
-| `FREEDOM_DNS_ADDR` | `:53` | DNS server listen address |
+| `FREEDOM_DNS_ADDR` | `:8053` | DNS server listen address |
 | `FREEDOM_UPSTREAM_DNS` | `1.1.1.1:53` | Upstream resolver for non-`.fn` queries |
 | `FREEDOM_BOOTSTRAP` | *(none)* | Comma-separated bootstrap peer multiaddrs |
 
+The DNS server defaults to the high port **`:8053`**, so a node runs **without
+root**. If the DNS port can't be bound, the node logs a warning and keeps running
+— the DHT and HTTP API are unaffected.
+
 ## Examples
 
-**Local development**, using unprivileged ports so you don't need `sudo`:
+**Local development** works out of the box on the default `:8053` — no `sudo`:
 
 ```sh
-FREEDOM_DNS_ADDR=127.0.0.1:15353 \
 FREEDOM_HTTP_ADDR=127.0.0.1:8080 \
 go run .
 ```
@@ -32,15 +35,24 @@ FREEDOM_UPSTREAM_DNS=9.9.9.9:53 go run .
 FREEDOM_BOOTSTRAP="/ip4/203.0.113.10/tcp/4001/p2p/<peerID>,/ip4/…/…" go run .
 ```
 
-## The `:53` port
+## System-wide resolution and the `:53` port
 
-`:53` is privileged. For local development use a high port
-(`FREEDOM_DNS_ADDR=127.0.0.1:15353`), or grant the built binary the capability:
+The default `:8053` is great for testing (`dig -p 8053 …`), but your OS and
+browser only send DNS to the standard **`:53`**. To make `.fn` resolve
+system-wide, run Freedom Names on `:53`. Since `:53` is privileged, either grant
+the binary the capability once:
 
 ```sh
 go build -o freedom-names .
 sudo setcap cap_net_bind_service=+ep ./freedom-names
+FREEDOM_DNS_ADDR=:53 ./freedom-names
 ```
+
+…or keep `:8053` and forward `:53 → 127.0.0.1:8053` with a local resolver
+(dnsmasq / systemd-resolved), or point a stub resolver at `127.0.0.1:8053`.
+
+> **Avoid `:5353`** for the DNS port — it collides with mDNS/avahi on most
+> desktops. That's why the default is `:8053`.
 
 ## Node identity vs. name keys
 

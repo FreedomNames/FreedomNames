@@ -90,7 +90,7 @@ freedom lookup mysite.<pubKeyID>.fn --type A
 Or straight over DNS, like any resolver:
 
 ```sh
-dig @127.0.0.1 -p 53 mysite.<pubKeyID>.fn A
+dig @127.0.0.1 -p 8053 mysite.<pubKeyID>.fn A
 ```
 
 Either way you get back the `A` record you published. 🎉

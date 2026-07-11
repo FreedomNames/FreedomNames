@@ -34,8 +34,9 @@ go run .
 A node runs three things at once:
 
 - a **libp2p DHT** peer (the decentralized storage/resolution network),
-- a **DNS server** (default `:53`) that resolves `.fn` names and forwards
-  everything else upstream — point your OS/browser at it and `.fn` just works,
+- a **DNS server** (default `:8053`) that resolves `.fn` names and forwards
+  everything else upstream — point your OS/browser at it (or bridge it to `:53`,
+  see below) and `.fn` just works,
 - an **HTTP API** (default `:8080`) for publishing and resolving.
 
 Run a **bootstrap** (server) node that others can connect to:
@@ -51,13 +52,22 @@ All configuration is via environment variables (nothing is hardcoded):
 | Variable | Default | Purpose |
 |---|---|---|
 | `FREEDOM_HTTP_ADDR` | `:8080` | HTTP API listen address |
-| `FREEDOM_DNS_ADDR` | `:53` | DNS server listen address |
+| `FREEDOM_DNS_ADDR` | `:8053` | DNS server listen address |
 | `FREEDOM_UPSTREAM_DNS` | `1.1.1.1:53` | Upstream resolver for non-`.fn` queries |
 | `FREEDOM_BOOTSTRAP` | (none) | Comma-separated bootstrap peer multiaddrs |
 
-`:53` is privileged. For local development use a high port, e.g.
-`FREEDOM_DNS_ADDR=127.0.0.1:15353`, or grant the binary the capability:
-`sudo setcap cap_net_bind_service=+ep ./freedom-names`.
+The DNS server defaults to the high port **`:8053`** so a node runs **without
+root**. If the DNS port fails to bind, the node logs a warning and keeps
+running — the DHT and HTTP API are unaffected.
+
+For **system-wide** resolution your OS/browser needs Freedom Names on the
+standard `:53`. Options:
+
+- Grant the binary the capability once (recommended):
+  `sudo setcap cap_net_bind_service=+ep ./freedom-names`, then run with
+  `FREEDOM_DNS_ADDR=:53`.
+- Or keep `:8053` and forward `:53 → :8053` with a local resolver
+  (dnsmasq/systemd-resolved), or point a stub resolver at `127.0.0.1:8053`.
 
 ## Managing names with the CLI
 
@@ -90,7 +100,7 @@ during development, `go run . freedom keygen mysite`.
 Once a node is running, query it like any DNS server:
 
 ```sh
-dig @127.0.0.1 -p 53 mysite.<pubKeyID>.fn A
+dig @127.0.0.1 -p 8053 mysite.<pubKeyID>.fn A
 ```
 
 Non-`.fn` queries are transparently forwarded to the upstream resolver, so the

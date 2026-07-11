@@ -9,14 +9,14 @@ you can make `.fn` "just work" system-wide by pointing your machine at the node.
 The simplest test, asking the node by hand with `dig`:
 
 ```sh
-dig @127.0.0.1 -p 53 mysite.<pubKeyID>.fn A
+dig @127.0.0.1 -p 8053 mysite.<pubKeyID>.fn A
 ```
 
 Non-`.fn` queries are transparently forwarded upstream, so the same server can
 answer for `example.com` too:
 
 ```sh
-dig @127.0.0.1 -p 53 example.com A
+dig @127.0.0.1 -p 8053 example.com A
 ```
 
 This is what makes a Freedom Names node usable as your **only** resolver: it adds
