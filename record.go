@@ -172,6 +172,12 @@ func UnmarshalFNRecord(data []byte) (*FNRecord, error) {
 	return &r, nil
 }
 
+// unmarshalOwnerPubKey parses a marshaled libp2p public key (as carried in an
+// FN01/FN02 OP_RETURN), returning an error if it is not a valid key.
+func unmarshalOwnerPubKey(marshaled []byte) (crypto.PubKey, error) {
+	return crypto.UnmarshalPublicKey(marshaled)
+}
+
 // pubKeyID returns the self-certifying suffix for a marshaled public key: the
 // lowercase base36 encoding of its sha2-256 multihash. This is what appears in
 // the human name "label.<pubKeyID>.fn" and what the DHT key is derived from.
