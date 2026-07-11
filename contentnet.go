@@ -182,14 +182,20 @@ func (cs *ContentService) handleStream(stream network.Stream) {
 // provideLoop re-announces every locally stored blob periodically so provider
 // records stay fresh while this node is up.
 func (cs *ContentService) provideLoop() {
-	// Announce shortly after start, then on an interval.
-	first := time.NewTimer(20 * time.Second)
-	defer first.Stop()
+	// Announce shortly after start (once peers are likely connected), then on a
+	// steady interval via a single ticker (no per-iteration timer allocation).
+	select {
+	case <-time.After(20 * time.Second):
+		cs.provideAll()
+	case <-cs.node.ctx.Done():
+		return
+	}
+
+	ticker := time.NewTicker(provideInterval)
+	defer ticker.Stop()
 	for {
 		select {
-		case <-first.C:
-			cs.provideAll()
-		case <-time.After(provideInterval):
+		case <-ticker.C:
 			cs.provideAll()
 		case <-cs.node.ctx.Done():
 			return
