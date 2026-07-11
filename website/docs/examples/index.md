@@ -1,7 +1,7 @@
 # Examples
 
 Practical, end-to-end recipes. Each one assumes you have a
-[node running](/guide/running-a-node) on `http://localhost:8080` and the
+[node running](/guide/running-a-node) on `http://localhost:8420` and the
 `freedom` CLI available.
 
 <div class="fn-examples">

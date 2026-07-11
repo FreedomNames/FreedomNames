@@ -1,6 +1,6 @@
 # HTTP API reference
 
-Every node exposes an HTTP API (default `:8080`) for publishing and resolving
+Every node exposes an HTTP API (default `:8420`) for publishing and resolving
 records and for inspecting the node. The CLI talks to this same API.
 
 | Route | Method | Purpose |
@@ -61,7 +61,7 @@ filtered by type.
 | `type` | no | filter to one type (`A`\|`AAAA`\|`TXT`\|`CNAME`) |
 
 ```sh
-curl "http://localhost:8080/resolve?name=mysite.<pubKeyID>.fn&type=A"
+curl "http://localhost:8420/resolve?name=mysite.<pubKeyID>.fn&type=A"
 ```
 
 **Response** `200 OK`:
@@ -82,7 +82,7 @@ curl "http://localhost:8080/resolve?name=mysite.<pubKeyID>.fn&type=A"
 Returns the DHT routing-table peers and the currently connected hosts.
 
 ```sh
-curl http://localhost:8080/peers
+curl http://localhost:8420/peers
 ```
 
 ```json
@@ -97,7 +97,7 @@ curl http://localhost:8080/peers
 Returns general information about the node and its view of the network.
 
 ```sh
-curl http://localhost:8080/info
+curl http://localhost:8420/info
 ```
 
 ```json
@@ -118,7 +118,7 @@ Purges the node's local resolution cache. Useful after publishing an update if y
 want a resolve to skip the cache and hit the DHT.
 
 ```sh
-curl -X DELETE http://localhost:8080/clear_cache
+curl -X DELETE http://localhost:8420/clear_cache
 ```
 
 Returns `200 OK` with an empty body.

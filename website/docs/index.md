@@ -92,10 +92,10 @@ freedom name mysite
 #   mysite.<pubKeyID>.fn
 
 # 4. Sign the records and publish them to a running node
-freedom publish mysite --api http://localhost:8080
+freedom publish mysite --api http://localhost:8420
 
 # 5. Resolve it, from anywhere on the network
-dig @127.0.0.1 -p 53 mysite.<pubKeyID>.fn A
+dig @127.0.0.1 -p 8053 mysite.<pubKeyID>.fn A
 ```
 
 That `<pubKeyID>` is the base36 hash of your public key. Because it is *derived

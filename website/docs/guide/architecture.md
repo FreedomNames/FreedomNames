@@ -9,12 +9,12 @@ Running `go run .` starts all of these at once:
 
 ```
                        ┌──────────────────────────────┐
-   dig / browser  ───▶ │  DNS server        (:53)     │
+   dig / browser  ───▶ │  DNS server       (:8053)     │
                        │  resolves .fn, forwards rest  │
                        └──────────────┬───────────────┘
                                       │
    curl / freedom CLI ──▶ ┌───────────▼──────────────┐
-                          │  HTTP API      (:8080)    │
+                          │  HTTP API      (:8420)    │
                           │  /publish /resolve /info  │
                           └───────────┬──────────────┘
                                       │
@@ -30,10 +30,11 @@ Running `go run .` starts all of these at once:
 
 - **libp2p DHT peer**: the decentralized storage and resolution network. Signed
   records are stored under `/fn/<pubKeyID>` and served to other peers.
-- **DNS server** (default `:53`): resolves `.fn` names through the resolver and
-  transparently forwards everything else to an upstream resolver. Point your OS at
-  it and `.fn` works everywhere.
-- **HTTP API** (default `:8080`): publish signed records and resolve names
+- **DNS server** (default `:8053`, no root needed): resolves `.fn` names through
+  the resolver and transparently forwards everything else to an upstream resolver.
+  Run it on `:53` (see [the `:53` port](/guide/running-a-node#the-53-port)) and
+  point your OS at it, and `.fn` works everywhere.
+- **HTTP API** (default `:8420`): publish signed records and resolve names
   programmatically. See the [HTTP API reference](/guide/http-api).
 
 A **bootstrap** node (`go run . bootstrap`) is a server-mode peer that others

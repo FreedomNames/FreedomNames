@@ -6,7 +6,8 @@ once. This page gets one running on your machine.
 ## Prerequisites
 
 - **Go** (a recent version) to build and run the binary.
-- Optionally, permission to bind port `:53` for DNS (see [below](#the-53-port)).
+- No special privileges — the DNS server defaults to the high port `:8053`. (For
+  system-wide `.fn` resolution on `:53`, see [below](#the-53-port).)
 
 Clone the repository:
 
@@ -24,9 +25,9 @@ go run .
 That single command starts:
 
 - a **libp2p DHT peer**, the decentralized storage/resolution network,
-- a **DNS server** (default `:53`) that resolves `.fn` names and forwards
+- a **DNS server** (default `:8053`) that resolves `.fn` names and forwards
   everything else upstream,
-- an **HTTP API** (default `:8080`) for publishing and resolving.
+- an **HTTP API** (default `:8420`) for publishing and resolving.
 
 You now have a working node. Leave it running in a terminal; the CLI and your
 system resolver talk to it.
@@ -45,29 +46,31 @@ comma-separated list of multiaddrs). See [Configuration](/guide/configuration).
 
 ## The `:53` port
 
-Port `:53` is privileged, so a plain `go run .` may not be able to bind it. Two
-options:
+By default the DNS server listens on the high port **`:8053`**, so `go run .`
+works with no privileges. Query it with `dig -p 8053 …`.
 
-**During development**, use a high port:
-
-```sh
-FREEDOM_DNS_ADDR=127.0.0.1:15353 go run .
-```
-
-**For a real deployment**, build the binary and grant it the capability once:
+Your OS and browser, however, only send DNS to the standard **`:53`**. For
+system-wide `.fn` resolution, run Freedom Names on `:53` — build the binary and
+grant it the capability once:
 
 ```sh
 go build -o freedom-names .
 sudo setcap cap_net_bind_service=+ep ./freedom-names
-./freedom-names
+FREEDOM_DNS_ADDR=:53 ./freedom-names
 ```
+
+Alternatively, keep `:8053` and forward `:53 → 127.0.0.1:8053` with a local
+resolver (dnsmasq / systemd-resolved).
+
+If the DNS port fails to bind, the node logs a warning and keeps running — the
+DHT and HTTP API are unaffected.
 
 ## Verify it's up
 
 Ask the node about itself over the HTTP API:
 
 ```sh
-curl http://localhost:8080/info
+curl http://localhost:8420/info
 ```
 
 You'll get JSON describing the node's mode, peer ID, listen addresses, and an
