@@ -22,14 +22,15 @@ type Response struct {
 	Protocols       []string `json:"protocols"`
 }
 
-func StartHTTPServer(freedomDht FreedomDHT, cache Cache) {
+func StartHTTPServer(freedomDht FreedomDHT, resolver *Resolver, cache Cache, addr string) {
 	// Set up HTTP API endpoints
-	http.HandleFunc("/add", AddHandler(freedomDht, cache))
-	http.HandleFunc("/lookup", LookupHandler(freedomDht, cache))
-	http.HandleFunc("/peers", AllPeersHandler(freedomDht))
-	http.HandleFunc("/info", InfoHandler(freedomDht))
-	http.HandleFunc("/clear_cache", ClearCacheHandler(cache))
-	server := &http.Server{Addr: ":8080", Handler: nil}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/publish", PublishHandler(freedomDht))
+	mux.HandleFunc("/resolve", ResolveHandler(freedomDht, resolver))
+	mux.HandleFunc("/peers", AllPeersHandler(freedomDht))
+	mux.HandleFunc("/info", InfoHandler(freedomDht))
+	mux.HandleFunc("/clear_cache", ClearCacheHandler(cache))
+	server := &http.Server{Addr: addr, Handler: mux}
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -49,7 +50,7 @@ func StartHTTPServer(freedomDht FreedomDHT, cache Cache) {
 		wg.Done()
 	}()
 
-	log.Println("HTTP API server listening on :8080")
+	log.Printf("HTTP API server listening on %s", addr)
 	// Blocking until the server is done
 	err := server.ListenAndServe()
 	if err == http.ErrServerClosed {
@@ -61,110 +62,82 @@ func StartHTTPServer(freedomDht FreedomDHT, cache Cache) {
 	}
 }
 
-// AddHandler stores a domain mapping
-func AddHandler(freedomDht FreedomDHT, cache Cache) http.HandlerFunc {
+// PublishHandler stores a pre-signed FNRecord in the DHT. The client is expected
+// to have signed the record with the owner's private key (e.g. via the CLI).
+func PublishHandler(freedomDht FreedomDHT) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !freedomDht.IsInitialized() {
 			http.Error(w, "DHT not initialized", http.StatusInternalServerError)
 			return
 		}
-
 		if r.Method != http.MethodPost {
 			http.Error(w, "Only POST allowed", http.StatusMethodNotAllowed)
 			return
 		}
 
-		// TODO: Add TTL
-		// Valid request body (JSON):
-		// {
-		// 	"test.local": {
-		// 		"A": "192.168.1.42"
-		// 	}
-		// }
-		var data map[string]map[string]string
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, "Failed to read request body", http.StatusBadRequest)
 			return
 		}
-		if err := json.Unmarshal(body, &data); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
+		rec, err := UnmarshalFNRecord(body)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Invalid FNRecord: %v", err), http.StatusBadRequest)
 			return
 		}
-		for key, records := range data {
-			// The domain is the key
-			for _, value := range records {
-				// Store in local cache
-				// PoC: For now we just ignore recordType (A)
-				cache.Add(key, value)
-				// TODO: Combine the record types and store them as a single value in the DHT
-				// For now we just store the first record type (A)
-
-				// Store in DHT
-				dhtKey := "/fn/" + key
-				log.Println("Store key:", dhtKey)
-				if err := freedomDht.PutValue(dhtKey, []byte(value)); err != nil {
-					http.Error(w, fmt.Sprintf("Failed to store value in DHT: %v", err), http.StatusInternalServerError)
-					return
-				}
-			}
+		// Verify before publishing so we never store an unowned/forged record.
+		if err := rec.Verify(); err != nil {
+			http.Error(w, fmt.Sprintf("Record failed verification: %v", err), http.StatusBadRequest)
+			return
+		}
+		if err := freedomDht.PublishRecord(rec); err != nil {
+			http.Error(w, fmt.Sprintf("Failed to publish record: %v", err), http.StatusInternalServerError)
+			return
 		}
 
+		name, _ := rec.FullName()
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Key/Value added successfully"))
+		jsonResponse, _ := json.Marshal(map[string]string{"published": name})
+		w.Write(jsonResponse)
 	}
 }
 
-// LookupHandler retrieves the value from the local cache or DHT
-func LookupHandler(freedomDht FreedomDHT, cache Cache) http.HandlerFunc {
+// ResolveHandler resolves a "label.<pubKeyID>.fn" name to its resource records,
+// optionally filtered by ?type=A.
+func ResolveHandler(freedomDht FreedomDHT, resolver *Resolver) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !freedomDht.IsInitialized() {
 			http.Error(w, "DHT not initialized", http.StatusInternalServerError)
 			return
 		}
 
-		key := r.URL.Query().Get("key")
-		if key == "" {
-			http.Error(w, "Missing key parameter", http.StatusBadRequest)
+		name := r.URL.Query().Get("name")
+		if name == "" {
+			http.Error(w, "Missing name parameter", http.StatusBadRequest)
 			return
 		}
+		recordType := r.URL.Query().Get("type")
 
-		log.Println("Check for key:", key)
+		log.Println("Resolve name:", name)
 
-		// Fist check local cache
-		if value, found := cache.Get(key); found {
-			// PoC: Just return the A record
-			log.Println("Found value in local cache:", value)
-			w.WriteHeader(http.StatusOK)
-			jsonResponse, _ := json.Marshal(map[string]string{key: value})
-			w.Write(jsonResponse)
-			return
+		var (
+			records []RR
+			err     error
+		)
+		if recordType != "" {
+			records, err = resolver.ResolveType(name, recordType)
+		} else {
+			records, err = resolver.Resolve(name)
 		}
-
-		// Fetch from DHT
-		dhtKey := "/fn/" + key
-		valueBytes, err := freedomDht.GetValue(dhtKey)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to retrieve value from DHT: %v", err), http.StatusInternalServerError)
+			http.Error(w, fmt.Sprintf("Failed to resolve name: %v", err), http.StatusNotFound)
 			return
 		}
-		value := string(valueBytes)
 
 		w.Header().Set("Content-Type", "application/json")
-
-		// Key not found, return a 404 JSON response
-		if value == "" {
-			// http error no response found
-			http.Error(w, "Key not found", http.StatusNotFound)
-			return
-		}
-
-		// Store in local cache
-		cache.Add(key, value)
-
-		// Key found, return JSON response
 		w.WriteHeader(http.StatusOK)
-		jsonResponse, _ := json.Marshal(map[string]string{key: value})
+		jsonResponse, _ := json.Marshal(map[string]any{"name": name, "records": records})
 		w.Write(jsonResponse)
 	}
 }

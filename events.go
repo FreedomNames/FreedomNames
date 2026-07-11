@@ -81,8 +81,6 @@ func (freedomName *FreedomNameNode) eventLoop() {
 					if e.Connectedness == network.NotConnected {
 						freedomName.kadDHT.Host().Network().Peerstore().RemovePeer(peerID)
 					}
-				case *event.EvtNATDeviceTypeChanged:
-					log.Printf("Event `NAT device type changed` - DeviceType %v, transport: %v", e.NatDeviceType.String(), e.TransportProtocol.String())
 				default:
 					log.Printf("Received unknown event (type: %T): %+v", e, e)
 				}

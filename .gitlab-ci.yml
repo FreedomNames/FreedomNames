@@ -26,6 +26,11 @@ go-mod-tidy:
   script:
     - go mod tidy -diff
 
+go-test:
+  stage: test
+  script:
+    - go test -race ./...
+
 go-build:
   stage: build
   script:

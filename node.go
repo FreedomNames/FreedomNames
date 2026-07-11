@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log"
 	"os"
+	"sync"
 
 	libp2p "github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -27,6 +28,8 @@ type FreedomDHT interface {
 	Shutdown()
 	PutValue(key string, value []byte) error
 	GetValue(key string) ([]byte, error)
+	PublishRecord(rec *FNRecord) error
+	ResolveRecord(key string) (*FNRecord, error)
 	GetMode() string
 	GetPeerInfos() []kbucket.PeerInfo
 	GetRoutingPeers() []peer.ID
@@ -50,6 +53,11 @@ type FreedomNameNode struct {
 	// Bandwidth counter
 	bandwidthCounter *metrics.BandwidthCounter
 
+	// Locally-owned records we are responsible for republishing before they
+	// expire in the DHT. Keyed by DHT key.
+	owned   map[string]*FNRecord
+	ownedMu sync.Mutex
+
 	// dualkadDHT *dual.DHT
 }
 
@@ -70,7 +78,7 @@ func (n *mDNSNotifee) HandlePeerFound(pi peer.AddrInfo) {
 }
 
 // NewNode creates a new libp2p node with DHT and mDNS discovery
-func NewNode(ctx context.Context) *FreedomNameNode {
+func NewNode(ctx context.Context, cfg *Config) *FreedomNameNode {
 	serviceName := "FreedomNames/1.0.0"
 	// Generate a new private key or load it from a file
 	privKey, err := loadOrGenerateKey()
@@ -142,12 +150,8 @@ func NewNode(ctx context.Context) *FreedomNameNode {
 		log.Println("mDNS service started")
 	}
 
-	// Define a list of bootstrap peers.
-	bootstrapPeers := []string{
-		"/ip4/192.168.1.204/tcp/4020/p2p/12D3KooWKsFK44rGGDuemE9cw8mkcHLM1k7x3uNDjAz3Ts29D8GZ",
-		// "/dnsaddr/domain.name/p2p/aaaa"
-	}
-	bootstrapInfos := BootstrapPeerInfos(bootstrapPeers)
+	// Bootstrap peers come from configuration (FREEDOM_BOOTSTRAP), not hardcoded.
+	bootstrapInfos := BootstrapPeerInfos(cfg.Bootstrap)
 
 	// DHT options
 	dhtOpts := []dht.Option{
@@ -188,11 +192,13 @@ func NewNode(ctx context.Context) *FreedomNameNode {
 		cancel:           cancel,
 		kadDHT:           dht,
 		bandwidthCounter: bwctr,
+		owned:            make(map[string]*FNRecord),
 	}
 
 	// Start additional services now
 	go freedomName.eventLoop()
 	go freedomName.statsLoop()
+	go freedomName.republishLoop()
 
 	return freedomName
 }
@@ -365,7 +371,9 @@ func loadOrGenerateKey() (crypto.PrivKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	os.WriteFile(keyFile, keyData, 0600) // Store securely
+	if err := os.WriteFile(keyFile, keyData, 0600); err != nil { // Store securely
+		return nil, err
+	}
 
 	return priv, nil
 }
