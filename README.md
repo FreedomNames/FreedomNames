@@ -23,7 +23,7 @@ key→name binding before accepting any update, and the newest record (highest
 sequence number) wins.
 
 Globally-unique *bare* names (`mysite.fn`, no key suffix) are a planned **Layer 2**
-via an optional Bitcoin Cash registry — see [`docs/layer2-bch-registry.md`](docs/layer2-bch-registry.md).
+via an optional Bitcoin Cash registry.
 
 ## Running a node
 

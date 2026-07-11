@@ -3,7 +3,7 @@ package main
 // bchRegistry is the (not-yet-implemented) Bitcoin Cash registry resolver. When
 // built, it will map a normalized bare name to the controlling CashTokens NFT
 // whose commitment carries the owner's public key, using LBRY-style claim
-// semantics. See docs/layer2-bch-registry.md for the full design.
+// semantics.
 //
 // It is wired in behind the NameRegistry interface so Layer 1 does not depend on
 // it; today it returns ErrRegistryNotImplemented and callers fall back to
