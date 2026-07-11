@@ -8,7 +8,7 @@ import (
 // Config holds runtime configuration. Values come from environment variables so
 // nothing operational is hardcoded; sensible defaults keep `go run .` working.
 type Config struct {
-	HTTPAddr    string   // address for the HTTP API (default ":8080")
+	HTTPAddr    string   // address for the HTTP API (default ":8420")
 	DNSAddr     string   // address for the DNS server (default ":53")
 	UpstreamDNS string   // upstream resolver for non-.fn queries (default "1.1.1.1:53")
 	Bootstrap   []string // bootstrap peer multiaddrs

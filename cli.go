@@ -14,6 +14,11 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 )
 
+// defaultAPI is the node HTTP API the CLI talks to by default. It matches the
+// node's default FREEDOM_HTTP_ADDR (":8420") so `publish`/`lookup` work out of
+// the box against a locally running node.
+const defaultAPI = "http://localhost:8420"
+
 // cliUsage documents the freedom subcommands.
 const cliUsage = `freedom - manage Freedom Names
 
@@ -26,7 +31,7 @@ Usage:
   freedom lookup <name> [--api URL] [--type TYPE]   Resolve a name via a running node
 
 Keys and staged records live under ~/.freedom/keys/.
-The default node API is http://localhost:8080 (override with --api).
+The default node API is http://localhost:8420 (override with --api).
 `
 
 // RunCLI dispatches a "freedom" subcommand.
@@ -204,7 +209,7 @@ func cliPublish(args []string) error {
 	if label == "" {
 		return fmt.Errorf("usage: freedom publish <label> [--api URL]")
 	}
-	api := flagValue(flags, "--api", "http://localhost:8080")
+	api := flagValue(flags, "--api", defaultAPI)
 
 	priv, err := loadKey(label)
 	if err != nil {
@@ -248,7 +253,7 @@ func cliLookup(args []string) error {
 	if name == "" {
 		return fmt.Errorf("usage: freedom lookup <name> [--api URL] [--type TYPE]")
 	}
-	api := flagValue(flags, "--api", "http://localhost:8080")
+	api := flagValue(flags, "--api", defaultAPI)
 	rtype := flagValue(flags, "--type", "")
 
 	url := api + "/resolve?name=" + name
