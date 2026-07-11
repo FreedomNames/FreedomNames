@@ -32,8 +32,14 @@ Usage:
   freedom name <label>                   Print the full "label.<pubKeyID>.fn" name
   freedom lookup <name> [--api URL] [--type TYPE]   Resolve a name via a running node
 
-Keys and staged records live under ~/.freedom/keys/.
-The default node API is http://localhost:8420 (override with --api).
+Bare names on Bitcoin Cash (Layer 2, set FREEDOM_BCH_ELECTRUM):
+  freedom wallet                         Show the BCH funding address + balance
+  freedom claim <label>                  Register the bare "<label>.fn" name on-chain
+  freedom adopt <label>                  Re-bind a name NFT you received to your key
+  freedom whois <name>                   Show the on-chain owner of a bare name
+
+Keys and staged records live under ~/.freedom/keys/; the BCH wallet key in
+~/.freedom/bch.key. The default node API is http://localhost:8420 (--api).
 `
 
 // RunCLI dispatches a "freedom" subcommand.
@@ -56,6 +62,14 @@ func RunCLI(args []string) {
 		err = cliName(args[1:])
 	case "lookup":
 		err = cliLookup(args[1:])
+	case "wallet":
+		err = cliWallet(args[1:])
+	case "claim":
+		err = cliClaim(args[1:])
+	case "adopt":
+		err = cliAdopt(args[1:])
+	case "whois":
+		err = cliWhois(args[1:])
 	case "help", "-h", "--help":
 		fmt.Print(cliUsage)
 		return

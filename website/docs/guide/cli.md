@@ -108,12 +108,41 @@ freedom lookup mysite.<pubKeyID>.fn
 freedom lookup mysite.<pubKeyID>.fn --type A
 ```
 
+## Bare names on Bitcoin Cash (Layer 2)
+
+These commands register globally-unique bare names (`mysite.fn`, no key suffix)
+on Bitcoin Cash. They talk directly to an Electrum server set via
+`FREEDOM_BCH_ELECTRUM` and do **not** need a running node. See
+[Layer 2](/guide/layer2) for the full protocol.
+
+### `freedom wallet`
+
+Shows the BCH funding address (fund it from a chipnet faucet), balance, and how
+many name NFTs the wallet holds.
+
+### `freedom claim <label>`
+
+Registers `<label>.fn` on-chain: mints the name NFT bound to the label's Ed25519
+owner key (`freedom keygen <label>` first), and prints the transaction id. First
+confirmed claim wins.
+
+### `freedom adopt <label>`
+
+Re-binds a name NFT you received by a plain wallet transfer to your own key, so
+`<label>.fn` resolves to your records.
+
+### `freedom whois <name>`
+
+Shows the on-chain owner of a bare name, including the equivalent
+self-certifying `<label>.<pubKeyID>.fn` name.
+
 ## Where things live
 
 | Path | Contents |
 | --- | --- |
 | `~/.freedom/keys/<label>.key` | the owner private key for a name |
 | `~/.freedom/keys/<label>.records.json` | staged records awaiting publish |
+| `~/.freedom/bch.key` | the BCH wallet key (funds Layer 2 claims) |
 
 The node's own libp2p identity (`private.key`) is **separate**, so your names are
 portable between nodes.

@@ -40,9 +40,16 @@ func main() {
 		panic(err)
 	}
 
-	// The BCH registry (Layer 2) resolves bare names; it is a stub today, so bare
-	// names return not-implemented and self-certifying names resolve as normal.
-	resolver := NewResolver(freedomDht, cache).WithRegistry(NewBCHRegistry())
+	// The BCH registry (Layer 2) resolves globally-unique bare names via Bitcoin
+	// Cash. When no electrum endpoint is configured it is left off, and bare
+	// names simply resolve to not-found; self-certifying names always work.
+	resolver := NewResolver(freedomDht, cache)
+	if cfg.BCHElectrum != "" {
+		bchClient := newElectrumClient(cfg.BCHElectrum)
+		defer bchClient.Close()
+		resolver = resolver.WithRegistry(NewBCHRegistry(bchClient, cfg.BCHMinConf))
+		log.Printf("BCH registry enabled (%s via %s)", cfg.BCHNetwork, cfg.BCHElectrum)
+	}
 
 	// Start the DNS server (resolves .fn, forwards everything else upstream).
 	// A bind failure (e.g. :53 needs privileges) is non-fatal: the DHT and HTTP

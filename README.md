@@ -22,8 +22,9 @@ from the owner's public key; the validator verifies the signature and the
 key→name binding before accepting any update, and the newest record (highest
 sequence number) wins.
 
-Globally-unique *bare* names (`mysite.fn`, no key suffix) are a planned **Layer 2**
-via an optional Bitcoin Cash registry.
+Globally-unique *bare* names (`mysite.fn`, no key suffix) are available as
+**Layer 2** (beta, chipnet): a claimed name is a CashTokens NFT on Bitcoin Cash.
+Set `FREEDOM_BCH_ELECTRUM` and use `freedom claim <name>`. Layer 1 works without it.
 
 ## Running a node
 

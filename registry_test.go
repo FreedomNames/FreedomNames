@@ -67,13 +67,37 @@ func TestBareNameResolvesViaRegistry(t *testing.T) {
 	}
 }
 
-func TestBareNameStubFallsBack(t *testing.T) {
+func TestBareNameUnknownIsNotFound(t *testing.T) {
 	dhtStore := newFakeDHT()
 	cache, _ := NewMemoryCache()
 
-	// The BCH stub is not implemented: bare names must error, not panic.
-	resolver := NewResolver(dhtStore, cache).WithRegistry(NewBCHRegistry())
+	// A registry with no claims returns not-found for a bare name.
+	reg := &mockRegistry{owners: map[string][]byte{}}
+	resolver := NewResolver(dhtStore, cache).WithRegistry(reg)
 	if _, err := resolver.Resolve(context.Background(), "mysite.fn"); err == nil {
-		t.Fatal("expected bare-name resolution to fail against the stub")
+		t.Fatal("expected bare-name resolution to fail when unclaimed")
+	}
+}
+
+func TestNormalizeRegistryName(t *testing.T) {
+	ok := map[string]string{
+		"mysite":     "mysite",
+		"MySite.fn":  "mysite",
+		"my-site.fn": "my-site",
+		"a1":         "a1",
+	}
+	for in, want := range ok {
+		got, err := normalizeRegistryName(in)
+		if err != nil {
+			t.Errorf("normalize(%q) unexpected error: %v", in, err)
+		} else if got != want {
+			t.Errorf("normalize(%q) = %q, want %q", in, got, want)
+		}
+	}
+	bad := []string{"", "-bad", "bad-", "has space", "under_score", "a.b", "café"}
+	for _, in := range bad {
+		if _, err := normalizeRegistryName(in); err == nil {
+			t.Errorf("normalize(%q) should have failed", in)
+		}
 	}
 }

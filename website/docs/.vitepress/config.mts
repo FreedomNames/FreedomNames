@@ -91,6 +91,7 @@ export default defineConfig({
             { text: 'Publish a TXT record', link: '/examples/txt-record' },
             { text: 'Rotate your records', link: '/examples/rotate-records' },
             { text: 'Run a bootstrap node', link: '/examples/bootstrap-node' },
+            { text: 'Claim a bare name (chipnet)', link: '/examples/claim-a-bare-name' },
           ],
         },
       ],
