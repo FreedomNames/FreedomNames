@@ -91,7 +91,7 @@ Claimed "mysite" on chipnet
 This one transaction mints a mutable NFT (its commitment is the hash of your
 owner key), reveals your key in an `FN01` OP_RETURN, and pays the discovery
 marker. Look the `<txid>` up on a chipnet explorer that understands CashTokens,
-e.g. https://chipnet.imaginary.cash/ — you should see a newly minted NFT.
+e.g. https://chipnet.imaginary.cash/: you should see a newly minted NFT.
 
 ## 7. Resolve it
 

@@ -9,6 +9,47 @@ import (
 	"syscall"
 )
 
+// nodeVersion identifies this build in /health and /info so a spawning host
+// (e.g. LibreWeb) can confirm it launched the expected node.
+const nodeVersion = "0.3.0"
+
+// applyNodeFlags lets a spawning host (e.g. LibreWeb) override config via flags,
+// which take precedence over environment variables:
+//
+//	--http-addr HOST:PORT   full HTTP API listen address
+//	--api-bind  HOST        just the bind host of the HTTP API (port unchanged)
+//	--content-dir DIR       content-addressed blobstore directory
+//	--dns-addr HOST:PORT    DNS server listen address
+//
+// Unknown flags are ignored (the only bare positional the node understands is
+// "bootstrap", handled in node.go).
+func applyNodeFlags(cfg *Config, args []string) {
+	for i := 0; i < len(args); i++ {
+		if i+1 >= len(args) {
+			break
+		}
+		val := args[i+1]
+		switch args[i] {
+		case "--http-addr":
+			cfg.HTTPAddr = val
+			i++
+		case "--api-bind":
+			_, port, ok := strings.Cut(cfg.HTTPAddr, ":")
+			if !ok {
+				port = "8420"
+			}
+			cfg.HTTPAddr = val + ":" + port
+			i++
+		case "--content-dir":
+			cfg.ContentDir = val
+			i++
+		case "--dns-addr":
+			cfg.DNSAddr = val
+			i++
+		}
+	}
+}
+
 // isPrivilegedPortErr reports whether err is a permission-denied bind, which for
 // a DNS server almost always means the configured port is privileged (<1024).
 func isPrivilegedPortErr(err error) bool {
@@ -31,6 +72,7 @@ func main() {
 	defer cancel()
 
 	cfg := LoadConfig()
+	applyNodeFlags(cfg, os.Args[1:]) // flags override env for a spawned node
 
 	freedomDht := NewNode(ctx, cfg)
 	defer freedomDht.Shutdown()
@@ -38,6 +80,16 @@ func main() {
 	cache, err := NewMemoryCache()
 	if err != nil {
 		panic(err)
+	}
+
+	// Attach the content service (the page-bytes layer). A failure here is
+	// non-fatal: naming still works, the node just can't serve/fetch content.
+	var content *ContentService
+	if store, err := NewBlobStore(cfg.ContentDir); err != nil {
+		log.Printf("WARNING: content service disabled: %v", err)
+	} else {
+		content = freedomDht.AttachContent(store)
+		log.Printf("Content store at %s", cfg.ContentDir)
 	}
 
 	// The BCH registry (Layer 2) resolves globally-unique bare names via Bitcoin
@@ -69,5 +121,5 @@ func main() {
 	}
 
 	// StartHTTPServer blocks until interrupted.
-	StartHTTPServer(freedomDht, resolver, cache, cfg.HTTPAddr)
+	StartHTTPServer(freedomDht, resolver, cache, content, cfg.HTTPAddr)
 }

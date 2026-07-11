@@ -26,9 +26,10 @@ const cliUsage = `freedom - manage Freedom Names
 
 Usage:
   freedom keygen <label>                 Generate an owner keypair for a name
-  freedom set <label> <TYPE> <VALUE> [ttl]   Stage a resource record (A|AAAA|TXT|CNAME)
+  freedom set <label> <TYPE> <VALUE> [ttl]   Stage a resource record (A|AAAA|TXT|CNAME|CONTENT)
   freedom clear <label>                  Remove all staged records for a name
   freedom publish <label> [--api URL]    Sign staged records and publish to a running node
+  freedom put <label> <file> [--api URL] [--ttl S]   Upload a file's content and point <label> at it
   freedom name <label>                   Print the full "label.<pubKeyID>.fn" name
   freedom lookup <name> [--api URL] [--type TYPE]   Resolve a name via a running node
 
@@ -58,6 +59,8 @@ func RunCLI(args []string) {
 		err = cliClear(args[1:])
 	case "publish":
 		err = cliPublish(args[1:])
+	case "put":
+		err = cliPut(args[1:])
 	case "name":
 		err = cliName(args[1:])
 	case "lookup":
@@ -246,10 +249,6 @@ func cliPublish(args []string) error {
 	}
 	api := flagValue(flags, "--api", defaultAPI)
 
-	priv, err := loadKey(label)
-	if err != nil {
-		return err
-	}
 	records, err := loadStaged(label)
 	if err != nil {
 		return err
@@ -257,8 +256,18 @@ func cliPublish(args []string) error {
 	if len(records) == 0 {
 		return fmt.Errorf("no staged records for %q (use: freedom set ...)", label)
 	}
+	return publishRecords(api, label, records)
+}
 
-	// Sequence numbers must increase per name for updates to win in the DHT.
+// publishRecords signs the given records for a label (with a sequence number
+// strictly above the name's current record) and POSTs them to a node. Shared by
+// `freedom publish` and `freedom put`.
+func publishRecords(api, label string, records []RR) error {
+	priv, err := loadKey(label)
+	if err != nil {
+		return err
+	}
+
 	var current *FNRecord
 	pub, _ := crypto.MarshalPublicKey(priv.GetPublic())
 	if id, idErr := pubKeyID(pub); idErr == nil {
@@ -404,6 +413,28 @@ func popPositional(args []string) (string, []string) {
 		return a, rest
 	}
 	return "", args
+}
+
+// popPositionals splits args into up to n positionals and the remaining
+// (flag) args. A "--flag value" pair is treated as flags, not positionals.
+func popPositionals(args []string, n int) (positionals, flags []string) {
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if len(a) >= 2 && a[:2] == "--" {
+			flags = append(flags, a)
+			if i+1 < len(args) {
+				flags = append(flags, args[i+1])
+				i++
+			}
+			continue
+		}
+		if len(positionals) < n {
+			positionals = append(positionals, a)
+		} else {
+			flags = append(flags, a)
+		}
+	}
+	return positionals, flags
 }
 
 // flagValue returns the value following --name, or fallback.

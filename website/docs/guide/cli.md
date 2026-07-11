@@ -19,10 +19,11 @@ The default node API is `http://localhost:8420` (override with `--api`).
 | Command | Purpose |
 | --- | --- |
 | `freedom keygen <label>` | Generate an owner keypair for a name |
-| `freedom set <label> <TYPE> <VALUE> [ttl]` | Stage a resource record (`A`\|`AAAA`\|`TXT`\|`CNAME`) |
+| `freedom set <label> <TYPE> <VALUE> [ttl]` | Stage a resource record (`A`\|`AAAA`\|`TXT`\|`CNAME`\|`CONTENT`) |
 | `freedom clear <label>` | Remove all staged records for a name |
 | `freedom name <label>` | Print the full `label.<pubKeyID>.fn` name |
 | `freedom publish <label> [--api URL]` | Sign staged records and publish to a node |
+| `freedom put <label> <file> [--api URL] [--ttl S]` | Upload a file's content and point `<label>` at it |
 | `freedom lookup <name> [--api URL] [--type TYPE]` | Resolve a name via a node |
 | `freedom help` | Show usage |
 
@@ -97,6 +98,26 @@ Published mysite.<pubKeyID>.fn (seq 1720713600, 2 record(s))
 
 Fails if there are no staged records, or if the node rejects the record (e.g. it
 fails verification).
+
+## `freedom put <label> <file> [--api URL] [--ttl S]`
+
+The one-step author flow: uploads a file's bytes to a running node, points
+`<label>` at the resulting content hash (a single `CONTENT` record), and
+publishes. This is what a browser's editor triggers when a user saves a page.
+
+```sh
+freedom keygen blog
+freedom put blog ./index.html
+```
+
+```
+Uploaded ./index.html (2048 bytes) -> muf...hbst
+Published blog.<pubKeyID>.fn (seq ..., 1 record(s))
+```
+
+Now `blog.<pubKeyID>.fn` resolves to the page: fetch it with
+`GET /resolve-content?name=blog.<pubKeyID>.fn`. See
+[the content network](/guide/content).
 
 ## `freedom lookup <name> [--api URL] [--type TYPE]`
 

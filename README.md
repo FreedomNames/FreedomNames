@@ -32,13 +32,18 @@ Set `FREEDOM_BCH_ELECTRUM` and use `freedom claim <name>`. Layer 1 works without
 go run .
 ```
 
-A node runs three things at once:
+A node runs several things at once:
 
-- a **libp2p DHT** peer (the decentralized storage/resolution network),
+- a **libp2p DHT** peer (the decentralized naming/discovery network),
+- a **content network** that stores and serves page bytes peer-to-peer (a
+  content-addressed blobstore + a stream protocol), so a name can point at an
+  actual page, not just DNS records. This is what lets Freedom Names back a
+  decentralized-web browser such as LibreWeb, replacing IPFS,
 - a **DNS server** (default `:8053`) that resolves `.fn` names and forwards
-  everything else upstream — point your OS/browser at it (or bridge it to `:53`,
+  everything else upstream. Point your OS/browser at it (or bridge it to `:53`,
   see below) and `.fn` just works,
-- an **HTTP API** (default `:8420`) for publishing and resolving.
+- an **HTTP API** (default `127.0.0.1:8420`) for publishing, resolving, and
+  content.
 
 Run a **bootstrap** (server) node that others can connect to:
 
@@ -114,8 +119,11 @@ Freedom Names node can act as your system resolver.
 | `/publish` | POST | Store a signed `FNRecord` (JSON body) |
 | `/resolve?name=<name>&type=<TYPE>` | GET | Resolve a name to its records |
 | `/record?name=<name>` | GET | Fetch the raw signed record (includes seq and expiry) |
+| `/content` | POST/GET | Store page bytes (`POST`) or fetch by `?hash=` (`GET`) |
+| `/resolve-content?name=<name>` | GET | Resolve a name to its `CONTENT` bytes in one call |
 | `/peers` | GET | Routing-table peers + connected hosts |
-| `/info` | GET | Node mode, peer ID, addresses, network size |
+| `/info` | GET | Version, mode, peer ID, addresses, network size |
+| `/health` | GET | Liveness + version handshake |
 | `/clear_cache` | DELETE | Purge the local resolution cache |
 
 ## Development

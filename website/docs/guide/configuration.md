@@ -5,13 +5,23 @@ node is entirely driven by its environment.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `FREEDOM_HTTP_ADDR` | `:8420` | HTTP API listen address |
+| `FREEDOM_HTTP_ADDR` | `127.0.0.1:8420` | HTTP API listen address (loopback by default) |
 | `FREEDOM_DNS_ADDR` | `:8053` | DNS server listen address |
 | `FREEDOM_UPSTREAM_DNS` | `1.1.1.1:53` | Upstream resolver for non-`.fn` queries |
+| `FREEDOM_CONTENT_DIR` | `~/.freedom/content` | Content-addressed blobstore directory |
 | `FREEDOM_BOOTSTRAP` | *(none)* | Comma-separated bootstrap peer multiaddrs |
 | `FREEDOM_BCH_ELECTRUM` | *(chipnet server)* | Electrum server for Layer 2 bare names (`ssl://host:port`) |
 | `FREEDOM_BCH_NETWORK` | `chipnet` | BCH network: `chipnet` or `mainnet` |
 | `FREEDOM_BCH_MINCONF` | `1` | Confirmations before a name claim counts |
+
+The HTTP API binds to **`127.0.0.1`** by default: it is an unauthenticated local
+control surface (a browser or app spawns the node), so it must not be exposed on
+all interfaces. Set `FREEDOM_HTTP_ADDR=:8420` to share it on a LAN deliberately.
+
+A spawning host can also override these with **flags**, which take precedence
+over the environment: `--http-addr HOST:PORT`, `--api-bind HOST`,
+`--content-dir DIR`, `--dns-addr HOST:PORT`. See
+[embedding a node](/guide/embedding).
 
 The `FREEDOM_BCH_*` variables enable [Layer 2](/guide/layer2) (globally-unique
 bare names on Bitcoin Cash). Point `FREEDOM_BCH_ELECTRUM` at any Electrum Cash

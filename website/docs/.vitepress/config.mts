@@ -77,6 +77,8 @@ export default defineConfig({
           text: 'Going further',
           collapsed: false,
           items: [
+            { text: 'The content network', link: '/guide/content' },
+            { text: 'Embedding a node', link: '/guide/embedding' },
             { text: 'Layer 2: bare names', link: '/guide/layer2' },
             { text: 'FAQ', link: '/guide/faq' },
           ],
