@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"log"
 	"time"
 
@@ -55,9 +57,17 @@ func (freedomName *FreedomNameNode) PublishRecord(rec *FNRecord) error {
 	return nil
 }
 
-// ResolveRecord fetches and returns the current FNRecord for a DHT key.
-func (freedomName *FreedomNameNode) ResolveRecord(key string) (*FNRecord, error) {
-	value, err := freedomName.GetValue(key)
+// ResolveRecord fetches and returns the current FNRecord for a DHT key. The
+// caller's context bounds the lookup (so e.g. the DNS path can use a short,
+// client-appropriate budget), additionally capped at dhtOpTimeout.
+func (freedomName *FreedomNameNode) ResolveRecord(ctx context.Context, key string) (*FNRecord, error) {
+	if freedomName.kadDHT == nil {
+		return nil, errors.New("DHT not initialized")
+	}
+	ctx, cancel := context.WithTimeout(ctx, dhtOpTimeout)
+	defer cancel()
+
+	value, err := freedomName.kadDHT.GetValue(ctx, key)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +101,7 @@ func (freedomName *FreedomNameNode) republishOwned() {
 	live := make(map[string]*FNRecord, len(freedomName.owned))
 	for key, rec := range freedomName.owned {
 		if rec.EOL != 0 && now > rec.EOL {
-			log.Printf("WARNING: record %s (label %q) passed its signed EOL and was dropped from republishing — the owner must re-publish (re-sign) it", key, rec.Label)
+			log.Printf("WARNING: record %s (label %q) passed its signed EOL and was dropped from republishing; the owner must re-publish (re-sign) it", key, rec.Label)
 			delete(freedomName.owned, key)
 			continue
 		}

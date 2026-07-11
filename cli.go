@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -307,9 +308,13 @@ func cliLookup(args []string) error {
 // nextSeq picks the sequence number for a publish: wall-clock time, but always
 // strictly above the name's current record when one exists. This keeps updates
 // winning in the DHT even for same-second double publishes or a clock stepped
-// backwards, either of which would otherwise wedge updates.
+// backwards, either of which would otherwise wedge updates. Saturates at
+// MaxUint64 rather than wrapping to 0 on a (hostile) maximal current record.
 func nextSeq(wallClock uint64, current *FNRecord) uint64 {
 	if current != nil && current.Seq >= wallClock {
+		if current.Seq == math.MaxUint64 {
+			return math.MaxUint64
+		}
 		return current.Seq + 1
 	}
 	return wallClock

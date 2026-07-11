@@ -30,7 +30,7 @@ type FreedomDHT interface {
 	PutValue(key string, value []byte) error
 	GetValue(key string) ([]byte, error)
 	PublishRecord(rec *FNRecord) error
-	ResolveRecord(key string) (*FNRecord, error)
+	ResolveRecord(ctx context.Context, key string) (*FNRecord, error)
 	GetMode() string
 	GetPeerInfos() []kbucket.PeerInfo
 	GetRoutingPeers() []peer.ID

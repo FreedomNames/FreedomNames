@@ -31,7 +31,7 @@ func (f *fakeDHT) PublishRecord(rec *FNRecord) error {
 	return nil
 }
 
-func (f *fakeDHT) ResolveRecord(key string) (*FNRecord, error) {
+func (f *fakeDHT) ResolveRecord(_ context.Context, key string) (*FNRecord, error) {
 	v, ok := f.store[key]
 	if !ok {
 		return nil, net.ErrClosed // any non-nil error signals "not found"
@@ -60,7 +60,7 @@ func mustResolver(t *testing.T) (*Resolver, crypto.PrivKey, string) {
 func TestResolverResolvesFNName(t *testing.T) {
 	resolver, _, name := mustResolver(t)
 
-	records, err := resolver.Resolve(name)
+	records, err := resolver.Resolve(context.Background(), name)
 	if err != nil {
 		t.Fatalf("resolve %s: %v", name, err)
 	}
@@ -76,11 +76,11 @@ func TestResolverNormalizesCacheKey(t *testing.T) {
 
 	// Prime the cache using the FQDN mixed-case spelling.
 	fqdn := "MySite." + name[len("mysite."):] + "." // e.g. MySite.<id>.fn.
-	if _, err := resolver.Resolve(fqdn); err != nil {
+	if _, err := resolver.Resolve(context.Background(), fqdn); err != nil {
 		t.Fatalf("resolve fqdn spelling: %v", err)
 	}
 	// The canonical spelling must hit the same (single) cache entry.
-	if _, err := resolver.Resolve(name); err != nil {
+	if _, err := resolver.Resolve(context.Background(), name); err != nil {
 		t.Fatalf("resolve canonical spelling: %v", err)
 	}
 	if got := resolver.cache.Length(); got != 1 {

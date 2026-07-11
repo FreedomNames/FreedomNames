@@ -76,8 +76,9 @@ curl "http://localhost:8420/resolve?name=mysite.<pubKeyID>.fn&type=A"
 ```
 
 **Errors:** `400` if `name` is missing or malformed; `404` if the name does not
-exist; `502` if the lookup infrastructure failed (DHT timeout, no peers), which
-means: retry later, the name may still exist.
+exist; `501` for bare names (the Layer 2 registry is not built yet, do not
+retry); `502` if the lookup infrastructure failed (DHT timeout, no peers),
+which means: retry later, the name may still exist.
 
 ## GET `/record`
 

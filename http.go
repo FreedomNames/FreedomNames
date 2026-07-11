@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"sync"
 
 	"github.com/libp2p/go-libp2p/core/routing"
@@ -134,9 +133,9 @@ func ResolveHandler(freedomDht FreedomDHT, resolver *Resolver) http.HandlerFunc 
 			err     error
 		)
 		if recordType != "" {
-			records, err = resolver.ResolveType(name, recordType)
+			records, err = resolver.ResolveType(r.Context(), name, recordType)
 		} else {
-			records, err = resolver.Resolve(name)
+			records, err = resolver.Resolve(r.Context(), name)
 		}
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Failed to resolve name: %v", err), resolveErrStatus(err))
@@ -151,16 +150,21 @@ func ResolveHandler(freedomDht FreedomDHT, resolver *Resolver) http.HandlerFunc 
 }
 
 // resolveErrStatus maps a resolution error to an HTTP status so clients can
-// tell "this name does not exist" (404) apart from "the lookup infrastructure
-// failed, retry later" (502).
+// tell "this name does not exist" (404) apart from "bad request" (400), "not
+// supported, do not retry" (501), and "the lookup infrastructure failed, retry
+// later" (502).
 func resolveErrStatus(err error) int {
 	switch {
 	case errors.Is(err, routing.ErrNotFound), errors.Is(err, ErrRegistryNotFound):
 		return http.StatusNotFound
-	case strings.Contains(err.Error(), "not a fn name"), strings.Contains(err.Error(), "malformed fn name"):
+	case errors.Is(err, ErrNotFNName):
 		return http.StatusBadRequest
+	case errors.Is(err, ErrRegistryNotImplemented):
+		// Bare names need the (not yet built) Layer 2 registry: permanent
+		// until a release ships it, so clients should not retry.
+		return http.StatusNotImplemented
 	default:
-		// Transient/unknown failure (DHT timeout, no peers, registry error).
+		// Transient/unknown failure (DHT timeout, no peers).
 		return http.StatusBadGateway
 	}
 }
@@ -185,7 +189,7 @@ func RecordHandler(freedomDht FreedomDHT) http.HandlerFunc {
 			http.Error(w, fmt.Sprintf("Invalid name: %v", err), http.StatusBadRequest)
 			return
 		}
-		rec, err := freedomDht.ResolveRecord(key)
+		rec, err := freedomDht.ResolveRecord(r.Context(), key)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Failed to fetch record: %v", err), resolveErrStatus(err))
 			return

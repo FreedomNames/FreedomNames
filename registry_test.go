@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"testing"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -57,7 +58,7 @@ func TestBareNameResolvesViaRegistry(t *testing.T) {
 	reg := &mockRegistry{owners: map[string][]byte{"mysite.fn": pub}}
 
 	resolver := NewResolver(dhtStore, cache).WithRegistry(reg)
-	records, err := resolver.Resolve("mysite.fn")
+	records, err := resolver.Resolve(context.Background(), "mysite.fn")
 	if err != nil {
 		t.Fatalf("resolve bare name: %v", err)
 	}
@@ -72,7 +73,7 @@ func TestBareNameStubFallsBack(t *testing.T) {
 
 	// The BCH stub is not implemented: bare names must error, not panic.
 	resolver := NewResolver(dhtStore, cache).WithRegistry(NewBCHRegistry())
-	if _, err := resolver.Resolve("mysite.fn"); err == nil {
+	if _, err := resolver.Resolve(context.Background(), "mysite.fn"); err == nil {
 		t.Fatal("expected bare-name resolution to fail against the stub")
 	}
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -13,6 +14,10 @@ import (
 	"codeberg.org/miekg/dns/dnsutil"
 	"codeberg.org/miekg/dns/rdata"
 )
+
+// dnsResolveTimeout bounds a .fn lookup on the DNS path. Stub resolvers
+// typically give up after ~5s, so answering later than that is wasted work.
+const dnsResolveTimeout = 4 * time.Second
 
 // DNSServer answers queries for the ".fn" zone from the DHT and forwards all
 // other queries to an upstream resolver, so it can be used as a drop-in system
@@ -101,7 +106,12 @@ func (s *DNSServer) handleFN(ctx context.Context, w dns.ResponseWriter, r *dns.M
 	name := q.Header().Name
 	qtype := dns.RRToType(q)
 
-	records, err := s.resolver.Resolve(name)
+	// Bound the lookup below a typical stub-resolver patience (~5s): a slow
+	// DHT walk should fail fast here rather than answer a client that already
+	// gave up.
+	resolveCtx, cancel := context.WithTimeout(ctx, dnsResolveTimeout)
+	defer cancel()
+	records, err := s.resolver.Resolve(resolveCtx, name)
 
 	// Re-use r as the response.
 	r.Reset()
@@ -110,7 +120,11 @@ func (s *DNSServer) handleFN(ctx context.Context, w dns.ResponseWriter, r *dns.M
 
 	if err != nil {
 		log.Printf("DNS: resolve %s: %v", name, err)
-		r.Rcode = dns.RcodeNameError // NXDOMAIN
+		if errors.Is(err, context.DeadlineExceeded) {
+			r.Rcode = dns.RcodeServerFailure // transient: lookup timed out
+		} else {
+			r.Rcode = dns.RcodeNameError // NXDOMAIN
+		}
 		r.Pack()
 		io.Copy(w, r)
 		return

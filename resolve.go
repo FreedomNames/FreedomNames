@@ -1,9 +1,11 @@
 package main
 
+import "context"
+
 // RecordStore is the minimal record-lookup surface a Resolver needs. Both the
-// real node and test fakes satisfy it.
+// real node and test fakes satisfy it. The context bounds the lookup.
 type RecordStore interface {
-	ResolveRecord(key string) (*FNRecord, error)
+	ResolveRecord(ctx context.Context, key string) (*FNRecord, error)
 }
 
 // Resolver resolves Freedom Names ("label.<pubKeyID>.fn") to their resource
@@ -35,7 +37,7 @@ func (r *Resolver) WithRegistry(registry NameRegistry) *Resolver {
 // It checks the cache first, then the DHT, caching any DHT hit. Cache keys use
 // the canonical (lowercased, no trailing dot) form so the DNS FQDN spelling and
 // the HTTP/CLI spelling share one entry.
-func (r *Resolver) Resolve(name string) ([]RR, error) {
+func (r *Resolver) Resolve(ctx context.Context, name string) ([]RR, error) {
 	canonical := CanonicalName(name)
 	if records, ok := r.cache.Get(canonical); ok {
 		return records, nil
@@ -45,7 +47,7 @@ func (r *Resolver) Resolve(name string) ([]RR, error) {
 	if err != nil {
 		return nil, err
 	}
-	rec, err := r.store.ResolveRecord(key)
+	rec, err := r.store.ResolveRecord(ctx, key)
 	if err != nil {
 		return nil, err
 	}
@@ -73,8 +75,8 @@ func (r *Resolver) dhtKeyForName(name string) (string, error) {
 }
 
 // ResolveType returns only the records of the requested type for a name.
-func (r *Resolver) ResolveType(name, recordType string) ([]RR, error) {
-	records, err := r.Resolve(name)
+func (r *Resolver) ResolveType(ctx context.Context, name, recordType string) ([]RR, error) {
+	records, err := r.Resolve(ctx, name)
 	if err != nil {
 		return nil, err
 	}

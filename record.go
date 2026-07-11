@@ -235,18 +235,23 @@ func IsPubKeyID(s string) bool {
 	return decoded.Code == mh.SHA2_256
 }
 
+// ErrNotFNName marks a name that is not a well-formed "label.<pubKeyID>.fn"
+// name. Callers classify errors with errors.Is (e.g. to map them to HTTP 400)
+// instead of matching message text.
+var ErrNotFNName = errors.New("not a valid fn name")
+
 // ParseName splits a "label.<pubKeyID>.fn" name into its label and pubkey-id.
 // It tolerates a trailing dot (as DNS fully-qualified names carry).
 func ParseName(name string) (label, keyID string, err error) {
 	trimmed := CanonicalName(name)
 	parts := strings.Split(trimmed, ".")
 	if len(parts) < 3 || parts[len(parts)-1] != tld {
-		return "", "", fmt.Errorf("not a %s name: %q", tld, name)
+		return "", "", fmt.Errorf("%w: %q", ErrNotFNName, name)
 	}
 	keyID = parts[len(parts)-2]
 	label = strings.Join(parts[:len(parts)-2], ".")
 	if label == "" || keyID == "" {
-		return "", "", fmt.Errorf("malformed %s name: %q", tld, name)
+		return "", "", fmt.Errorf("%w (malformed): %q", ErrNotFNName, name)
 	}
 	return label, keyID, nil
 }
