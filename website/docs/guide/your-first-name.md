@@ -68,11 +68,15 @@ freedom publish mysite --api http://localhost:8420
 Published mysite.<pubKeyID>.fn (seq 1720713600, 2 record(s))
 ```
 
-Under the hood the CLI signs the staged records with your private key, derives a
-sequence number from the current time (so republishes always supersede older
-ones), and POSTs the signed record to the node's `/publish` endpoint. The node
-**verifies** it before storing it in the DHT. If the signature or key binding
-were wrong, it would be rejected.
+Under the hood the CLI signs the staged records with your private key, picks a
+sequence number strictly above the name's current record (fetched via the node's
+`/record` endpoint, falling back to the current time) so updates always
+supersede older ones, and POSTs the signed record to the node's `/publish`
+endpoint. The node **verifies** it before storing it in the DHT. If the
+signature or key binding were wrong, it would be rejected.
+
+A published record stays valid for 7 days. Re-run `freedom publish` before then
+to renew it; the CLI prints the exact expiry after each publish.
 
 ::: info
 `--api` defaults to `http://localhost:8420`, so you can omit it when publishing to

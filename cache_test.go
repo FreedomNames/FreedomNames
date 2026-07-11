@@ -28,7 +28,7 @@ func TestCacheExpiry(t *testing.T) {
 func TestCacheHitReturnsRecords(t *testing.T) {
 	c, _ := NewMemoryCache()
 	want := []RR{{Type: "A", Value: "10.0.0.5", TTL: 300}}
-	c.Add("mysite.k.fn", want)
+	c.Add("mysite.k.fn", want, 0)
 
 	got, ok := c.Get("mysite.k.fn")
 	if !ok {
@@ -36,5 +36,23 @@ func TestCacheHitReturnsRecords(t *testing.T) {
 	}
 	if len(got) != 1 || got[0].Value != "10.0.0.5" {
 		t.Fatalf("unexpected records: %+v", got)
+	}
+}
+
+func TestCacheExpiryCappedByEOL(t *testing.T) {
+	c, _ := NewMemoryCache()
+	records := []RR{{Type: "A", Value: "10.0.0.5", TTL: 300}}
+
+	// EOL already in the past: the entry must be an immediate miss even though
+	// the RR TTL alone would cache it for 300s.
+	c.Add("expired.k.fn", records, time.Now().Add(-time.Minute).Unix())
+	if _, ok := c.Get("expired.k.fn"); ok {
+		t.Fatal("expected record with past EOL to be treated as a miss")
+	}
+
+	// EOL far in the future: normal RR-TTL caching applies.
+	c.Add("live.k.fn", records, time.Now().Add(24*time.Hour).Unix())
+	if _, ok := c.Get("live.k.fn"); !ok {
+		t.Fatal("expected record with future EOL to be cached")
 	}
 }

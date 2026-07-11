@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -10,6 +11,8 @@ import (
 	"os"
 	"os/signal"
 	"sync"
+
+	"github.com/libp2p/go-libp2p/core/routing"
 )
 
 type Response struct {
@@ -27,6 +30,7 @@ func StartHTTPServer(freedomDht FreedomDHT, resolver *Resolver, cache Cache, add
 	mux := http.NewServeMux()
 	mux.HandleFunc("/publish", PublishHandler(freedomDht))
 	mux.HandleFunc("/resolve", ResolveHandler(freedomDht, resolver))
+	mux.HandleFunc("/record", RecordHandler(freedomDht))
 	mux.HandleFunc("/peers", AllPeersHandler(freedomDht))
 	mux.HandleFunc("/info", InfoHandler(freedomDht))
 	mux.HandleFunc("/clear_cache", ClearCacheHandler(cache))
@@ -129,18 +133,71 @@ func ResolveHandler(freedomDht FreedomDHT, resolver *Resolver) http.HandlerFunc 
 			err     error
 		)
 		if recordType != "" {
-			records, err = resolver.ResolveType(name, recordType)
+			records, err = resolver.ResolveType(r.Context(), name, recordType)
 		} else {
-			records, err = resolver.Resolve(name)
+			records, err = resolver.Resolve(r.Context(), name)
 		}
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to resolve name: %v", err), http.StatusNotFound)
+			http.Error(w, fmt.Sprintf("Failed to resolve name: %v", err), resolveErrStatus(err))
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		jsonResponse, _ := json.Marshal(map[string]any{"name": name, "records": records})
+		w.Write(jsonResponse)
+	}
+}
+
+// resolveErrStatus maps a resolution error to an HTTP status so clients can
+// tell "this name does not exist" (404) apart from "bad request" (400), "not
+// supported, do not retry" (501), and "the lookup infrastructure failed, retry
+// later" (502).
+func resolveErrStatus(err error) int {
+	switch {
+	case errors.Is(err, routing.ErrNotFound), errors.Is(err, ErrRegistryNotFound):
+		return http.StatusNotFound
+	case errors.Is(err, ErrNotFNName):
+		return http.StatusBadRequest
+	case errors.Is(err, ErrRegistryNotImplemented):
+		// Bare names need the (not yet built) Layer 2 registry: permanent
+		// until a release ships it, so clients should not retry.
+		return http.StatusNotImplemented
+	default:
+		// Transient/unknown failure (DHT timeout, no peers).
+		return http.StatusBadGateway
+	}
+}
+
+// RecordHandler returns the raw signed FNRecord for a name (including Seq and
+// EOL), bypassing the record cache. The CLI uses it to derive the next sequence
+// number before publishing an update.
+func RecordHandler(freedomDht FreedomDHT) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !freedomDht.IsInitialized() {
+			http.Error(w, "DHT not initialized", http.StatusInternalServerError)
+			return
+		}
+
+		name := r.URL.Query().Get("name")
+		if name == "" {
+			http.Error(w, "Missing name parameter", http.StatusBadRequest)
+			return
+		}
+		key, err := DHTKeyForName(name)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Invalid name: %v", err), http.StatusBadRequest)
+			return
+		}
+		rec, err := freedomDht.ResolveRecord(r.Context(), key)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to fetch record: %v", err), resolveErrStatus(err))
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		jsonResponse, _ := json.Marshal(rec)
 		w.Write(jsonResponse)
 	}
 }

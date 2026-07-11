@@ -57,6 +57,25 @@ func TestCliSetKeepsDistinctRecords(t *testing.T) {
 	}
 }
 
+func TestNextSeq(t *testing.T) {
+	// First publish: no current record, use wall-clock.
+	if got := nextSeq(1000, nil); got != 1000 {
+		t.Fatalf("nil current: want 1000, got %d", got)
+	}
+	// Normal update: current record older than the clock, use wall-clock.
+	if got := nextSeq(1000, &FNRecord{Seq: 500}); got != 1000 {
+		t.Fatalf("older current: want 1000, got %d", got)
+	}
+	// Same-second double publish: must go strictly above the current record.
+	if got := nextSeq(1000, &FNRecord{Seq: 1000}); got != 1001 {
+		t.Fatalf("same-second: want 1001, got %d", got)
+	}
+	// Clock stepped backwards: must still go above the current record.
+	if got := nextSeq(900, &FNRecord{Seq: 1000}); got != 1001 {
+		t.Fatalf("clock back: want 1001, got %d", got)
+	}
+}
+
 func TestStagedRoundTripPath(t *testing.T) {
 	withTempHome(t)
 	// Sanity: staged file lands under ~/.freedom/keys.

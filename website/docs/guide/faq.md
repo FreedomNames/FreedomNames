@@ -35,10 +35,11 @@ target). The set is intentionally small for now.
 
 ## How do updates propagate?
 
-You republish. Each publish carries a sequence number derived from wall-clock time,
-and the **newest valid record wins** across the network. Nodes cache resolutions,
-so if you want a fresh read immediately after an update you can clear a node's cache
-via [`DELETE /clear_cache`](/guide/http-api#delete-clear_cache).
+You republish. Each publish carries a sequence number strictly above the name's
+current record, and the **newest valid record wins** across the network. Nodes
+cache resolutions, so if you want a fresh read immediately after an update you
+can clear a node's cache via
+[`DELETE /clear_cache`](/guide/http-api#delete-clear_cache).
 
 ## Does it break the rest of my DNS?
 

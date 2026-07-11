@@ -11,12 +11,12 @@ node is entirely driven by its environment.
 | `FREEDOM_BOOTSTRAP` | *(none)* | Comma-separated bootstrap peer multiaddrs |
 
 The DNS server defaults to the high port **`:8053`**, so a node runs **without
-root**. If the DNS port can't be bound, the node logs a warning and keeps running
-— the DHT and HTTP API are unaffected.
+root**. If the DNS port can't be bound, the node logs a warning and keeps running;
+the DHT and HTTP API are unaffected.
 
 ## Examples
 
-**Local development** works out of the box on the default `:8053` — no `sudo`:
+**Local development** works out of the box on the default `:8053`, no `sudo` needed:
 
 ```sh
 FREEDOM_HTTP_ADDR=127.0.0.1:8420 \
@@ -51,7 +51,7 @@ FREEDOM_DNS_ADDR=:53 ./freedom-names
 …or keep `:8053` and forward `:53 → 127.0.0.1:8053` with a local resolver
 (dnsmasq / systemd-resolved), or point a stub resolver at `127.0.0.1:8053`.
 
-> **Avoid `:5353`** for the DNS port — it collides with mDNS/avahi on most
+> **Avoid `:5353`** for the DNS port: it collides with mDNS/avahi on most
 > desktops. That's why the default is `:8053`.
 
 ## Node identity vs. name keys

@@ -112,6 +112,7 @@ Freedom Names node can act as your system resolver.
 |---|---|---|
 | `/publish` | POST | Store a signed `FNRecord` (JSON body) |
 | `/resolve?name=<name>&type=<TYPE>` | GET | Resolve a name to its records |
+| `/record?name=<name>` | GET | Fetch the raw signed record (includes seq and expiry) |
 | `/peers` | GET | Routing-table peers + connected hosts |
 | `/info` | GET | Node mode, peer ID, addresses, network size |
 | `/clear_cache` | DELETE | Purge the local resolution cache |

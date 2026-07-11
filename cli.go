@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"time"
@@ -242,8 +244,16 @@ func cliPublish(args []string) error {
 		return fmt.Errorf("no staged records for %q (use: freedom set ...)", label)
 	}
 
-	// Seq derived from wall-clock so republishes monotonically increase.
-	seq := uint64(time.Now().Unix())
+	// Sequence numbers must increase per name for updates to win in the DHT.
+	var current *FNRecord
+	pub, _ := crypto.MarshalPublicKey(priv.GetPublic())
+	if id, idErr := pubKeyID(pub); idErr == nil {
+		fullName := label + "." + id + "." + tld
+		if rec, ok := fetchCurrentRecord(api, fullName); ok {
+			current = rec
+		}
+	}
+	seq := nextSeq(uint64(time.Now().Unix()), current)
 	rec, err := BuildAndSignRecord(priv, label, records, seq)
 	if err != nil {
 		return err
@@ -264,6 +274,8 @@ func cliPublish(args []string) error {
 	}
 	name, _ := rec.FullName()
 	fmt.Printf("Published %s (seq %d, %d record(s))\n", name, seq, len(records))
+	fmt.Printf("Record valid until %s. Re-run publish before then to renew.\n",
+		time.Unix(rec.EOL, 0).Format(time.RFC1123))
 	return nil
 }
 
@@ -275,11 +287,12 @@ func cliLookup(args []string) error {
 	api := flagValue(flags, "--api", defaultAPI)
 	rtype := flagValue(flags, "--type", "")
 
-	url := api + "/resolve?name=" + name
+	// Escape query values so metacharacters in a name can't corrupt the URL.
+	params := url.Values{"name": {name}}
 	if rtype != "" {
-		url += "&type=" + rtype
+		params.Set("type", rtype)
 	}
-	resp, err := http.Get(url)
+	resp, err := http.Get(api + "/resolve?" + params.Encode())
 	if err != nil {
 		return fmt.Errorf("lookup via %s: %w", api, err)
 	}
@@ -290,6 +303,45 @@ func cliLookup(args []string) error {
 	}
 	fmt.Println(string(body))
 	return nil
+}
+
+// nextSeq picks the sequence number for a publish: wall-clock time, but always
+// strictly above the name's current record when one exists. This keeps updates
+// winning in the DHT even for same-second double publishes or a clock stepped
+// backwards, either of which would otherwise wedge updates. Saturates at
+// MaxUint64 rather than wrapping to 0 on a (hostile) maximal current record.
+func nextSeq(wallClock uint64, current *FNRecord) uint64 {
+	if current != nil && current.Seq >= wallClock {
+		if current.Seq == math.MaxUint64 {
+			return math.MaxUint64
+		}
+		return current.Seq + 1
+	}
+	return wallClock
+}
+
+// fetchCurrentRecord fetches the current signed record for a full name from a
+// running node, returning ok=false if the name has no record or the node is
+// unreachable (first publish, or transient failure; callers fall back).
+func fetchCurrentRecord(api, fullName string) (*FNRecord, bool) {
+	params := url.Values{"name": {fullName}}
+	resp, err := http.Get(api + "/record?" + params.Encode())
+	if err != nil {
+		return nil, false
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, false
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, false
+	}
+	rec, err := UnmarshalFNRecord(body)
+	if err != nil {
+		return nil, false
+	}
+	return rec, true
 }
 
 // --- staged records helpers ---

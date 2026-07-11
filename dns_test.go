@@ -31,7 +31,7 @@ func (f *fakeDHT) PublishRecord(rec *FNRecord) error {
 	return nil
 }
 
-func (f *fakeDHT) ResolveRecord(key string) (*FNRecord, error) {
+func (f *fakeDHT) ResolveRecord(_ context.Context, key string) (*FNRecord, error) {
 	v, ok := f.store[key]
 	if !ok {
 		return nil, net.ErrClosed // any non-nil error signals "not found"
@@ -60,12 +60,57 @@ func mustResolver(t *testing.T) (*Resolver, crypto.PrivKey, string) {
 func TestResolverResolvesFNName(t *testing.T) {
 	resolver, _, name := mustResolver(t)
 
-	records, err := resolver.Resolve(name)
+	records, err := resolver.Resolve(context.Background(), name)
 	if err != nil {
 		t.Fatalf("resolve %s: %v", name, err)
 	}
 	if len(records) != 1 || records[0].Value != "10.0.0.5" {
 		t.Fatalf("unexpected records: %+v", records)
+	}
+}
+
+// TestResolverNormalizesCacheKey ensures the DNS FQDN spelling (trailing dot,
+// mixed case) and the plain spelling share one cache entry and both resolve.
+func TestResolverNormalizesCacheKey(t *testing.T) {
+	resolver, _, name := mustResolver(t)
+
+	// Prime the cache using the FQDN mixed-case spelling.
+	fqdn := "MySite." + name[len("mysite."):] + "." // e.g. MySite.<id>.fn.
+	if _, err := resolver.Resolve(context.Background(), fqdn); err != nil {
+		t.Fatalf("resolve fqdn spelling: %v", err)
+	}
+	// The canonical spelling must hit the same (single) cache entry.
+	if _, err := resolver.Resolve(context.Background(), name); err != nil {
+		t.Fatalf("resolve canonical spelling: %v", err)
+	}
+	if got := resolver.cache.Length(); got != 1 {
+		t.Fatalf("expected 1 shared cache entry across spellings, got %d", got)
+	}
+}
+
+// TestCNAMEAnsweredForAQuery ensures a CNAME record answers A queries (RFC 1034
+// 3.6.2) so CNAME-only names remain reachable through normal clients.
+func TestCNAMEAnsweredForAQuery(t *testing.T) {
+	rr := RR{Type: "CNAME", Value: "example.com", TTL: 300}
+	if got := toDNSRR("site.x.fn.", rr, dns.TypeA); got == nil {
+		t.Fatal("expected CNAME record to be returned for an A query")
+	}
+	if got := toDNSRR("site.x.fn.", rr, dns.TypeTXT); got != nil {
+		t.Fatal("did not expect CNAME record for a TXT query")
+	}
+}
+
+// TestMappedIPv4AnsweredOverDNS ensures the IPv4-mapped IPv6 form accepted by
+// record validation also yields a DNS A answer.
+func TestMappedIPv4AnsweredOverDNS(t *testing.T) {
+	rr := RR{Type: "A", Value: "::ffff:192.0.2.1", TTL: 300}
+	got := toDNSRR("site.x.fn.", rr, dns.TypeA)
+	if got == nil {
+		t.Fatal("expected IPv4-mapped A record to be answered")
+	}
+	a, ok := got.(*dns.A)
+	if !ok || a.Addr.String() != "192.0.2.1" {
+		t.Fatalf("expected unmapped 192.0.2.1, got %v", got)
 	}
 }
 

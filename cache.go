@@ -12,8 +12,9 @@ type Cache interface {
 	// entry is missing or has expired.
 	Get(name string) ([]RR, bool)
 	// Add caches the resource records for a name. The entry expires after the
-	// smallest record TTL (or a default if none is set).
-	Add(name string, records []RR)
+	// smallest record TTL (or a default if none is set), but never past the
+	// record's signed end-of-life (eol, unix seconds; 0 means no EOL cap).
+	Add(name string, records []RR, eol int64)
 	// Expire removes a single entry by name.
 	Expire(name string)
 	Length() int
@@ -60,11 +61,19 @@ func (c *MemoryCache) Get(name string) ([]RR, bool) {
 	return value.Records, true
 }
 
-// Add caches resource records, computing expiry from the smallest TTL in the set.
-func (c *MemoryCache) Add(name string, records []RR) {
+// Add caches resource records, computing expiry from the smallest TTL in the
+// set, capped at the record's signed EOL so expired records are never served
+// from cache.
+func (c *MemoryCache) Add(name string, records []RR, eol int64) {
+	expiresAt := time.Now().Add(cacheTTL(records))
+	if eol > 0 {
+		if eolTime := time.Unix(eol, 0); eolTime.Before(expiresAt) {
+			expiresAt = eolTime
+		}
+	}
 	c.cache.Add(name, cacheRecord{
 		Records:   records,
-		ExpiresAt: time.Now().Add(cacheTTL(records)),
+		ExpiresAt: expiresAt,
 	})
 }
 

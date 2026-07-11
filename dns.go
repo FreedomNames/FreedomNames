@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -13,6 +14,10 @@ import (
 	"codeberg.org/miekg/dns/dnsutil"
 	"codeberg.org/miekg/dns/rdata"
 )
+
+// dnsResolveTimeout bounds a .fn lookup on the DNS path. Stub resolvers
+// typically give up after ~5s, so answering later than that is wasted work.
+const dnsResolveTimeout = 4 * time.Second
 
 // DNSServer answers queries for the ".fn" zone from the DHT and forwards all
 // other queries to an upstream resolver, so it can be used as a drop-in system
@@ -101,7 +106,12 @@ func (s *DNSServer) handleFN(ctx context.Context, w dns.ResponseWriter, r *dns.M
 	name := q.Header().Name
 	qtype := dns.RRToType(q)
 
-	records, err := s.resolver.Resolve(name)
+	// Bound the lookup below a typical stub-resolver patience (~5s): a slow
+	// DHT walk should fail fast here rather than answer a client that already
+	// gave up.
+	resolveCtx, cancel := context.WithTimeout(ctx, dnsResolveTimeout)
+	defer cancel()
+	records, err := s.resolver.Resolve(resolveCtx, name)
 
 	// Re-use r as the response.
 	r.Reset()
@@ -110,7 +120,11 @@ func (s *DNSServer) handleFN(ctx context.Context, w dns.ResponseWriter, r *dns.M
 
 	if err != nil {
 		log.Printf("DNS: resolve %s: %v", name, err)
-		r.Rcode = dns.RcodeNameError // NXDOMAIN
+		if errors.Is(err, context.DeadlineExceeded) {
+			r.Rcode = dns.RcodeServerFailure // transient: lookup timed out
+		} else {
+			r.Rcode = dns.RcodeNameError // NXDOMAIN
+		}
 		r.Pack()
 		io.Copy(w, r)
 		return
@@ -146,7 +160,7 @@ func (s *DNSServer) handleForward(ctx context.Context, w dns.ResponseWriter, r *
 }
 
 // toDNSRR converts a Freedom Names RR into a wire DNS RR for the given query
-// type. It returns nil if the record type does not match the query type.
+// type. It returns nil if the record does not answer the query type.
 func toDNSRR(name string, rr RR, qtype uint16) dns.RR {
 	hdr := dns.Header{Name: name, TTL: rr.TTL, Class: dns.ClassINET}
 	switch rr.Type {
@@ -155,7 +169,13 @@ func toDNSRR(name string, rr RR, qtype uint16) dns.RR {
 			return nil
 		}
 		addr, err := netip.ParseAddr(rr.Value)
-		if err != nil || !addr.Is4() {
+		if err != nil {
+			return nil
+		}
+		// Unmap accepts the IPv4-mapped IPv6 form ("::ffff:1.2.3.4") that
+		// record validation also accepts, normalizing it to plain IPv4.
+		addr = addr.Unmap()
+		if !addr.Is4() {
 			return nil
 		}
 		return &dns.A{Hdr: hdr, A: rdata.A{Addr: addr}}
@@ -174,7 +194,10 @@ func toDNSRR(name string, rr RR, qtype uint16) dns.RR {
 		}
 		return &dns.TXT{Hdr: hdr, TXT: rdata.TXT{Txt: []string{rr.Value}}}
 	case RecordTypeCNAME:
-		if qtype != dns.TypeCNAME {
+		// Per RFC 1034 §3.6.2 a CNAME answers queries for other types too:
+		// return the CNAME for A/AAAA (and CNAME) queries so CNAME-only names
+		// stay reachable through normal clients, which chase the target.
+		if qtype != dns.TypeCNAME && qtype != dns.TypeA && qtype != dns.TypeAAAA {
 			return nil
 		}
 		return &dns.CNAME{Hdr: hdr, CNAME: rdata.CNAME{Target: dnsutil.Fqdn(rr.Value)}}

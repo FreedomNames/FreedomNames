@@ -6,7 +6,7 @@ once. This page gets one running on your machine.
 ## Prerequisites
 
 - **Go** (a recent version) to build and run the binary.
-- No special privileges — the DNS server defaults to the high port `:8053`. (For
+- No special privileges: the DNS server defaults to the high port `:8053`. (For
   system-wide `.fn` resolution on `:53`, see [below](#the-53-port).)
 
 Clone the repository:
@@ -50,7 +50,7 @@ By default the DNS server listens on the high port **`:8053`**, so `go run .`
 works with no privileges. Query it with `dig -p 8053 …`.
 
 Your OS and browser, however, only send DNS to the standard **`:53`**. For
-system-wide `.fn` resolution, run Freedom Names on `:53` — build the binary and
+system-wide `.fn` resolution, run Freedom Names on `:53`. Build the binary and
 grant it the capability once:
 
 ```sh
@@ -62,7 +62,7 @@ FREEDOM_DNS_ADDR=:53 ./freedom-names
 Alternatively, keep `:8053` and forward `:53 → 127.0.0.1:8053` with a local
 resolver (dnsmasq / systemd-resolved).
 
-If the DNS port fails to bind, the node logs a warning and keeps running — the
+If the DNS port fails to bind, the node logs a warning and keeps running; the
 DHT and HTTP API are unaffected.
 
 ## Verify it's up

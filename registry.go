@@ -26,23 +26,17 @@ type NameRegistry interface {
 }
 
 // isBareName reports whether a name is a bare "<labels>.fn" name with no
-// self-certifying pubkey suffix (i.e. it needs the registry to resolve an owner).
-// A self-certifying name has the shape "label.<pubKeyID>.fn" where <pubKeyID> is
-// a base36 hash; a bare name is anything under .fn that ParseName cannot split
-// into (label, keyID).
+// self-certifying pubkey suffix (i.e. it needs the registry to resolve an
+// owner). A name is self-certifying iff its second-to-last label actually
+// decodes as a base36 sha2-256 multihash (IsPubKeyID) — no length heuristics,
+// so long human labels can't be mistaken for key ids and vice versa.
 func isBareName(name string) bool {
-	trimmed := strings.TrimSuffix(strings.ToLower(name), ".")
-	if !strings.HasSuffix(trimmed, "."+tld) {
+	if !strings.HasSuffix(CanonicalName(name), "."+tld) {
 		return false
 	}
-	// If it parses as a self-certifying name AND the keyID looks like a hash,
-	// it's not bare. We treat everything that is not a valid self-certifying
-	// name as bare and defer to the registry.
 	_, keyID, err := ParseName(name)
 	if err != nil {
 		return true
 	}
-	// A self-certifying keyID is the base36 of a sha2-256 multihash: length ~52.
-	// Treat clearly-too-short suffixes as bare labels rather than key IDs.
-	return len(keyID) < 40
+	return !IsPubKeyID(keyID)
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"testing"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -23,6 +24,12 @@ func TestIsBareName(t *testing.T) {
 		"mysite.fn": true, // bare
 		"mysite.mugh925ipvygve5a4p0p8ai5vp4o2dofmeeok84hamb238j2r9o3.fn": false, // self-certifying
 		"example.com": false, // not .fn
+		// A long human label must NOT be mistaken for a pubkey id: it does not
+		// decode as a base36 sha2-256 multihash, so the name is bare.
+		"blog.my-very-long-organization-department-name-somewhere.fn": true,
+		// A random 52-char base36-ish string that is not a valid multihash is
+		// still bare, regardless of its length.
+		"blog.zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz.fn": true,
 	}
 	for name, want := range cases {
 		if got := isBareName(name); got != want {
@@ -51,7 +58,7 @@ func TestBareNameResolvesViaRegistry(t *testing.T) {
 	reg := &mockRegistry{owners: map[string][]byte{"mysite.fn": pub}}
 
 	resolver := NewResolver(dhtStore, cache).WithRegistry(reg)
-	records, err := resolver.Resolve("mysite.fn")
+	records, err := resolver.Resolve(context.Background(), "mysite.fn")
 	if err != nil {
 		t.Fatalf("resolve bare name: %v", err)
 	}
@@ -66,7 +73,7 @@ func TestBareNameStubFallsBack(t *testing.T) {
 
 	// The BCH stub is not implemented: bare names must error, not panic.
 	resolver := NewResolver(dhtStore, cache).WithRegistry(NewBCHRegistry())
-	if _, err := resolver.Resolve("mysite.fn"); err == nil {
+	if _, err := resolver.Resolve(context.Background(), "mysite.fn"); err == nil {
 		t.Fatal("expected bare-name resolution to fail against the stub")
 	}
 }
