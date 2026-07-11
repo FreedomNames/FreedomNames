@@ -9,10 +9,11 @@ import (
 // Config holds runtime configuration. Values come from environment variables so
 // nothing operational is hardcoded; sensible defaults keep `go run .` working.
 type Config struct {
-	HTTPAddr    string   // address for the HTTP API (default ":8420")
-	DNSAddr     string   // address for the DNS server (default ":53")
+	HTTPAddr    string   // address for the HTTP API (default "127.0.0.1:8420")
+	DNSAddr     string   // address for the DNS server (default ":8053")
 	UpstreamDNS string   // upstream resolver for non-.fn queries (default "1.1.1.1:53")
 	Bootstrap   []string // bootstrap peer multiaddrs
+	ContentDir  string   // content-addressed blobstore directory
 
 	// Layer 2 (BCH registry for globally-unique bare names).
 	BCHElectrum string // electrum server, e.g. "ssl://host:50002" (empty disables L2)
@@ -29,7 +30,11 @@ var defaultBootstrapPeers = []string{
 // LoadConfig reads configuration from the environment with defaults.
 func LoadConfig() *Config {
 	cfg := &Config{
-		HTTPAddr: envOr("FREEDOM_HTTP_ADDR", ":8420"),
+		// Bind the HTTP API to loopback by default: it is an unauthenticated
+		// local control surface (a browser spawns the node), so it must not be
+		// exposed on all interfaces. Override with FREEDOM_HTTP_ADDR=:8420 to
+		// share it on a LAN deliberately.
+		HTTPAddr: envOr("FREEDOM_HTTP_ADDR", "127.0.0.1:8420"),
 		// Default to the high port :8053 so nodes run without root. (We avoid
 		// :5353, which collides with mDNS/avahi on most desktops.) Set
 		// FREEDOM_DNS_ADDR=:53 (with setcap or a :53->:8053 forwarder) for
@@ -37,6 +42,7 @@ func LoadConfig() *Config {
 		DNSAddr:     envOr("FREEDOM_DNS_ADDR", ":8053"),
 		UpstreamDNS: envOr("FREEDOM_UPSTREAM_DNS", "1.1.1.1:53"),
 		Bootstrap:   defaultBootstrapPeers,
+		ContentDir:  envOr("FREEDOM_CONTENT_DIR", defaultContentDirOr()),
 
 		BCHNetwork:  envOr("FREEDOM_BCH_NETWORK", "chipnet"),
 		BCHElectrum: envOr("FREEDOM_BCH_ELECTRUM", defaultBCHElectrum),
@@ -59,6 +65,16 @@ func LoadConfig() *Config {
 // (that operator sees every bare name you resolve). For real use, point
 // FREEDOM_BCH_ELECTRUM at your own Fulcrum server.
 const defaultBCHElectrum = "ssl://chipnet.bch.ninja:50002"
+
+// defaultContentDirOr returns ~/.freedom/content, or "" if the home dir can't
+// be determined (the caller then reports the store as disabled).
+func defaultContentDirOr() string {
+	dir, err := defaultContentDir()
+	if err != nil {
+		return ""
+	}
+	return dir
+}
 
 func envOr(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {

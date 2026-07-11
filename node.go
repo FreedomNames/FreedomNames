@@ -59,6 +59,9 @@ type FreedomNameNode struct {
 	owned   map[string]*FNRecord
 	ownedMu sync.Mutex
 
+	// Content service: the peer-to-peer page-bytes layer (set by AttachContent).
+	content *ContentService
+
 	// dualkadDHT *dual.DHT
 }
 
@@ -202,6 +205,19 @@ func NewNode(ctx context.Context, cfg *Config) *FreedomNameNode {
 	go freedomName.republishLoop()
 
 	return freedomName
+}
+
+// AttachContent creates the peer-to-peer content service over the given
+// blobstore and registers its stream handler. Content is optional: a node
+// without it still resolves names, it just cannot serve or fetch page bytes.
+func (freedomName *FreedomNameNode) AttachContent(store *BlobStore) *ContentService {
+	freedomName.content = NewContentService(freedomName, store)
+	return freedomName.content
+}
+
+// Content returns the node's content service, or nil if none is attached.
+func (freedomName *FreedomNameNode) Content() *ContentService {
+	return freedomName.content
 }
 
 // ------------------------------------------------------------

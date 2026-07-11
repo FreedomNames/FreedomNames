@@ -17,6 +17,26 @@ func newTestKey(t *testing.T) crypto.PrivKey {
 	return priv
 }
 
+func TestContentRecordValidation(t *testing.T) {
+	priv := newTestKey(t)
+	goodHash, _ := contentHash([]byte("a page"))
+
+	// A CONTENT record with a valid content hash verifies.
+	rec, err := BuildAndSignRecord(priv, "mysite", []RR{{Type: RecordTypeCONTENT, Value: goodHash, TTL: 300}}, 1)
+	if err != nil {
+		t.Fatalf("build CONTENT record: %v", err)
+	}
+	if err := rec.Verify(); err != nil {
+		t.Fatalf("verify CONTENT record: %v", err)
+	}
+
+	// A CONTENT record with a bogus value is rejected.
+	bad := &FNRecord{Label: "mysite", Records: []RR{{Type: RecordTypeCONTENT, Value: "not-a-hash", TTL: 300}}}
+	if err := bad.validateRecords(); err == nil {
+		t.Fatal("expected CONTENT record with invalid hash to be rejected")
+	}
+}
+
 func TestSignVerifyRoundTrip(t *testing.T) {
 	priv := newTestKey(t)
 	rec, err := BuildAndSignRecord(priv, "mysite", []RR{{Type: "A", Value: "10.0.0.5", TTL: 300}}, 1)

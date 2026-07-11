@@ -22,6 +22,11 @@ const (
 	RecordTypeAAAA  = "AAAA"
 	RecordTypeTXT   = "TXT"
 	RecordTypeCNAME = "CNAME"
+	// RecordTypeCONTENT points a name at content: its value is a base36
+	// sha2-256 multihash of a blob served over the content network. This is
+	// how a name maps to a page's bytes (the decentralized-web equivalent of
+	// an IPFS dnslink), resolved via GET /resolve-content.
+	RecordTypeCONTENT = "CONTENT"
 )
 
 // dhtNamespace is the DHT key namespace, matching the NamespacedValidator
@@ -148,6 +153,10 @@ func (r *FNRecord) validateRecords() error {
 		case RecordTypeCNAME:
 			if rr.Value == "" {
 				return errors.New("CNAME record has empty target")
+			}
+		case RecordTypeCONTENT:
+			if !isContentHash(rr.Value) {
+				return fmt.Errorf("CONTENT record value %q is not a valid content hash", rr.Value)
 			}
 		case RecordTypeTXT:
 			// Any UTF-8 string is acceptable.

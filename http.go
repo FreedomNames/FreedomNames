@@ -16,6 +16,7 @@ import (
 )
 
 type Response struct {
+	Version         string   `json:"version"`
 	Mode            string   `json:"mode"`
 	PeerID          string   `json:"peerID"`
 	ListenAddresses []string `json:"listenAddresses"`
@@ -25,7 +26,7 @@ type Response struct {
 	Protocols       []string `json:"protocols"`
 }
 
-func StartHTTPServer(freedomDht FreedomDHT, resolver *Resolver, cache Cache, addr string) {
+func StartHTTPServer(freedomDht FreedomDHT, resolver *Resolver, cache Cache, content *ContentService, addr string) {
 	// Set up HTTP API endpoints
 	mux := http.NewServeMux()
 	mux.HandleFunc("/publish", PublishHandler(freedomDht))
@@ -34,6 +35,10 @@ func StartHTTPServer(freedomDht FreedomDHT, resolver *Resolver, cache Cache, add
 	mux.HandleFunc("/peers", AllPeersHandler(freedomDht))
 	mux.HandleFunc("/info", InfoHandler(freedomDht))
 	mux.HandleFunc("/clear_cache", ClearCacheHandler(cache))
+	mux.HandleFunc("/health", HealthHandler(freedomDht))
+	// Content endpoints (LibreWeb's page-bytes layer).
+	mux.HandleFunc("/content", ContentHandler(content))
+	mux.HandleFunc("/resolve-content", ResolveContentHandler(resolver, content))
 	server := &http.Server{Addr: addr, Handler: mux}
 
 	var wg sync.WaitGroup
@@ -279,6 +284,7 @@ func InfoHandler(freedomDht FreedomDHT) http.HandlerFunc {
 		}
 
 		response := Response{
+			Version:         nodeVersion,
 			Mode:            mode,
 			PeerID:          peerID,
 			ListenAddresses: listenAddrList,

@@ -1,14 +1,20 @@
 # HTTP API reference
 
-Every node exposes an HTTP API (default `:8420`) for publishing and resolving
-records and for inspecting the node. The CLI talks to this same API.
+Every node exposes an HTTP API (default `127.0.0.1:8420`) for publishing and
+resolving records, moving content, and inspecting the node. The CLI talks to this
+same API. The API binds to loopback by default; it is an unauthenticated local
+control surface, so expose it beyond `127.0.0.1` only deliberately.
 
 | Route | Method | Purpose |
 | --- | --- | --- |
 | [`/publish`](#post-publish) | POST | Store a signed `FNRecord` |
 | [`/resolve`](#get-resolve) | GET | Resolve a name to its records |
+| [`/record`](#get-record) | GET | Fetch the raw signed record |
+| [`/content`](#post-get-content) | POST/GET | Store / fetch page bytes by hash |
+| [`/resolve-content`](#get-resolve-content) | GET | Name to page bytes in one call |
 | [`/peers`](#get-peers) | GET | Routing-table peers + connected hosts |
-| [`/info`](#get-info) | GET | Node mode, peer ID, addresses, network size |
+| [`/info`](#get-info) | GET | Version, mode, peer ID, addresses, network size |
+| [`/health`](#get-health) | GET | Liveness + version handshake |
 | [`/clear_cache`](#delete-clear_cache) | DELETE | Purge the local resolution cache |
 
 ## POST `/publish`
@@ -147,7 +153,66 @@ curl -X DELETE http://localhost:8420/clear_cache
 
 Returns `200 OK` with an empty body.
 
+## POST / GET `/content`
+
+The content layer's store and fetch. See [the content network](/guide/content)
+for the model.
+
+**Store**: `POST` raw bytes (`application/octet-stream`):
+
+```sh
+curl -X POST --data-binary @index.html http://localhost:8420/content
+```
+
+```json
+{ "hash": "muf...hbst" }
+```
+
+The node stores the bytes locally and announces a provider record. Max body size
+is 32 MiB.
+
+**Fetch**: `GET` with `?hash=`:
+
+```sh
+curl "http://localhost:8420/content?hash=muf...hbst" -o page.html
+```
+
+Returns the raw bytes (`application/octet-stream`) from the local store, or
+fetched from a provider on a miss. Received bytes are verified against the hash.
+
+**Errors:** `400` missing/invalid hash; `404` not found on the network; `502`
+transient discovery/transfer failure; `503` content service disabled.
+
+## GET `/resolve-content`
+
+Resolve a name to its `CONTENT` record and stream the bytes in one call: the
+request a browser makes per page load.
+
+```sh
+curl "http://localhost:8420/resolve-content?name=blog.<pubKeyID>.fn" -o page.html
+```
+
+Returns the raw page bytes; the content hash is echoed in the
+`X-Freedom-Content-Hash` response header.
+
+**Errors:** `400` missing name; `404` name has no CONTENT record or content
+unavailable; `502` transient failure.
+
+## GET `/health`
+
+A stable liveness + version endpoint for a spawning host to confirm the node is
+up and is the expected build.
+
+```sh
+curl http://localhost:8420/health
+```
+
+```json
+{ "status": "ok", "version": "0.3.0", "ready": true }
+```
+
 ## Next
 
 - The [**CLI**](/guide/cli) that wraps this API.
+- The [**content network**](/guide/content) and [**embedding a node**](/guide/embedding).
 - [**Configuration**](/guide/configuration) to change the listen address and more.
