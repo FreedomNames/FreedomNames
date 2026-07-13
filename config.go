@@ -16,9 +16,9 @@ type Config struct {
 	ContentDir  string   // content-addressed blobstore directory
 
 	// Layer 2 (BCH registry for globally-unique bare names).
-	BCHElectrum string // electrum server, e.g. "ssl://host:50002" (empty disables L2)
-	BCHNetwork  string // "chipnet" | "mainnet"
-	BCHMinConf  int64  // confirmations required for a claim to count
+	BCHElectrum []string // electrum servers, tried in order with failover (empty disables L2)
+	BCHNetwork  string   // "mainnet" | "chipnet" | "testnet4" | "testnet3"
+	BCHMinConf  int64    // confirmations required for a claim to count
 }
 
 // Default bootstrap peers. Replace/extend with real public /dnsaddr entries as
@@ -44,9 +44,18 @@ func LoadConfig() *Config {
 		Bootstrap:   defaultBootstrapPeers,
 		ContentDir:  envOr("FREEDOM_CONTENT_DIR", defaultContentDirOr()),
 
-		BCHNetwork:  envOr("FREEDOM_BCH_NETWORK", "chipnet"),
-		BCHElectrum: envOr("FREEDOM_BCH_ELECTRUM", defaultBCHElectrum),
-		BCHMinConf:  1,
+		// Default to mainnet: bare names are a real, globally-unique namespace.
+		// Point FREEDOM_BCH_NETWORK at chipnet/testnet4 to experiment with free
+		// faucet coins (see the README).
+		BCHNetwork: envOr("FREEDOM_BCH_NETWORK", "mainnet"),
+		BCHMinConf: 1,
+	}
+	// Electrum servers: an explicit FREEDOM_BCH_ELECTRUM (comma-separated) wins;
+	// otherwise use the built-in bootstrap list for the selected network.
+	if v := os.Getenv("FREEDOM_BCH_ELECTRUM"); v != "" {
+		cfg.BCHElectrum = splitAndTrim(v)
+	} else {
+		cfg.BCHElectrum = defaultBCHElectrumServers(cfg.BCHNetwork)
 	}
 	if v := os.Getenv("FREEDOM_BOOTSTRAP"); v != "" {
 		cfg.Bootstrap = splitAndTrim(v)
@@ -59,12 +68,61 @@ func LoadConfig() *Config {
 	return cfg
 }
 
-// defaultBCHElectrum is a public chipnet Fulcrum server used when
-// FREEDOM_BCH_ELECTRUM is unset, so Layer 2 works out of the box for testing.
-// NOTE: relying on one public server is a privacy and availability trade-off
-// (that operator sees every bare name you resolve). For real use, point
-// FREEDOM_BCH_ELECTRUM at your own Fulcrum server.
-const defaultBCHElectrum = "ssl://chipnet.bch.ninja:50002"
+// Built-in Electrum/Fulcrum bootstrap servers, one list per BCH network. The
+// client (electrum.go) tries them in order and fails over, so a single dead
+// server never takes Layer 2 down, fitting for a decentralized namespace.
+// Sourced from Electron Cash's public server lists (SSL endpoints only; .onion
+// servers are omitted since we dial plain TLS, not Tor).
+//
+// NOTE: any public server sees which bare names you resolve. For privacy or
+// guaranteed availability, run your own Fulcrum and set FREEDOM_BCH_ELECTRUM.
+var (
+	bchMainnetElectrum = []string{
+		"ssl://bch.imaginary.cash:50002",
+		"ssl://electrum.imaginary.cash:50002",
+		"ssl://bch.loping.net:50002",
+		"ssl://electroncash.dk:50002",
+		"ssl://bch0.kister.net:50002",
+		"ssl://cashnode.bch.ninja:50002",
+		"ssl://fulcrum.criptolayer.net:50002",
+		"ssl://blackie.c3-soft.com:50002",
+	}
+	bchChipnetElectrum = []string{
+		"ssl://chipnet.bch.ninja:50002",
+		"ssl://chipnet.imaginary.cash:50002",
+		"ssl://chipnet.c3-soft.com:64002",
+		"ssl://cbch.loping.net:62102",
+	}
+	bchTestnet4Electrum = []string{
+		"ssl://tbch4.loping.net:62002",
+		"ssl://blackie.c3-soft.com:62002",
+	}
+	bchTestnet3Electrum = []string{
+		"ssl://testnet.imaginary.cash:50002",
+		"ssl://tbch.loping.net:60002",
+		"ssl://testnet.bitcoincash.network:60002",
+		"ssl://bch0.kister.net:51002",
+		"ssl://blackie.c3-soft.com:60002",
+	}
+)
+
+// defaultBCHElectrumServers returns the built-in Electrum bootstrap list for a
+// network. An unknown network yields an empty list (Layer 2 disabled) rather
+// than silently pointing at the wrong chain.
+func defaultBCHElectrumServers(network string) []string {
+	switch network {
+	case "mainnet":
+		return bchMainnetElectrum
+	case "chipnet":
+		return bchChipnetElectrum
+	case "testnet4":
+		return bchTestnet4Electrum
+	case "testnet3", "testnet":
+		return bchTestnet3Electrum
+	default:
+		return nil
+	}
+}
 
 // defaultContentDirOr returns ~/.freedom/content, or "" if the home dir can't
 // be determined (the caller then reports the store as disabled).

@@ -22,10 +22,10 @@ func bchContext() (context.Context, context.CancelFunc) {
 // bchWalletFromEnv opens the wallet against the configured electrum server.
 func bchWalletFromEnv() (*bchWallet, *electrumClient, error) {
 	cfg := LoadConfig()
-	if cfg.BCHElectrum == "" {
-		return nil, nil, fmt.Errorf("no BCH electrum server configured (set FREEDOM_BCH_ELECTRUM)")
+	if len(cfg.BCHElectrum) == 0 {
+		return nil, nil, fmt.Errorf("no BCH electrum server configured (set FREEDOM_BCH_ELECTRUM or FREEDOM_BCH_NETWORK)")
 	}
-	client := newElectrumClient(cfg.BCHElectrum)
+	client := newElectrumClient(cfg.BCHElectrum...)
 	w, err := loadOrCreateBCHWallet(cfg.BCHNetwork, client)
 	if err != nil {
 		client.Close()
@@ -179,10 +179,10 @@ func cliWhois(args []string) error {
 	}
 
 	cfg := LoadConfig()
-	if cfg.BCHElectrum == "" {
-		return fmt.Errorf("no BCH electrum server configured (set FREEDOM_BCH_ELECTRUM)")
+	if len(cfg.BCHElectrum) == 0 {
+		return fmt.Errorf("no BCH electrum server configured (set FREEDOM_BCH_ELECTRUM or FREEDOM_BCH_NETWORK)")
 	}
-	client := newElectrumClient(cfg.BCHElectrum)
+	client := newElectrumClient(cfg.BCHElectrum...)
 	defer client.Close()
 
 	reg := NewBCHRegistry(client, cfg.BCHMinConf)
