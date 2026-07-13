@@ -132,13 +132,16 @@ freedom lookup mysite.<pubKeyID>.fn --type A
 ## Bare names on Bitcoin Cash (Layer 2)
 
 These commands register globally-unique bare names (`mysite.fn`, no key suffix)
-on Bitcoin Cash. They talk directly to an Electrum server set via
-`FREEDOM_BCH_ELECTRUM` and do **not** need a running node. See
-[Layer 2](/guide/layer2) for the full protocol.
+on Bitcoin Cash. They talk directly to an Electrum server and do **not** need a
+running node. They default to **mainnet**; set `FREEDOM_BCH_NETWORK=chipnet` (or
+`testnet4` / `testnet3`) to rehearse for free with faucet coins. Servers come
+from a built-in per-network list with failover unless you override
+`FREEDOM_BCH_ELECTRUM`. See [Layer 2](/guide/layer2) for the full protocol.
 
 ### `freedom wallet`
 
-Shows the BCH funding address (fund it from a chipnet faucet), balance, and how
+Shows the BCH funding address (a `bitcoincash:` address on mainnet, or a
+`bchtest:` one you can fund from a faucet on a test network), balance, and how
 many name NFTs the wallet holds.
 
 ### `freedom claim <label>`

@@ -7,9 +7,12 @@ needs consensus. Rather than build a new chain, Layer 2 leans on an existing
 one: **Bitcoin Cash**.
 
 ::: info Status
-Layer 2 is **beta**, tested on **chipnet**. A claimed name is a real,
-tradeable CashTokens NFT. Set `FREEDOM_BCH_ELECTRUM` to enable it; without it,
-self-certifying (Layer 1) names still resolve fully.
+Layer 2 is enabled by default on **mainnet**: a claimed name is a real,
+tradeable CashTokens NFT. The node reads the chain through public
+Electrum/Fulcrum servers, using a built-in per-network bootstrap list with
+automatic failover. To experiment first, switch to a test network with
+`FREEDOM_BCH_NETWORK=chipnet` (or `testnet4` / `testnet3`) and use faucet coins.
+Self-certifying (Layer 1) names always resolve regardless.
 :::
 
 ## Why a second layer
@@ -84,6 +87,29 @@ you can also **send it in any token-aware wallet**; the new holder then runs
 
 Results are cached for a few minutes for reorg tolerance.
 
+## Reaching the chain: Electrum servers and failover
+
+A node reads BCH through the **Electrum Cash protocol** (as served by Fulcrum).
+It ships with a built-in bootstrap list of public servers **per network** and
+tries them in order, **failing over** to the next if one is unreachable, so no
+single server is a point of failure. The first server that connects is reused
+across reconnects.
+
+Two things you can override:
+
+- `FREEDOM_BCH_NETWORK` selects the chain (`mainnet` by default; `chipnet`,
+  `testnet4`, or `testnet3` for testing). Each network has its own bootstrap
+  list and address prefix.
+- `FREEDOM_BCH_ELECTRUM` replaces the bootstrap list with your own
+  comma-separated servers (`ssl://host:port`, tried in order with the same
+  failover).
+
+::: warning Privacy
+Any public Electrum server sees which bare names you resolve. For privacy or
+guaranteed availability, run your own Fulcrum and set `FREEDOM_BCH_ELECTRUM` to
+point at it.
+:::
+
 ## Name normalization
 
 Names are normalized before use: lowercased, restricted to `[a-z0-9-]` with no
@@ -100,8 +126,12 @@ the equivalent self-certifying `mysite.<pubKeyID>.fn` name.
 
 ## Trying it on chipnet
 
+Bare names default to **mainnet**, where a claim costs real (if tiny) BCH. To
+rehearse the whole flow for free, switch to **chipnet** and fund from a faucet.
+The built-in chipnet server list is used automatically, so you only set the
+network:
+
 ```sh
-export FREEDOM_BCH_ELECTRUM=ssl://chipnet.bch.ninja:50002
 export FREEDOM_BCH_NETWORK=chipnet
 
 freedom keygen mysite            # your Layer 1 owner key
@@ -110,6 +140,10 @@ freedom wallet                   # shows a bchtest: address to fund
 freedom claim mysite             # mints the name NFT on-chain
 freedom whois mysite.fn          # once confirmed, shows the owner
 ```
+
+For a real, permanent name, drop `FREEDOM_BCH_NETWORK` (mainnet is the default)
+and fund the `bitcoincash:` address instead. See the full walkthrough in
+[claiming a bare name](/examples/claim-a-bare-name).
 
 ## Reserved for later
 

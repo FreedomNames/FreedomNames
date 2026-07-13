@@ -17,15 +17,18 @@ go build -o freedom-names .
 
 ## 2. Point at chipnet
 
-The defaults already target chipnet, but set them explicitly so the session is
-self-contained:
+Bare names default to **mainnet**, where a claim costs real BCH. This
+walkthrough uses **chipnet** so it costs nothing, so switch networks for the
+session:
 
 ```sh
 export FREEDOM_BCH_NETWORK=chipnet
-export FREEDOM_BCH_ELECTRUM=ssl://chipnet.bch.ninja:50002
 ```
 
-Any Electrum Cash (Fulcrum) server on chipnet works; run your own if you prefer.
+That is all you need: the node uses a built-in list of public chipnet
+Electrum/Fulcrum servers automatically, failing over between them. To use a
+specific server (for example your own), set
+`FREEDOM_BCH_ELECTRUM=ssl://host:port`.
 
 ## 3. Create your funding wallet
 
@@ -144,7 +147,9 @@ chipnet wallet (e.g. Cashonize). The receiver then binds it to their own key:
 
 ## Troubleshooting
 
-- **`no BCH electrum server configured`**: set `FREEDOM_BCH_ELECTRUM`.
+- **`no BCH electrum server configured`**: `FREEDOM_BCH_NETWORK` is set to an
+  unknown value (so there is no built-in list). Use `mainnet`, `chipnet`,
+  `testnet4`, or `testnet3`, or set `FREEDOM_BCH_ELECTRUM` explicitly.
 - **`insufficient funds`**: the faucet payment has not confirmed yet, or was too
   small; check `freedom wallet`.
 - **`no eligible genesis UTXO`**: send yourself a little BCH so you have a plain

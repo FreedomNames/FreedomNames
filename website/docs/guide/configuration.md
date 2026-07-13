@@ -10,8 +10,8 @@ node is entirely driven by its environment.
 | `FREEDOM_UPSTREAM_DNS` | `1.1.1.1:53` | Upstream resolver for non-`.fn` queries |
 | `FREEDOM_CONTENT_DIR` | `~/.freedom/content` | Content-addressed blobstore directory |
 | `FREEDOM_BOOTSTRAP` | *(none)* | Comma-separated bootstrap peer multiaddrs |
-| `FREEDOM_BCH_ELECTRUM` | *(chipnet server)* | Electrum server for Layer 2 bare names (`ssl://host:port`) |
-| `FREEDOM_BCH_NETWORK` | `chipnet` | BCH network: `chipnet` or `mainnet` |
+| `FREEDOM_BCH_NETWORK` | `mainnet` | BCH network for Layer 2: `mainnet`, `chipnet`, `testnet4`, or `testnet3` |
+| `FREEDOM_BCH_ELECTRUM` | *(built-in list per network)* | Comma-separated Electrum/Fulcrum servers, tried in order with failover (`ssl://host:port`). Overrides the built-in bootstrap list |
 | `FREEDOM_BCH_MINCONF` | `1` | Confirmations before a name claim counts |
 
 The HTTP API binds to **`127.0.0.1`** by default: it is an unauthenticated local
@@ -23,10 +23,13 @@ over the environment: `--http-addr HOST:PORT`, `--api-bind HOST`,
 `--content-dir DIR`, `--dns-addr HOST:PORT`. See
 [embedding a node](/guide/embedding).
 
-The `FREEDOM_BCH_*` variables enable [Layer 2](/guide/layer2) (globally-unique
-bare names on Bitcoin Cash). Point `FREEDOM_BCH_ELECTRUM` at any Electrum Cash
-(Fulcrum) server, including your own. Leave it empty to disable Layer 2; Layer 1
-names always resolve.
+The `FREEDOM_BCH_*` variables drive [Layer 2](/guide/layer2) (globally-unique
+bare names on Bitcoin Cash), which is on by default on **mainnet**. The node
+reaches the chain through a built-in per-network list of public Electrum Cash
+(Fulcrum) servers, trying them in order with **failover**. Set
+`FREEDOM_BCH_NETWORK` to a test network (`chipnet`, `testnet4`, `testnet3`) to
+experiment with faucet coins, or `FREEDOM_BCH_ELECTRUM` to a comma-separated list
+of your own servers. Layer 1 names always resolve regardless of these settings.
 
 The DNS server defaults to the high port **`:8053`**, so a node runs **without
 root**. If the DNS port can't be bound, the node logs a warning and keeps running;

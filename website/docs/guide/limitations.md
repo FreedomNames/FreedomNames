@@ -12,8 +12,8 @@ capabilities only fully exercise with peers actually connected, and have not yet
 been run on a large public network:
 
 - **Name replication** across independent DHT nodes.
-- **Bitcoin Cash claim broadcast** on chipnet/mainnet (a funded claim to whois
-  cycle).
+- **A funded Bitcoin Cash claim-to-whois cycle** end to end on a live network
+  (mainnet or a test network), as opposed to against a mock chain.
 - **Peer-to-peer content fetch** via DHT provider records between two nodes.
 
 The code for all three is complete and tested against mocks / in-process hosts.
@@ -34,15 +34,15 @@ public bootstrap exists, off-LAN discovery is manual.
   name wins. There is no bidding or stake-weighting (unlike LBRY); a later,
   higher-value claim does not displace an earlier one. This is intentional for
   v1.
-- **Single Electrum server by default.** Bare-name resolution reads the chain
-  through one configured Electrum (Fulcrum) server. The default public server is
-  a convenience for testing: it is a privacy leak (it sees every bare name you
-  resolve) and a single point of failure. For real use, run or choose your own
-  server via `FREEDOM_BCH_ELECTRUM`, and ideally cross-check multiple.
-- **Light-client trust.** The resolver trusts the Electrum server's history
-  responses; it does not verify SPV proofs. A malicious server could withhold or
-  misreport claims. Mitigation (SPV proofs / multi-server agreement) is future
-  work.
+- **Public Electrum servers see your lookups.** Bare-name resolution reads the
+  chain through Electrum (Fulcrum) servers. A node ships with a built-in
+  per-network bootstrap list and fails over between them, so a single dead server
+  is not a point of failure, but any public server still sees every bare name you
+  resolve. For privacy, run your own Fulcrum and set `FREEDOM_BCH_ELECTRUM`.
+- **Light-client trust.** The resolver trusts each Electrum server's history
+  responses; it does not verify SPV proofs, and failover is for availability, not
+  cross-checking. A malicious server could withhold or misreport claims.
+  Mitigation (SPV proofs / multi-server agreement) is future work.
 - **Sequential chain reads.** Resolving a bare name whose NFT has been
   transferred many times walks the custody chain hop by hop over a single
   connection. It is bounded (64 hops) and cached (5 min), but a heavily-traded
