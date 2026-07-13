@@ -96,11 +96,12 @@ func main() {
 	// Cash. When no electrum endpoint is configured it is left off, and bare
 	// names simply resolve to not-found; self-certifying names always work.
 	resolver := NewResolver(freedomDht, cache)
-	if cfg.BCHElectrum != "" {
-		bchClient := newElectrumClient(cfg.BCHElectrum)
+	if len(cfg.BCHElectrum) > 0 {
+		bchClient := newElectrumClient(cfg.BCHElectrum...)
 		defer bchClient.Close()
 		resolver = resolver.WithRegistry(NewBCHRegistry(bchClient, cfg.BCHMinConf))
-		log.Printf("BCH registry enabled (%s via %s)", cfg.BCHNetwork, cfg.BCHElectrum)
+		log.Printf("BCH registry enabled (%s via %d electrum server(s), starting with %s)",
+			cfg.BCHNetwork, len(cfg.BCHElectrum), cfg.BCHElectrum[0])
 	}
 
 	// Start the DNS server (resolves .fn, forwards everything else upstream).

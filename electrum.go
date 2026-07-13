@@ -17,36 +17,70 @@ import (
 
 // electrumClient is a minimal Electrum Cash protocol client (the protocol
 // served by Fulcrum): newline-delimited JSON-RPC 2.0 over TCP or TLS. It is
-// deliberately tiny — only the handful of methods the BCH registry and wallet
-// need — instead of pulling in a heavy chain library.
+// deliberately tiny: only the handful of methods the BCH registry and wallet
+// need, instead of pulling in a heavy chain library.
 //
 // Endpoints use an explicit scheme: "ssl://host:port" or "tcp://host:port"
 // (the Electrum convention; public servers usually speak ssl on :50002).
+//
+// A client holds a list of endpoints and fails over between them: on connect it
+// tries each in turn until one is reachable and speaks the protocol, so a single
+// dead public server never takes Layer 2 down. In the spirit of a decentralized
+// network, the default lists (config.go) carry several independent operators.
 type electrumClient struct {
-	endpoint string
+	endpoints []string
 
-	mu     sync.Mutex // guards conn/reader/nextID; one in-flight call at a time
+	mu     sync.Mutex // guards conn/reader/nextID/lastGood; one in-flight call at a time
 	conn   net.Conn
 	reader *bufio.Reader
 	nextID uint64
+
+	// lastGood is the index of the endpoint that last connected successfully;
+	// the next connect starts there so we stick to a working server instead of
+	// re-probing dead ones from the top every time.
+	lastGood int
 }
 
-// electrumDialTimeout bounds connection establishment.
+// electrumDialTimeout bounds connection establishment to a single server.
 const electrumDialTimeout = 15 * time.Second
 
-// newElectrumClient creates a client for the given endpoint. The connection is
+// newElectrumClient creates a client over the given endpoints, tried in order
+// with failover. At least one endpoint is required. The connection is
 // established lazily on first call and re-established after errors.
-func newElectrumClient(endpoint string) *electrumClient {
-	return &electrumClient{endpoint: endpoint}
+func newElectrumClient(endpoints ...string) *electrumClient {
+	return &electrumClient{endpoints: endpoints}
 }
 
-// connect (re)establishes the connection and negotiates the protocol version.
-// Callers must hold c.mu.
+// connect (re)establishes the connection, trying each endpoint in turn until one
+// works. It starts from the last-known-good endpoint so a healthy server is
+// reused across reconnects. Callers must hold c.mu.
 func (c *electrumClient) connect(ctx context.Context) error {
-	scheme, addr, ok := strings.Cut(c.endpoint, "://")
+	if len(c.endpoints) == 0 {
+		return errors.New("no electrum endpoints configured")
+	}
+	var errs []error
+	n := len(c.endpoints)
+	for off := 0; off < n; off++ {
+		i := (c.lastGood + off) % n
+		endpoint := c.endpoints[i]
+		if err := c.dial(ctx, endpoint); err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		c.lastGood = i
+		return nil
+	}
+	return fmt.Errorf("all %d electrum endpoints failed: %w", n, errors.Join(errs...))
+}
+
+// dial connects to a single endpoint and negotiates the protocol version. On
+// success c.conn/c.reader are set; on failure they are left nil. Callers must
+// hold c.mu.
+func (c *electrumClient) dial(ctx context.Context, endpoint string) error {
+	scheme, addr, ok := strings.Cut(endpoint, "://")
 	if !ok {
 		// Default to ssl, the common public-server transport.
-		scheme, addr = "ssl", c.endpoint
+		scheme, addr = "ssl", endpoint
 	}
 
 	dialer := &net.Dialer{Timeout: electrumDialTimeout}
@@ -66,10 +100,10 @@ func (c *electrumClient) connect(ctx context.Context) error {
 	case "tcp":
 		conn, err = dialer.DialContext(ctx, "tcp", addr)
 	default:
-		return fmt.Errorf("electrum endpoint %q: unknown scheme %q (use ssl:// or tcp://)", c.endpoint, scheme)
+		return fmt.Errorf("electrum endpoint %q: unknown scheme %q (use ssl:// or tcp://)", endpoint, scheme)
 	}
 	if err != nil {
-		return fmt.Errorf("connect to electrum server %s: %w", c.endpoint, err)
+		return fmt.Errorf("connect to electrum server %s: %w", endpoint, err)
 	}
 
 	c.conn = conn
@@ -79,7 +113,7 @@ func (c *electrumClient) connect(ctx context.Context) error {
 	var version []string
 	if err := c.callLocked(ctx, "server.version", []any{"freedom-names", []string{"1.4", "1.5.3"}}, &version); err != nil {
 		c.closeLocked()
-		return fmt.Errorf("electrum version negotiation: %w", err)
+		return fmt.Errorf("electrum version negotiation with %s: %w", endpoint, err)
 	}
 	return nil
 }
@@ -140,6 +174,11 @@ func (c *electrumClient) callLocked(ctx context.Context, method string, params a
 	c.nextID++
 	id := c.nextID
 
+	// Normalize nil to an empty array: some Fulcrum builds reject "params": null
+	// with -32600 Invalid params, but accept an empty list.
+	if params == nil {
+		params = []any{}
+	}
 	req, err := json.Marshal(map[string]any{
 		"jsonrpc": "2.0",
 		"id":      id,
