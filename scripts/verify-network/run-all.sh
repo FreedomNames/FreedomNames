@@ -42,7 +42,12 @@ run_leg "content-fetch"      "$HERE/02-content-fetch.sh"      || true
 
 if [ -n "$WITH_L2" ]; then
   step "Layer 2 claim (guided, needs funded coins)"
-  if WORKDIR="$WORKDIR/layer2" bash -c "mkdir -p \"$WORKDIR/layer2\"; WORKDIR=\"$WORKDIR/layer2\" BIN=\"$BIN\" \"$HERE/03-layer2-claim.sh\""; then
+  # Forward FREEDOM_BCH_NETWORK (defaults to chipnet inside the leg) so
+  # `FREEDOM_BCH_NETWORK=mainnet run-all.sh --with-l2` actually reaches the leg.
+  mkdir -p "$WORKDIR/layer2"
+  if WORKDIR="$WORKDIR/layer2" BIN="$BIN" \
+     FREEDOM_BCH_NETWORK="${FREEDOM_BCH_NETWORK:-chipnet}" \
+     "$HERE/03-layer2-claim.sh"; then
     RESULTS+=("PASS  layer2-claim")
   else
     RESULTS+=("FAIL  layer2-claim")
