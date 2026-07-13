@@ -155,19 +155,14 @@ func ResolveHandler(freedomDht FreedomDHT, resolver *Resolver) http.HandlerFunc 
 }
 
 // resolveErrStatus maps a resolution error to an HTTP status so clients can
-// tell "this name does not exist" (404) apart from "bad request" (400), "not
-// supported, do not retry" (501), and "the lookup infrastructure failed, retry
-// later" (502).
+// tell "this name does not exist" (404) apart from "bad request" (400) and
+// "the lookup infrastructure failed, retry later" (502).
 func resolveErrStatus(err error) int {
 	switch {
 	case errors.Is(err, routing.ErrNotFound), errors.Is(err, ErrRegistryNotFound):
 		return http.StatusNotFound
 	case errors.Is(err, ErrNotFNName):
 		return http.StatusBadRequest
-	case errors.Is(err, ErrRegistryNotImplemented):
-		// Bare names need the (not yet built) Layer 2 registry: permanent
-		// until a release ships it, so clients should not retry.
-		return http.StatusNotImplemented
 	default:
 		// Transient/unknown failure (DHT timeout, no peers).
 		return http.StatusBadGateway

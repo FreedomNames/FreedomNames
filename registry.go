@@ -6,11 +6,9 @@ import (
 	"strings"
 )
 
-// ErrRegistryNotFound is returned when a bare name has no controlling owner.
+// ErrRegistryNotFound is returned when a bare name has no controlling owner
+// (including when no Layer 2 registry is configured, so the name is unclaimable).
 var ErrRegistryNotFound = errors.New("name not found in registry")
-
-// ErrRegistryNotImplemented is returned by resolvers that are not yet built.
-var ErrRegistryNotImplemented = errors.New("registry not implemented")
 
 // FN protocol tags carried in the OP_RETURN of registry transactions.
 const (

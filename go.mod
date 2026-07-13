@@ -1,8 +1,6 @@
 module gitlab.melroy.org/freedom-names/freedom-names
 
-go 1.26.0
-
-toolchain go1.26.5
+go 1.26.5
 
 require (
 	github.com/libp2p/go-libp2p v0.48.0
