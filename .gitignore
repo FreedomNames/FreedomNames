@@ -22,6 +22,7 @@ freedom-names
 
 # Build directories
 tmp
+build_release
 
 # Private key :)
 private.key

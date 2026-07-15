@@ -10,8 +10,22 @@ import (
 )
 
 // nodeVersion identifies this build in /health and /info so a spawning host
-// (e.g. LibreWeb) can confirm it launched the expected node.
-const nodeVersion = "0.3.0"
+// (e.g. LibreWeb) can confirm it launched the expected node. It falls back to
+// this compiled-in default and is overridden at release build time via
+// -ldflags "-X ...main.buildVersion=<tag>" (see scripts/build-release.sh).
+const defaultNodeVersion = "0.3.0"
+
+// buildVersion is injected by the release build via -ldflags. Empty in a plain
+// `go build`, in which case nodeVersion falls back to defaultNodeVersion.
+var buildVersion string
+
+// nodeVersion is the effective version string reported by the node.
+var nodeVersion = func() string {
+	if buildVersion != "" {
+		return buildVersion
+	}
+	return defaultNodeVersion
+}()
 
 // applyNodeFlags lets a spawning host (e.g. LibreWeb) override config via flags,
 // which take precedence over environment variables:

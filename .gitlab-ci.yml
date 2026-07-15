@@ -14,6 +14,7 @@ variables:
 stages:
   - test
   - build
+  - deploy
 
 format:
   stage: test
@@ -39,3 +40,57 @@ go-build:
     paths:
       - freedom-names
     expire_in: 1 week
+
+# Cross-compile the full release matrix (linux/windows/darwin x amd64/arm64)
+# and package each binary as a tarball (.zip for windows). Tag pipelines only.
+go-release:
+  stage: build
+  rules:
+    - if: $CI_PROJECT_NAMESPACE == "freedom-names" && $CI_COMMIT_TAG
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends zip
+  script:
+    - export APP_VERSION=${CI_COMMIT_TAG}
+    - ./scripts/build-release.sh
+  artifacts:
+    name: "FreedomNames $CI_COMMIT_TAG binaries"
+    expire_in: 1 month
+    paths:
+      - build_release/freedom-names-*.tar.gz
+      - build_release/freedom-names-*.zip
+
+# Add asset links to the (UI-created) GitLab release and mirror the binaries
+# to the GitHub release. Tag pipelines only.
+release:
+  stage: deploy
+  image: serversideup/github-cli:latest
+  needs:
+    - job: go-release
+      artifacts: true
+  rules:
+    - if: $CI_PROJECT_NAMESPACE == "freedom-names" && $CI_COMMIT_TAG
+  script:
+    - export APP_VERSION=${CI_COMMIT_TAG}
+    - ./scripts/create-release-links.sh
+
+    # GitHub Sync (fallback to only upload if creating a release fails).
+    # Uses the GH_TOKEN environment variable from GitLab CI/CD variables.
+    - |
+      gh release create "$CI_COMMIT_TAG" \
+        build_release/freedom-names-* \
+        --repo "FreedomNames/FreedomNames" \
+        --title "FreedomNames $CI_COMMIT_TAG" \
+        --notes "FreedomNames Release $CI_COMMIT_TAG" || \
+      gh release upload "$CI_COMMIT_TAG" \
+        build_release/freedom-names-* \
+        --repo "FreedomNames/FreedomNames" \
+        --clobber
+  environment:
+    name: production
+    url: https://github.com/FreedomNames/FreedomNames/releases
+  artifacts:
+    name: "FreedomNames $CI_COMMIT_TAG"
+    expire_in: 3 months
+    paths:
+      - build_release/freedom-names-*.tar.gz
+      - build_release/freedom-names-*.zip
