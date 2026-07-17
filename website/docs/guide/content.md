@@ -70,7 +70,10 @@ Node operators stay in control of what they contribute:
 Your **own published content is never evicted** and never counts against the
 hosting budget. Hosted content (pushed to you, or cached from your fetches) is
 only ever removed to make room: while the budget has space, nothing is deleted
-— not even TTL-expired sets. When a new set needs room, eviction picks
+— not even TTL-expired sets. This is deliberate: every replica a node keeps is
+content the network can still serve, so a node never *proactively* destroys
+availability — there is no cleanup timer, only eviction priority at the moment
+space is genuinely needed. When a new set needs room, eviction picks
 TTL-expired sets first (least recently accessed first) and falls back to plain
 LRU. Any access or re-push from a healing peer refreshes a set's clock, so
 content with a living swarm effectively never expires. The accounting lives in
