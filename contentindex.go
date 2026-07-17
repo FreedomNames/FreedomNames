@@ -273,11 +273,14 @@ func (ix *ContentIndex) hostedBytesLocked() int64 {
 	return total
 }
 
-// Admit decides whether a hosted set of the given size may be stored, evicting
-// expired and least-recently-used hosted sets as needed to make room. Owned
-// sets are never candidates; a freshly stored hosted set is protected for
-// evictionProtection to prevent churn thrash. Returns false when the set can
-// not fit even after eviction.
+// Admit decides whether a hosted set of the given size may be stored. Nothing
+// is ever deleted while the budget has room — a TTL-expired set is NOT
+// removed for being old, it just loses its protection and becomes the first
+// eviction candidate when space is actually needed. Under pressure, eviction
+// order is: expired hosted sets first (least recently accessed first), then
+// LRU among the rest. Owned sets are never candidates; a freshly stored
+// hosted set is protected for evictionProtection to prevent churn thrash.
+// Returns false when the set cannot fit even after eviction.
 func (ix *ContentIndex) Admit(size, budget, maxSize int64, ttl time.Duration, now time.Time) bool {
 	if ix == nil {
 		return true // store-only service (tests): no policy
@@ -288,26 +291,23 @@ func (ix *ContentIndex) Admit(size, budget, maxSize int64, ttl time.Duration, no
 	ix.mu.Lock()
 	defer ix.mu.Unlock()
 
-	// Expire hosted sets whose TTL lapsed.
-	for root, m := range ix.sets {
-		if !m.Owned && ttl > 0 && now.Unix()-m.LastAccess > int64(ttl.Seconds()) {
-			ix.evictLocked(root)
-		}
-	}
-	if ix.hostedBytesLocked()+size <= budget {
-		return true
-	}
-
-	// LRU-evict unprotected hosted sets until the new one fits.
 	for ix.hostedBytesLocked()+size > budget {
 		victim := ""
+		victimExpired := false
 		var oldest int64
 		for root, m := range ix.sets {
-			if m.Owned || now.Unix()-m.StoredAt < int64(evictionProtection.Seconds()) {
+			if m.Owned {
 				continue
 			}
-			if victim == "" || m.LastAccess < oldest {
-				victim, oldest = root, m.LastAccess
+			expired := ttl > 0 && now.Unix()-m.LastAccess > int64(ttl.Seconds())
+			if !expired && now.Unix()-m.StoredAt < int64(evictionProtection.Seconds()) {
+				continue // young, live sets are protected from churn
+			}
+			better := victim == "" ||
+				(expired && !victimExpired) ||
+				(expired == victimExpired && m.LastAccess < oldest)
+			if better {
+				victim, victimExpired, oldest = root, expired, m.LastAccess
 			}
 		}
 		if victim == "" {

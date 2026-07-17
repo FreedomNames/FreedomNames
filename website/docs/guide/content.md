@@ -61,7 +61,7 @@ Node operators stay in control of what they contribute:
 | --- | --- | --- |
 | `FREEDOM_CONTENT_REPLICAS` | `3` | copies pushed per publish (target holders = this + 1) |
 | `FREEDOM_CONTENT_HOST_BUDGET` | `20GB` | max disk spent hosting other people's content |
-| `FREEDOM_CONTENT_HOST_TTL` | `720h` (30 days) | hosted content expires this long after it was last accessed or re-pushed |
+| `FREEDOM_CONTENT_HOST_TTL` | `720h` (30 days) | hosted content untouched for this long loses its eviction protection — it is **not** deleted until space is needed |
 | `FREEDOM_CONTENT_HEAL_INTERVAL` | `1h` | how often replica counts are checked and topped up (`0` disables healing) |
 | `FREEDOM_CONTENT_UP_RATE` | unlimited | bytes/second serving + pushing content (e.g. `10MB`) |
 | `FREEDOM_CONTENT_DOWN_RATE` | unlimited | bytes/second fetching + receiving pushes |
@@ -69,11 +69,14 @@ Node operators stay in control of what they contribute:
 
 Your **own published content is never evicted** and never counts against the
 hosting budget. Hosted content (pushed to you, or cached from your fetches) is
-evicted least-recently-used when the budget fills, and expires after the TTL —
-but any access or re-push from a healing peer refreshes it, so content with a
-living swarm stays alive indefinitely. The accounting lives in a small
-`index.json` next to the blobs; blobs already on disk from older versions are
-adopted as hosted content on first start (re-publish once to mark them owned).
+only ever removed to make room: while the budget has space, nothing is deleted
+— not even TTL-expired sets. When a new set needs room, eviction picks
+TTL-expired sets first (least recently accessed first) and falls back to plain
+LRU. Any access or re-push from a healing peer refreshes a set's clock, so
+content with a living swarm effectively never expires. The accounting lives in
+a small `index.json` next to the blobs; blobs already on disk from older
+versions are adopted as hosted content on first start (re-publish once to mark
+them owned).
 
 ## Large content: chunking
 

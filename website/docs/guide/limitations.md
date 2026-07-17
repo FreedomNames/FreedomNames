@@ -68,7 +68,8 @@ public bootstrap exists, off-LAN discovery is manual.
 - **Replicas trust their placement.** Any peer can push content within your
   budget; there is no per-peer quota yet (the pusher's peer ID is recorded for
   a future share cap), so a determined peer could fill another node's hosting
-  budget with junk that then ages out via TTL/LRU.
+  budget with junk. Junk is displaced only under budget pressure, where
+  TTL-expired and least-recently-used sets are evicted first.
 
 ## Record and naming caveats
 

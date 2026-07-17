@@ -132,20 +132,43 @@ func TestIndexAdmitBudgetAndLRU(t *testing.T) {
 	}
 }
 
-func TestIndexAdmitTTLExpiry(t *testing.T) {
+// TestIndexExpiredKeptUntilSpaceNeeded: TTL never deletes data on its own —
+// an expired set survives while the budget has room, and is merely the FIRST
+// eviction candidate once space is actually needed.
+func TestIndexExpiredKeptUntilSpaceNeeded(t *testing.T) {
 	ix, store, _ := newTestIndex(t)
-	h, _ := store.Put([]byte("stale hosted content"))
-	ix.AddHosted(h, 100, nil, "")
+	now := time.Now()
+
+	stale, _ := store.Put([]byte("stale hosted content"))
+	fresh, _ := store.Put([]byte("fresh hosted content"))
+	ix.AddHosted(stale, 400, nil, "")
+	ix.AddHosted(fresh, 400, nil, "")
 	ix.mu.Lock()
-	stale := time.Now().Add(-48 * time.Hour).Unix()
-	ix.sets[h].StoredAt, ix.sets[h].LastAccess = stale, stale
+	old := now.Add(-48 * time.Hour).Unix()
+	ix.sets[stale].StoredAt, ix.sets[stale].LastAccess = old, old
+	// fresh: recently accessed but stored long ago (not protection-shielded),
+	// so only the TTL priority distinguishes it from stale.
+	ix.sets[fresh].StoredAt = old
 	ix.mu.Unlock()
 
-	if !ix.Admit(1, 1000, maxContentSize, 24*time.Hour, time.Now()) {
-		t.Fatalf("admit refused")
+	// Plenty of room: the expired set must NOT be removed.
+	if !ix.Admit(100, 1000, maxContentSize, 24*time.Hour, now) {
+		t.Fatalf("admit refused despite free budget")
 	}
-	if ix.Has(h) || store.Has(h) {
-		t.Fatalf("TTL-expired set not removed")
+	if !ix.Has(stale) || !store.Has(stale) {
+		t.Fatalf("expired set was deleted while budget had room")
+	}
+
+	// Budget pressure: the expired set is evicted first, the live one stays,
+	// even though eviction of either would have made enough room.
+	if !ix.Admit(400, 1000, maxContentSize, 24*time.Hour, now) {
+		t.Fatalf("admit under pressure refused")
+	}
+	if ix.Has(stale) || store.Has(stale) {
+		t.Fatalf("expired set should have been evicted first (index=%v blob=%v)", ix.Has(stale), store.Has(stale))
+	}
+	if !ix.Has(fresh) || !store.Has(fresh) {
+		t.Fatalf("live set evicted while an expired one existed")
 	}
 }
 
