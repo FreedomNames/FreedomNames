@@ -17,7 +17,7 @@ Alongside both layers, a node runs a **peer-to-peer content network** so a name
 can point at an actual page, not just DNS records. This is what lets Freedom
 Names back a decentralized-web browser such as LibreWeb, replacing IPFS.
 
-## How names work
+## How Freedom names work
 
 A name looks like:
 
@@ -38,6 +38,46 @@ uniqueness is enforced by BCH chain consensus. Resolvers all agree because they
 follow the same on-chain rule: the earliest *confirmed* valid claim wins (ties
 broken by smaller txid), and ownership can only move by a transaction that
 actually spends the name's NFT UTXO, so metadata-only hijacks are rejected.
+
+End to end, resolving a name (say `melroy.fn`) to page bytes looks like this —
+note that no step ever addresses an IP or a server; the name commits to a key,
+the key signs records, and the content's *hash* is its address:
+
+```plantuml
+@startuml
+start
+:Open <b>melroy.fn</b>;
+if (Name carries a <pubKeyID> suffix?) then (no — bare name)
+  partition "Layer 2 — BCH registry" {
+    :Find the earliest confirmed claim:\nthe name is a CashTokens NFT;
+    :Walk the NFT's custody chain\nto its current UTXO;
+    :Live token commitment reveals\nthe owner's public key;
+  }
+else (yes — self-certifying)
+  :Owner's public key is embedded\nin the name itself;
+endif
+partition "Layer 1 — DHT (naming)" {
+  :Derive the DHT key from the pubKeyID;
+  :Fetch the signed record set\n(newest sequence wins);
+  :Verify the signature against\nthe owner's public key;
+  :Read the CONTENT record\n→ content hash;
+}
+partition "Content network (bytes)" {
+  if (Blob in the local store?) then (yes)
+  else (no)
+    :Ask the DHT who provides the hash\n(publisher + pushed replicas);
+    :Stream the blob from any provider;
+  endif
+  :Verify the bytes against the hash\n(wrong content is impossible);
+  if (Blob is a chunk manifest?) then (yes)
+    :Fetch each chunk the same way,\nreassemble as a stream;
+  else (no)
+  endif
+}
+:Render the page bytes;
+stop
+@enduml
+```
 
 Layer 2 defaults to BCH **mainnet**, since bare names are a real,
 globally-unique namespace. A node reaches the chain through public
