@@ -208,10 +208,10 @@ func NewNode(ctx context.Context, cfg *Config) *FreedomNameNode {
 }
 
 // AttachContent creates the peer-to-peer content service over the given
-// blobstore and registers its stream handler. Content is optional: a node
+// blobstore and registers its stream handlers. Content is optional: a node
 // without it still resolves names, it just cannot serve or fetch page bytes.
-func (freedomName *FreedomNameNode) AttachContent(store *BlobStore) *ContentService {
-	freedomName.content = NewContentService(freedomName, store)
+func (freedomName *FreedomNameNode) AttachContent(store *BlobStore, cfg *Config) *ContentService {
+	freedomName.content = NewContentService(freedomName, store, cfg)
 	return freedomName.content
 }
 

@@ -8,6 +8,7 @@ require (
 	github.com/libp2p/go-libp2p-kbucket v0.8.0
 	github.com/libp2p/go-libp2p-record v0.3.1
 	github.com/multiformats/go-multiaddr v0.16.1
+	golang.org/x/time v0.12.0
 )
 
 require (
@@ -16,7 +17,6 @@ require (
 	github.com/dunglas/httpsfv v1.1.0 // indirect
 	github.com/filecoin-project/go-clock v0.1.0 // indirect
 	github.com/pion/transport/v4 v4.0.1 // indirect
-	golang.org/x/time v0.12.0 // indirect
 )
 
 require (

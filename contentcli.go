@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -35,16 +34,21 @@ func cliPut(args []string) error {
 		ttl = uint32(parsed)
 	}
 
-	data, err := os.ReadFile(file)
+	f, err := os.Open(file)
 	if err != nil {
-		return fmt.Errorf("read %s: %w", file, err)
+		return fmt.Errorf("open %s: %w", file, err)
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return fmt.Errorf("stat %s: %w", file, err)
 	}
 
-	hash, err := uploadContent(api, data)
+	hash, err := uploadContent(api, f)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Uploaded %s (%d bytes) -> %s\n", file, len(data), hash)
+	fmt.Printf("Uploaded %s (%d bytes) -> %s\n", file, info.Size(), hash)
 
 	// A name published this way points solely at its content.
 	records := []RR{{Type: RecordTypeCONTENT, Value: hash, TTL: ttl}}
@@ -54,10 +58,11 @@ func cliPut(args []string) error {
 	return publishRecords(api, label, records)
 }
 
-// uploadContent POSTs raw bytes to a node's /content endpoint and returns the
-// content hash the node assigned.
-func uploadContent(api string, data []byte) (string, error) {
-	resp, err := http.Post(api+"/content", "application/octet-stream", bytes.NewReader(data))
+// uploadContent POSTs raw bytes (streamed from r, so large files never sit
+// fully in memory) to a node's /content endpoint and returns the content hash
+// the node assigned.
+func uploadContent(api string, r io.Reader) (string, error) {
+	resp, err := http.Post(api+"/content", "application/octet-stream", r)
 	if err != nil {
 		return "", fmt.Errorf("upload to %s: %w", api, err)
 	}

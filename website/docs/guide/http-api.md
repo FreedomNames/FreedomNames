@@ -168,8 +168,12 @@ curl -X POST --data-binary @index.html http://localhost:8420/content
 { "hash": "muf...hbst" }
 ```
 
-The node stores the bytes locally and announces a provider record. Max body size
-is 32 MiB.
+The node stores the bytes locally, announces a provider record, and pushes
+replicas to the closest peers in the background (see
+[replication](/guide/content#replication-distributed-by-design)). Content
+larger than 8 MiB is transparently split into chunks plus a manifest (the
+returned hash addresses the manifest); the body is consumed as a stream. Max
+content size is 1 GiB.
 
 **Fetch**: `GET` with `?hash=`:
 
@@ -177,8 +181,10 @@ is 32 MiB.
 curl "http://localhost:8420/content?hash=muf...hbst" -o page.html
 ```
 
-Returns the raw bytes (`application/octet-stream`) from the local store, or
-fetched from a provider on a miss. Received bytes are verified against the hash.
+Returns the raw bytes (`application/octet-stream`, with `Content-Length`) from
+the local store, or fetched from a provider on a miss. Chunked content is
+streamed chunk by chunk as it is fetched. Received bytes are verified against
+their hashes.
 
 **Errors:** `400` missing/invalid hash; `404` not found on the network; `502`
 transient discovery/transfer failure; `503` content service disabled.
