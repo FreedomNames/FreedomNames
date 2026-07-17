@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -19,12 +21,29 @@ import (
 // and provider records; the actual page bytes live here and travel over the
 // content stream protocol (contentnet.go).
 
-// maxBlobSize caps a single blob (32 MiB). Whole-page content plus reasonable
-// assets fit comfortably; chunking for larger media is a later phase.
+// maxBlobSize caps a single blob (32 MiB) — the unit of storage and transfer.
+// Content larger than one chunk is split into chunkSize blobs plus a manifest
+// blob listing them (see ChunkManifest), so no single blob ever nears this cap;
+// it remains the wire-level safety limit.
 const maxBlobSize = 32 << 20
+
+// chunkSize is the fixed size of each chunk of large content (8 MiB). Content
+// up to chunkSize is stored as a single blob whose hash is the content hash
+// (unchanged from the pre-chunking format); anything larger becomes
+// ceil(size/chunkSize) chunk blobs plus a manifest.
+const chunkSize = 8 << 20
+
+// maxContentSize caps total content addressed by one manifest (1 GiB).
+const maxContentSize = 1 << 30
+
+// maxManifestChunks bounds a manifest's chunk list (maxContentSize/chunkSize).
+const maxManifestChunks = maxContentSize / chunkSize
 
 // ErrBlobTooLarge is returned when data exceeds maxBlobSize.
 var ErrBlobTooLarge = fmt.Errorf("blob exceeds max size of %d bytes", maxBlobSize)
+
+// ErrContentTooLarge is returned when content exceeds maxContentSize.
+var ErrContentTooLarge = fmt.Errorf("content exceeds max size of %d bytes", maxContentSize)
 
 // ErrBlobNotFound is returned when a hash is not in the local store.
 var ErrBlobNotFound = errors.New("blob not found")
@@ -138,6 +157,19 @@ func (s *BlobStore) Has(hash string) bool {
 	return err == nil
 }
 
+// Delete removes a blob. A missing blob is not an error (delete is used by
+// eviction, which may race with reconciliation).
+func (s *BlobStore) Delete(hash string) error {
+	if !isContentHash(hash) {
+		return fmt.Errorf("invalid content hash %q", hash)
+	}
+	err := os.Remove(s.path(hash))
+	if os.IsNotExist(err) {
+		return nil
+	}
+	return err
+}
+
 // Open returns a streaming reader for a hash (so serving a blob to a peer does
 // not have to buffer it all in memory). Caller must Close.
 func (s *BlobStore) Open(hash string) (io.ReadCloser, int64, error) {
@@ -157,6 +189,75 @@ func (s *BlobStore) Open(hash string) (io.ReadCloser, int64, error) {
 		return nil, 0, err
 	}
 	return f, info.Size(), nil
+}
+
+// --- chunk manifests ---
+//
+// Large content is addressed by the hash of a *manifest* blob: a magic header
+// plus JSON naming the chunk hashes in order. Chunks are ordinary blobs, so
+// the transfer protocol and provider records need no new machinery — a reader
+// fetches the manifest, then each chunk, each verified against its own hash.
+
+// manifestMagic is the first bytes of every manifest blob. A blob is treated
+// as a manifest only if it starts with this prefix AND the remainder parses as
+// a strictly valid manifest (decodeManifest), so ordinary content is not
+// misread as one.
+const manifestMagic = "freedom-names/manifest@1\n"
+
+// ChunkManifest describes content split into fixed-size chunks. Every chunk is
+// exactly ChunkSize bytes except the last, which holds the remainder.
+type ChunkManifest struct {
+	TotalSize int64    `json:"totalSize"`
+	ChunkSize int64    `json:"chunkSize"`
+	Chunks    []string `json:"chunks"`
+}
+
+// chunkLen returns the expected byte length of chunk i.
+func (m *ChunkManifest) chunkLen(i int) int64 {
+	if i == len(m.Chunks)-1 {
+		return m.TotalSize - int64(len(m.Chunks)-1)*m.ChunkSize
+	}
+	return m.ChunkSize
+}
+
+// encodeManifest serializes a manifest to its blob bytes.
+func encodeManifest(m *ChunkManifest) ([]byte, error) {
+	body, err := json.Marshal(m)
+	if err != nil {
+		return nil, err
+	}
+	return append([]byte(manifestMagic), body...), nil
+}
+
+// decodeManifest reports whether data is a valid manifest blob. Validation is
+// strict — magic prefix, well-formed hashes, and a chunk count that exactly
+// matches TotalSize — so a random blob cannot pass by accident.
+func decodeManifest(data []byte) (*ChunkManifest, bool) {
+	if !bytes.HasPrefix(data, []byte(manifestMagic)) {
+		return nil, false
+	}
+	var m ChunkManifest
+	if err := json.Unmarshal(data[len(manifestMagic):], &m); err != nil {
+		return nil, false
+	}
+	n := int64(len(m.Chunks))
+	if m.ChunkSize < 1 || m.ChunkSize > maxBlobSize {
+		return nil, false
+	}
+	// Single-chunk content is stored as a plain blob, so a real manifest has
+	// at least two chunks.
+	if n < 2 || n > maxManifestChunks {
+		return nil, false
+	}
+	if m.TotalSize > maxContentSize || m.TotalSize <= (n-1)*m.ChunkSize || m.TotalSize > n*m.ChunkSize {
+		return nil, false
+	}
+	for _, h := range m.Chunks {
+		if !isContentHash(h) {
+			return nil, false
+		}
+	}
+	return &m, true
 }
 
 // List returns the hashes currently stored (used by the keep-providing loop).

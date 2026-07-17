@@ -50,17 +50,25 @@ public bootstrap exists, off-LAN discovery is manual.
 
 ## Content layer scope
 
-- **Whole-blob, 32 MiB cap.** Each piece of content is stored and transferred as
-  one blob, capped at 32 MiB. This comfortably covers pages and reasonable
-  assets. Large media (chunking, deduplication, a DAG) is deliberately deferred.
-- **No content garbage collection.** A node keeps and re-provides every blob it
-  stores, including content it merely fetched for someone else. There is no
-  retention policy or GC yet, so disk use grows with everything the node has
-  seen. Prune `~/.freedom/content` manually if needed.
-- **Availability follows uptime.** Content stays reachable only while a node that
-  holds it is online and providing. There is no pinning service or replication
-  guarantee; if every holder goes offline, the content is unreachable until one
-  returns.
+- **1 GiB content cap, flat chunking.** Content larger than 8 MiB is split into
+  fixed-size chunks plus a manifest, up to 1 GiB total. Chunking is flat (one
+  manifest level, no DAG), and there is no content-defined chunking, so editing
+  a large file re-uploads all changed chunks; cross-file deduplication only
+  happens when chunk bytes align exactly.
+- **Hosting is bounded, owned content is not.** Hosted (other people's) content
+  is capped by `FREEDOM_CONTENT_HOST_BUDGET` with LRU eviction and a TTL, but
+  content you published yourself is never evicted or size-capped locally —
+  publishing a lot means hosting a lot yourself.
+- **Replication is best-effort, not guaranteed.** A publish pushes copies to 3
+  peers and holders heal the count hourly, but there is no admission guarantee:
+  on a small network, or if the closest peers are full or offline, fewer
+  replicas may exist. If every holder of a set goes offline at once, the
+  content is unreachable until one returns — the healing loop then restores
+  the replica count from whichever holder survives.
+- **Replicas trust their placement.** Any peer can push content within your
+  budget; there is no per-peer quota yet (the pusher's peer ID is recorded for
+  a future share cap), so a determined peer could fill another node's hosting
+  budget with junk that then ages out via TTL/LRU.
 
 ## Record and naming caveats
 

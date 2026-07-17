@@ -1,9 +1,12 @@
 package main
 
 import (
+	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Config holds runtime configuration. Values come from environment variables so
@@ -19,6 +22,17 @@ type Config struct {
 	BCHElectrum []string // electrum servers, tried in order with failover (empty disables L2)
 	BCHNetwork  string   // "mainnet" | "chipnet" | "testnet4" | "testnet3"
 	BCHMinConf  int64    // confirmations required for a claim to count
+
+	// Content replication and hosting policy. Content is distributed by
+	// design: a publish pushes copies to other nodes, and every holder tops
+	// the replica count back up — availability never rests on one node.
+	ContentReplicas     int           // pushed copies per publish (target holders = replicas+1)
+	ContentHostBudget   int64         // max bytes of hosted (other people's) content
+	ContentHostTTL      time.Duration // hosted content expires this long after last access/re-push
+	ContentHealInterval time.Duration // how often to check + top up replica counts
+	ContentUpRate       int64         // bytes/s serving + pushing content (0 = unlimited)
+	ContentDownRate     int64         // bytes/s fetching + receiving pushes (0 = unlimited)
+	ContentMaxPushSize  int64         // largest pushed content set this node accepts
 }
 
 // Default bootstrap peers. Replace/extend with real public /dnsaddr entries as
@@ -65,7 +79,91 @@ func LoadConfig() *Config {
 			cfg.BCHMinConf = n
 		}
 	}
+
+	// Content replication knobs. Defaults favor a robust network: 3 pushed
+	// replicas per publish and a 20 GiB hosting budget per node; bandwidth is
+	// unlimited unless the operator opts into a cap.
+	cfg.ContentReplicas = envInt("FREEDOM_CONTENT_REPLICAS", 3)
+	cfg.ContentHostBudget = envSize("FREEDOM_CONTENT_HOST_BUDGET", 20<<30)
+	cfg.ContentHostTTL = envDuration("FREEDOM_CONTENT_HOST_TTL", 30*24*time.Hour)
+	cfg.ContentHealInterval = envDuration("FREEDOM_CONTENT_HEAL_INTERVAL", time.Hour)
+	cfg.ContentUpRate = envSize("FREEDOM_CONTENT_UP_RATE", 0)
+	cfg.ContentDownRate = envSize("FREEDOM_CONTENT_DOWN_RATE", 0)
+	cfg.ContentMaxPushSize = envSize("FREEDOM_CONTENT_MAX_PUSH_SIZE", maxContentSize)
 	return cfg
+}
+
+// parseSize parses a byte quantity: a plain integer, or an integer/decimal with
+// a K/M/G/T suffix (optionally followed by "B" or "iB"), 1024-based. Examples:
+// "20GB", "512MiB", "1024", "1.5G".
+func parseSize(s string) (int64, error) {
+	s = strings.TrimSpace(s)
+	num := strings.ToUpper(s)
+	num = strings.TrimSuffix(num, "IB")
+	num = strings.TrimSuffix(num, "B")
+	var mult int64 = 1
+	switch {
+	case strings.HasSuffix(num, "K"):
+		mult, num = 1<<10, num[:len(num)-1]
+	case strings.HasSuffix(num, "M"):
+		mult, num = 1<<20, num[:len(num)-1]
+	case strings.HasSuffix(num, "G"):
+		mult, num = 1<<30, num[:len(num)-1]
+	case strings.HasSuffix(num, "T"):
+		mult, num = 1<<40, num[:len(num)-1]
+	}
+	f, err := strconv.ParseFloat(num, 64)
+	if err != nil || f < 0 {
+		return 0, fmt.Errorf("invalid size %q", s)
+	}
+	return int64(f * float64(mult)), nil
+}
+
+// envSize reads a byte-quantity env var, logging and falling back on a bad
+// value (matching the forgiving style of the other FREEDOM_* vars).
+func envSize(key string, fallback int64) int64 {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	n, err := parseSize(v)
+	if err != nil {
+		log.Printf("WARNING: %s=%q is not a valid size, using default", key, v)
+		return fallback
+	}
+	return n
+}
+
+// envDuration reads a duration env var (time.ParseDuration syntax, plus a "d"
+// days suffix, e.g. "30d").
+func envDuration(key string, fallback time.Duration) time.Duration {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	if days, err := strconv.ParseFloat(strings.TrimSuffix(v, "d"), 64); err == nil && strings.HasSuffix(v, "d") {
+		return time.Duration(days * 24 * float64(time.Hour))
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil || d < 0 {
+		log.Printf("WARNING: %s=%q is not a valid duration, using default", key, v)
+		return fallback
+	}
+	return d
+}
+
+// envInt reads a non-negative integer env var.
+func envInt(key string, fallback int) int {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 0 {
+		log.Printf("WARNING: %s=%q is not a valid integer, using default", key, v)
+		return fallback
+	}
+	return n
 }
 
 // Built-in Electrum/Fulcrum bootstrap servers, one list per BCH network. The

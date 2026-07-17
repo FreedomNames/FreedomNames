@@ -102,7 +102,7 @@ func main() {
 	if store, err := NewBlobStore(cfg.ContentDir); err != nil {
 		log.Printf("WARNING: content service disabled: %v", err)
 	} else {
-		content = freedomDht.AttachContent(store)
+		content = freedomDht.AttachContent(store, cfg)
 		log.Printf("Content store at %s", cfg.ContentDir)
 	}
 

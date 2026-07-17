@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"strconv"
 )
 
 // This file holds the content-layer HTTP endpoints LibreWeb depends on:
@@ -40,19 +42,18 @@ func ContentHandler(content *ContentService) http.HandlerFunc {
 	}
 }
 
-// postContent stores the raw request body and returns its content hash.
+// postContent stores the request body (chunked past chunkSize) and returns its
+// content hash. The body is consumed as a stream, so upload size is bounded by
+// maxContentSize, not by memory.
 func postContent(w http.ResponseWriter, r *http.Request, content *ContentService) {
-	// Cap the read so an oversized upload can't exhaust memory.
-	data, err := io.ReadAll(io.LimitReader(r.Body, maxBlobSize+1))
-	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, "read body: %v", err)
+	// Cap the read one byte past the limit so an oversized upload is detected
+	// (PutStream errors when the total crosses maxContentSize) without
+	// reading an unbounded body.
+	hash, _, err := content.PutStream(r.Context(), io.LimitReader(r.Body, maxContentSize+1))
+	if errors.Is(err, ErrContentTooLarge) {
+		writeJSONError(w, http.StatusRequestEntityTooLarge, "content exceeds max size of %d bytes", maxContentSize)
 		return
 	}
-	if len(data) > maxBlobSize {
-		writeJSONError(w, http.StatusRequestEntityTooLarge, "content exceeds max size of %d bytes", maxBlobSize)
-		return
-	}
-	hash, err := content.Put(r.Context(), data)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "store content: %v", err)
 		return
@@ -63,6 +64,7 @@ func postContent(w http.ResponseWriter, r *http.Request, content *ContentService
 }
 
 // getContent serves the bytes for ?hash=, fetching from providers on a miss.
+// Chunked content is streamed chunk by chunk rather than assembled in memory.
 func getContent(w http.ResponseWriter, r *http.Request, content *ContentService) {
 	hash := r.URL.Query().Get("hash")
 	if hash == "" {
@@ -73,14 +75,13 @@ func getContent(w http.ResponseWriter, r *http.Request, content *ContentService)
 		writeJSONError(w, http.StatusBadRequest, "invalid content hash")
 		return
 	}
-	data, err := content.Fetch(r.Context(), hash)
+	rc, size, err := content.FetchStream(r.Context(), hash)
 	if err != nil {
 		writeContentFetchError(w, hash, err)
 		return
 	}
-	w.Header().Set("Content-Type", "application/octet-stream")
-	w.WriteHeader(http.StatusOK)
-	w.Write(data)
+	defer rc.Close()
+	writeContentStream(w, hash, rc, size)
 }
 
 // ResolveContentHandler resolves a name to its CONTENT record and streams the
@@ -108,15 +109,26 @@ func ResolveContentHandler(resolver *Resolver, content *ContentService) http.Han
 		}
 
 		hash := records[0].Value
-		data, err := content.Fetch(r.Context(), hash)
+		rc, size, err := content.FetchStream(r.Context(), hash)
 		if err != nil {
 			writeContentFetchError(w, hash, err)
 			return
 		}
-		w.Header().Set("Content-Type", "application/octet-stream")
+		defer rc.Close()
 		w.Header().Set("X-Freedom-Content-Hash", hash)
-		w.WriteHeader(http.StatusOK)
-		w.Write(data)
+		writeContentStream(w, hash, rc, size)
+	}
+}
+
+// writeContentStream streams content bytes with an exact Content-Length. A
+// chunk fetch failing mid-stream can only truncate the response (headers are
+// already sent); the length mismatch lets the client detect it.
+func writeContentStream(w http.ResponseWriter, hash string, rc io.Reader, size int64) {
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
+	w.WriteHeader(http.StatusOK)
+	if _, err := io.Copy(w, rc); err != nil {
+		log.Printf("content: stream %s: %v", hash, err)
 	}
 }
 

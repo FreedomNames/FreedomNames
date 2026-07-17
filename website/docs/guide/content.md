@@ -30,11 +30,65 @@ and *discovery* only. The bytes travel over a dedicated stream protocol.
   blob over `/freedomnames/content/1.0.0`. The received bytes are verified against
   the requested hash (a peer cannot serve you the wrong content) and cached
   locally.
-- **Staying available**: a node re-announces every blob it stores on an interval,
-  so an author's own site stays reachable while their node is up.
+- **Staying available**: content is **replicated by design, at publish time** —
+  not on demand, and with no pinning. See the next section.
 
-Blobs are whole (no chunking) in this version, capped at 32 MiB: comfortable for
-pages plus reasonable assets. Larger media (chunking/DAG) is a later phase.
+## Replication: distributed by design
+
+Freedom Names assumes every node goes down eventually — including the
+publisher's. So availability is never left to demand (the IPFS trade-off,
+where content nobody fetched lives only on the publisher's node until someone
+pins it). Instead, the swarm holds the data:
+
+- **Push at publish**: storing content immediately pushes full copies to the 3
+  peers closest (in DHT distance) to the content's hash, over
+  `/freedomnames/content/push/1.0.0`. Each receiver verifies every byte
+  against the content hashes before storing, then announces itself as a
+  provider. From the first minute, the publisher is not a single point of
+  failure.
+- **Self-healing**: every holder — publisher or replica — periodically counts
+  the live providers of each content set it holds. If the count fell below the
+  target (holders die, disks fail), it pushes copies to new closest peers.
+  This runs on *whoever still holds the content*, so replication keeps
+  healing even after the publisher is gone for good.
+- **Spread on demand too**: a node that fetches content keeps a copy (budget
+  permitting) and becomes one more provider, so popular content grows extra
+  replicas beyond the target.
+
+Node operators stay in control of what they contribute:
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `FREEDOM_CONTENT_REPLICAS` | `3` | copies pushed per publish (target holders = this + 1) |
+| `FREEDOM_CONTENT_HOST_BUDGET` | `20GB` | max disk spent hosting other people's content |
+| `FREEDOM_CONTENT_HOST_TTL` | `720h` (30 days) | hosted content expires this long after it was last accessed or re-pushed |
+| `FREEDOM_CONTENT_HEAL_INTERVAL` | `1h` | how often replica counts are checked and topped up (`0` disables healing) |
+| `FREEDOM_CONTENT_UP_RATE` | unlimited | bytes/second serving + pushing content (e.g. `10MB`) |
+| `FREEDOM_CONTENT_DOWN_RATE` | unlimited | bytes/second fetching + receiving pushes |
+| `FREEDOM_CONTENT_MAX_PUSH_SIZE` | `1GB` | largest single content set accepted from a push |
+
+Your **own published content is never evicted** and never counts against the
+hosting budget. Hosted content (pushed to you, or cached from your fetches) is
+evicted least-recently-used when the budget fills, and expires after the TTL —
+but any access or re-push from a healing peer refreshes it, so content with a
+living swarm stays alive indefinitely. The accounting lives in a small
+`index.json` next to the blobs; blobs already on disk from older versions are
+adopted as hosted content on first start (re-publish once to mark them owned).
+
+## Large content: chunking
+
+Content up to 8 MiB is a single blob whose hash is simply the hash of its
+bytes. Larger content (up to 1 GiB) is transparently split into 8 MiB chunks —
+each an ordinary blob — plus a small **manifest** blob listing the chunk hashes
+in order. The `CONTENT` record then points at the manifest's hash.
+
+Fetching is the same machinery applied twice: get the manifest (from the local
+store or a provider), then stream each chunk, preferring the peer that served
+the manifest before falling back to per-chunk provider discovery. Every chunk
+is verified against its own hash and its length checked against the manifest,
+so a peer can neither corrupt nor truncate the content undetected. Assembly is
+streaming — only one chunk is held in memory at a time, on both the storing
+and the fetching side.
 
 ## Publishing a page in one step
 
