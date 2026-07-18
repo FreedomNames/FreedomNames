@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -77,11 +78,41 @@ func isAddrInUseErr(err error) bool {
 	return errors.Is(err, syscall.EADDRINUSE) || strings.Contains(err.Error(), "address already in use")
 }
 
+// nodeUsage documents the node binary itself; the `freedom` subcommand has
+// its own usage in cli.go.
+const nodeUsage = `freedom-names - decentralized naming (.fn) node
+
+Usage:
+  freedom-names [flags]            Run a node (DHT peer + DNS + HTTP API)
+  freedom-names bootstrap          Run a bootstrap node (fixed ports, no DNS/API)
+  freedom-names freedom <command>  Manage names (see: freedom-names freedom help)
+
+Flags:
+  --http-addr HOST:PORT   HTTP API listen address (default 127.0.0.1:8420)
+  --api-bind HOST         Bind host of the HTTP API (port unchanged)
+  --content-dir DIR       Content blobstore directory (default ~/.freedom/content)
+  --dns-addr HOST:PORT    DNS server listen address (default :8053)
+  -h, --help              Show this help
+  --version               Show the node version
+
+Configuration is otherwise driven by FREEDOM_* environment variables; flags
+take precedence. See https://freedomnames.org for documentation.
+`
+
 func main() {
-	// A "freedom" subcommand invokes the CLI instead of running a node.
-	if len(os.Args) > 1 && os.Args[1] == "freedom" {
-		RunCLI(os.Args[2:])
-		return
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		// A "freedom" subcommand invokes the CLI instead of running a node.
+		case "freedom":
+			RunCLI(os.Args[2:])
+			return
+		case "-h", "--help", "help":
+			fmt.Print(nodeUsage)
+			return
+		case "--version":
+			fmt.Printf("freedom-names %s\n", nodeVersion)
+			return
+		}
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
