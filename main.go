@@ -96,7 +96,7 @@ Flags:
   --version               Show the node version
 
 Configuration is otherwise driven by FREEDOM_* environment variables; flags
-take precedence. Docs: https://gitlab.melroy.org/freedom-names/freedom-names
+take precedence. Docs: https://freedomnames.org
 `
 
 func main() {
