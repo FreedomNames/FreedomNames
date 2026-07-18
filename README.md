@@ -233,6 +233,11 @@ Freedom Names node can act as your system resolver.
 | `/health` | GET | Liveness + version handshake |
 | `/clear_cache` | DELETE | Purge the local resolution cache |
 
+Content responses (`/content` GET and `/resolve-content`) carry a `Content-Type`
+header sniffed from the first bytes (e.g. `image/png`, `text/plain`), since the
+content-addressed store keeps no MIME metadata. Unrecognized bytes fall back to
+`application/octet-stream`.
+
 ## Development
 
 Run tests (including a live over-the-wire DNS server test):
