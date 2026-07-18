@@ -195,10 +195,10 @@ func TestPushCorruptBlobRejected(t *testing.T) {
 // --- replicator decision logic (fakes, no network) ---
 
 type fakeSwarm struct {
-	peers    []peer.ID
-	provs    []peer.ID
-	accepts  map[peer.ID]byte // default pushAccept
-	pushed   []peer.ID
+	peers   []peer.ID
+	provs   []peer.ID
+	accepts map[peer.ID]byte // default pushAccept
+	pushed  []peer.ID
 }
 
 func (f *fakeSwarm) closest(ctx context.Context, root string, n int) ([]peer.ID, error) {

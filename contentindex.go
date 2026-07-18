@@ -31,8 +31,8 @@ type contentMeta struct {
 	Owned      bool     `json:"owned"`
 	Size       int64    `json:"size"` // total bytes: root blob + chunks
 	Chunks     []string `json:"chunks,omitempty"`
-	StoredAt   int64    `json:"storedAt"`   // unix seconds
-	LastAccess int64    `json:"lastAccess"` // unix seconds, TTL + LRU driver
+	StoredAt   int64    `json:"storedAt"`       // unix seconds
+	LastAccess int64    `json:"lastAccess"`     // unix seconds, TTL + LRU driver
 	From       string   `json:"from,omitempty"` // pusher peer ID (future per-peer caps)
 }
 
