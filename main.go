@@ -12,8 +12,10 @@ import (
 // nodeVersion identifies this build in /health and /info so a spawning host
 // (e.g. LibreWeb) can confirm it launched the expected node. It falls back to
 // this compiled-in default and is overridden at release build time via
-// -ldflags "-X ...main.buildVersion=<tag>" (see scripts/build-release.sh).
-const defaultNodeVersion = "0.3.0"
+// -ldflags "-X main.buildVersion=<tag>" (see scripts/build-release.sh).
+// The fallback deliberately never looks like a release version, so an
+// uninjected build can't masquerade as one.
+const defaultNodeVersion = "0.0.0-dev"
 
 // buildVersion is injected by the release build via -ldflags. Empty in a plain
 // `go build`, in which case nodeVersion falls back to defaultNodeVersion.

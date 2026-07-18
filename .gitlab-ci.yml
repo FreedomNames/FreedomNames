@@ -35,7 +35,9 @@ go-test:
 go-build:
   stage: build
   script:
-    - go build
+    # Stamp the build so /health and /info report the tag (or a dev version
+    # carrying the commit sha) instead of the compiled-in fallback.
+    - go build -ldflags "-X main.buildVersion=${CI_COMMIT_TAG:-0.0.0-dev+${CI_COMMIT_SHORT_SHA}}"
   artifacts:
     paths:
       - freedom-names

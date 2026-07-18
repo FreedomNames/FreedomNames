@@ -13,8 +13,6 @@ if [ -z "${APP_VERSION:-}" ]; then
     exit 1
 fi
 
-# The Go module path; used to inject the version via -ldflags.
-MODULE="gitlab.melroy.org/freedom-names/freedom-names"
 # Strip a leading 'v' so the injected version matches the nodeVersion style.
 VERSION="${APP_VERSION#v}"
 
@@ -42,7 +40,7 @@ for platform in "${PLATFORMS[@]}"; do
     echo "INFO: Building $GOOS/$GOARCH ..."
     CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" \
         go build -trimpath \
-        -ldflags "-s -w -X ${MODULE}/main.buildVersion=${VERSION}" \
+        -ldflags "-s -w -X main.buildVersion=${VERSION}" \
         -o "$OUT_DIR/$bin_name" .
 
     base="freedom-names-$APP_VERSION-$GOOS-$GOARCH"
