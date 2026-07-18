@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,9 @@ import (
 	"net/http"
 	"strconv"
 )
+
+// sniffLen is how many leading bytes http.DetectContentType considers.
+const sniffLen = 512
 
 // This file holds the content-layer HTTP endpoints LibreWeb depends on:
 // POST /content (store bytes), GET /content?hash= (fetch bytes), and
@@ -123,11 +127,22 @@ func ResolveContentHandler(resolver *Resolver, content *ContentService) http.Han
 // writeContentStream streams content bytes with an exact Content-Length. A
 // chunk fetch failing mid-stream can only truncate the response (headers are
 // already sent); the length mismatch lets the client detect it.
+//
+// The store keeps no MIME metadata (content is bytes-addressed), so the type
+// is sniffed from the first bytes at serve time; that also covers content
+// fetched from remote peers.
 func writeContentStream(w http.ResponseWriter, hash string, rc io.Reader, size int64) {
-	w.Header().Set("Content-Type", "application/octet-stream")
+	head := make([]byte, sniffLen)
+	n, err := io.ReadFull(rc, head)
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+		writeContentFetchError(w, hash, err)
+		return
+	}
+	head = head[:n]
+	w.Header().Set("Content-Type", http.DetectContentType(head))
 	w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
 	w.WriteHeader(http.StatusOK)
-	if _, err := io.Copy(w, rc); err != nil {
+	if _, err := io.Copy(w, io.MultiReader(bytes.NewReader(head), rc)); err != nil {
 		log.Printf("content: stream %s: %v", hash, err)
 	}
 }
