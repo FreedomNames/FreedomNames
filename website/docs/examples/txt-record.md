@@ -56,7 +56,8 @@ freedom set notes TXT "this is one value"
 
 ## Replace vs. append
 
-`freedom set` **appends** to the staged set. To publish a fresh set, clear first:
+`freedom set` **appends** each new type+value pair to the staged set; re-setting
+an identical pair just updates its TTL. To publish a fresh set, clear first:
 
 ```sh
 freedom clear notes

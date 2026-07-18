@@ -13,6 +13,20 @@ node is entirely driven by its environment.
 | `FREEDOM_BCH_NETWORK` | `mainnet` | BCH network for Layer 2: `mainnet`, `chipnet`, `testnet4`, or `testnet3` |
 | `FREEDOM_BCH_ELECTRUM` | *(built-in list per network)* | Comma-separated Electrum/Fulcrum servers, tried in order with failover (`ssl://host:port`). Overrides the built-in bootstrap list |
 | `FREEDOM_BCH_MINCONF` | `1` | Confirmations before a name claim counts |
+| `FREEDOM_CONTENT_REPLICAS` | `3` | Copies pushed to other nodes per publish (target holders = this + 1) |
+| `FREEDOM_CONTENT_HOST_BUDGET` | `20G` (20 GiB) | Max bytes of hosted (other people's) content |
+| `FREEDOM_CONTENT_HOST_TTL` | `30d` | Hosted content loses eviction protection this long after last access/re-push |
+| `FREEDOM_CONTENT_HEAL_INTERVAL` | `1h` | How often each holder checks and tops up replica counts |
+| `FREEDOM_CONTENT_UP_RATE` | `0` (unlimited) | Bytes/s cap on serving + pushing content |
+| `FREEDOM_CONTENT_DOWN_RATE` | `0` (unlimited) | Bytes/s cap on fetching + receiving pushes |
+| `FREEDOM_CONTENT_MAX_PUSH_SIZE` | `1G` (1 GiB) | Largest pushed content set this node accepts |
+
+Size values (`…_BUDGET`, `…_RATE`, `…_MAX_PUSH_SIZE`) take a plain byte count or
+a `K`/`M`/`G`/`T` suffix (1024-based; an optional `B`/`iB` is accepted, so `20G`,
+`20GB` and `20GiB` all mean 20 GiB). Duration values (`…_TTL`, `…_INTERVAL`)
+use Go duration syntax (`1h`, `90m`) plus a `d` suffix for days (`30d`). The
+`FREEDOM_CONTENT_*` replication knobs are explained in
+[the content network](/guide/content#replication-distributed-by-design).
 
 The HTTP API binds to **`127.0.0.1`** by default: it is an unauthenticated local
 control surface (a browser or app spawns the node), so it must not be exposed on
@@ -20,7 +34,9 @@ all interfaces. Set `FREEDOM_HTTP_ADDR=:8420` to share it on a LAN deliberately.
 
 A spawning host can also override these with **flags**, which take precedence
 over the environment: `--http-addr HOST:PORT`, `--api-bind HOST`,
-`--content-dir DIR`, `--dns-addr HOST:PORT`. See
+`--content-dir DIR`, `--dns-addr HOST:PORT`. Note that `--api-bind` replaces
+only the bind host and keeps the port of the current HTTP address (the
+`FREEDOM_HTTP_ADDR`/`--http-addr` value, `8420` if that has no port). See
 [embedding a node](/guide/embedding).
 
 The `FREEDOM_BCH_*` variables drive [Layer 2](/guide/layer2) (globally-unique
@@ -53,7 +69,7 @@ FREEDOM_UPSTREAM_DNS=9.9.9.9:53 go run .
 **Join a network via bootstrap peers**:
 
 ```sh
-FREEDOM_BOOTSTRAP="/ip4/203.0.113.10/tcp/4001/p2p/<peerID>,/ip4/…/…" go run .
+FREEDOM_BOOTSTRAP="/ip4/203.0.113.10/tcp/4020/p2p/<peerID>,/ip4/…/…" go run .
 ```
 
 ## System-wide resolution and the `:53` port

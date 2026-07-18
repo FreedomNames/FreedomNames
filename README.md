@@ -156,7 +156,7 @@ standard `:53`. Options:
 # Generate an owner keypair for a name
 freedom keygen mysite
 
-# Stage one or more resource records (A | AAAA | TXT | CNAME)
+# Stage one or more resource records (A | AAAA | TXT | CNAME | CONTENT)
 freedom set mysite A 10.0.0.5 300
 freedom set mysite TXT "hello world"
 

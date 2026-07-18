@@ -2,7 +2,8 @@
 
 Changing what a name points at is just publishing a new signed record. The network
 keeps the one with the **highest sequence number**, and the CLI derives that number
-from wall-clock time, so a later publish always wins.
+from wall-clock time — always strictly above the name's current record, so a later
+publish wins even twice within the same second or after a backward clock step.
 
 ## Change an IP address
 
@@ -20,7 +21,8 @@ The new record's sequence number is larger than the previous publish, so it
 supersedes it across the network.
 
 ::: tip Why clear first?
-`freedom set` **appends** to whatever is staged locally. If you don't
+`freedom set` **appends** each new type+value pair to whatever is staged locally
+(re-setting an identical pair just updates its TTL). If you don't
 `freedom clear`, you'll publish both the old and new records. Clear to replace;
 skip clearing to add.
 :::
@@ -37,7 +39,8 @@ freedom lookup blog.<pubKeyID>.fn --type A
 
 ## How "newest wins" is enforced
 
-- Every record carries a `seq` (and an `eol` expiry used as a tiebreaker).
+- Every record carries a `seq`; a tie falls to the later `eol` expiry, then to
+  the larger raw record bytes.
 - The DHT **validator** on every node selects the record with the higher `seq`.
 - A competing update is only accepted if it carries a **valid signature from the
   same key**, so an attacker can't win the race without your private key.

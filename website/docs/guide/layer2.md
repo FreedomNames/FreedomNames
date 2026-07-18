@@ -58,13 +58,17 @@ identified by a tag in an `OP_RETURN` output:
 **Claim (`FN01`)** registers a name. The transaction:
 
 1. **mints a mutable NFT** whose commitment is `hash160(ownerPubKey)`, sent to
-   your own address. This NFT *is* the name deed.
+   your own address as a 1000-sat output. This NFT *is* the name deed. The mint
+   must spend a coin at output index 0 (the CashTokens genesis rule — see the
+   [walkthrough](/examples/claim-a-bare-name) if `claim` reports "no eligible
+   genesis UTXO").
 2. carries `OP_RETURN FN01 <name> <ownerPubKey>`, revealing the full Ed25519
    owner key the commitment hashes.
-3. pays a small **dust marker** to `hash160("FN:" + name)`, an address nobody
-   controls. Every claim/rebind pays this same marker, so all activity for a
-   name is discoverable with a single query, and the burned dust is a tiny
-   anti-spam registration cost.
+3. pays a small **dust marker** (546 sat) to a standard P2PKH address whose
+   pubkey hash is `hash160("FN:" + name)` — a hash with no known key, so the
+   dust is effectively unspendable. Every claim/rebind pays this same marker, so
+   all activity for a name is discoverable with a single query, and the locked
+   dust is a tiny anti-spam registration cost.
 
 **Rebind (`FN02`)** points an existing name NFT at a new owner key. You spend
 the NFT, set its commitment to `hash160(newOwnerPubKey)`, and attach
@@ -72,20 +76,42 @@ the NFT, set its commitment to `hash160(newOwnerPubKey)`, and attach
 you can also **send it in any token-aware wallet**; the new holder then runs
 `freedom adopt <name>` once to bind it to their own key.
 
+A claim is **permanent**: names never expire, and there is no renewal or
+revocation mechanism. Ownership only changes when the NFT itself moves.
+
 ## Resolution
 
 `ResolveOwner("mysite.fn")`:
 
 1. queries the name's marker script history for claim/rebind transactions,
 2. takes the **earliest confirmed** valid `FN01` as authoritative (first come,
-   first served). Its transaction id is the NFT category.
+   first served; two claims in the same block are broken deterministically by
+   the numerically smaller transaction id, so every resolver agrees). Its
+   transaction id is the NFT category.
 3. follows the NFT from its mint output to the current holder and reads the live
    commitment,
-4. returns the revealed owner pubkey whose `hash160` matches that commitment
-   (falling back to the last valid binding if the NFT was moved by a plain
-   wallet transfer that has not been adopted yet).
+4. returns the revealed owner pubkey whose `hash160` matches that commitment.
 
-Results are cached for a few minutes for reorg tolerance.
+Only transactions with at least `FREEDOM_BCH_MINCONF` confirmations count; the
+setting is floored to 1, so unconfirmed transactions never do.
+
+A few consequences of the commitment-match rule:
+
+- A **plain wallet transfer** leaves the commitment unchanged, so the name keeps
+  resolving to the previous owner's key until the new holder runs
+  `freedom adopt`. If the live commitment matches **no** revealed key, the name
+  simply has no resolvable owner — there is no fallback binding.
+- That absence of a fallback is what makes hijacking impossible: a pubkey only
+  becomes authoritative by matching the live NFT commitment, so a stranger who
+  merely pays the marker dust and posts an `FN02` without holding the NFT can
+  never take over the name.
+- If the NFT is **burned** (spent into a transaction with no output carrying the
+  token), the last commitment before the burn stands, so the name keeps
+  resolving to its pre-burn owner.
+
+Successful lookups are cached for 5 minutes for reorg tolerance; a not-found
+answer is cached for only 30 seconds, so a freshly confirmed claim becomes
+visible quickly.
 
 ## Reaching the chain: Electrum servers and failover
 
@@ -94,6 +120,11 @@ It ships with a built-in bootstrap list of public servers **per network** and
 tries them in order, **failing over** to the next if one is unreachable, so no
 single server is a point of failure. The first server that connects is reused
 across reconnects.
+
+If **every** server is unreachable, bare-name resolution fails with a transient
+error. Nothing is cached in that case, so the next lookup retries the full
+list; `freedom wallet` still prints your address but shows the balance as
+unavailable. Self-certifying names are unaffected.
 
 Two things you can override:
 
@@ -107,15 +138,18 @@ Two things you can override:
 ::: warning Privacy
 Any public Electrum server sees which bare names you resolve. For privacy or
 guaranteed availability, run your own Fulcrum and set `FREEDOM_BCH_ELECTRUM` to
-point at it.
+point at it. It must speak Electrum protocol **1.5 or newer** — the version
+that added CashTokens data, which claims and resolution depend on.
 :::
 
 ## Name normalization
 
 Names are normalized before use: lowercased, restricted to `[a-z0-9-]` with no
-leading or trailing `-` and a length of 1 to 63. The **same** function runs on
-the client (when claiming) and in every resolver, so a name means exactly one
-thing everywhere.
+leading or trailing `-` and a length of 1 to 63. A bare name cannot contain
+dots, and anything outside that charset — including non-ASCII names — is
+rejected outright; there is no punycode/IDNA mapping for Unicode names. The
+**same** function runs on the client (when claiming) and in every resolver, so
+a name means exactly one thing everywhere.
 
 ## How the two layers compose
 

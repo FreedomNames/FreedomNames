@@ -34,11 +34,13 @@ freedom set mysite A 10.0.0.5 300
 freedom set mysite TXT "hello world"
 ```
 
-Each `set` appends a resource record and validates the whole set eagerly, so
-mistakes (a malformed IP, an unsupported type) surface now rather than at publish
-time. The trailing number on the `A` record is the TTL in seconds (default 300).
+Each `set` appends a resource record (re-setting an existing type+value pair
+just updates its TTL) and validates the whole set eagerly, so mistakes (a
+malformed IP, an unsupported type) surface now rather than at publish time. The
+trailing number on the `A` record is the TTL in seconds (default 300).
 
-Supported types: `A`, `AAAA`, `TXT`, `CNAME`.
+Supported types: `A`, `AAAA`, `TXT`, `CNAME`, and
+[`CONTENT`](/guide/content).
 
 Staged records live in `~/.freedom/keys/mysite.records.json`. To start over:
 

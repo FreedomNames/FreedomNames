@@ -25,7 +25,10 @@ The default node API is `http://localhost:8420` (override with `--api`).
 | `freedom publish <label> [--api URL]` | Sign staged records and publish to a node |
 | `freedom put <label> <file> [--api URL] [--ttl S]` | Upload a file's content and point `<label>` at it |
 | `freedom lookup <name> [--api URL] [--type TYPE]` | Resolve a name via a node |
-| `freedom help` | Show usage |
+| `freedom help` | Show usage (also `-h` / `--help`) |
+
+Running `freedom` with no subcommand prints the usage and exits with code `2`;
+an unknown subcommand prints it and exits with code `1`.
 
 ## `freedom keygen <label>`
 
@@ -60,7 +63,8 @@ freedom set mysite CNAME target.example.com
 Staged records accumulate in `~/.freedom/keys/<label>.records.json`.
 
 **Supported types:** `A` (IPv4), `AAAA` (IPv6), `TXT` (any UTF-8), `CNAME`
-(non-empty target).
+(non-empty target), `CONTENT` (a content hash, see
+[the content network](/guide/content)).
 
 ## `freedom clear <label>`
 
@@ -118,6 +122,12 @@ Published blog.<pubKeyID>.fn (seq ..., 1 record(s))
 Now `blog.<pubKeyID>.fn` resolves to the page: fetch it with
 `GET /resolve-content?name=blog.<pubKeyID>.fn`. See
 [the content network](/guide/content).
+
+::: warning
+Unlike `freedom set`, which merges into the staged set, `put` **replaces** all
+staged records for `<label>` with the single `CONTENT` record it publishes. Use
+`set` + `publish` if the name should carry other records alongside its content.
+:::
 
 ## `freedom lookup <name> [--api URL] [--type TYPE]`
 

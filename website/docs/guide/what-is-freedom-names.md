@@ -37,7 +37,7 @@ mysite.<pubKeyID>.fn
 GNU Name System use), there is nothing to register and nothing to squat. If you
 can sign for the name, you own it. If you can't, you don't.
 
-Records (the `A`, `AAAA`, `TXT`, and `CNAME` entries a name maps to) are bundled
+Records (the `A`, `AAAA`, `TXT`, `CNAME`, and `CONTENT` entries a name maps to) are bundled
 into a signed `FNRecord` and stored in the DHT under a key derived from your
 public key. Every node independently verifies the signature and the key→name
 binding before accepting an update, and the newest record (highest sequence
@@ -58,10 +58,10 @@ number) wins.
 
 - **Not a blockchain.** Layer 1 has *no consensus at all*, and doesn't need any,
   because self-certifying names can't collide.
-- **Not clean bare names, yet.** `mysite.fn` (no key suffix) requires agreeing on
-  *who owns `mysite`*, which does need consensus. That's the planned
-  [Layer 2](/guide/layer2) over a Bitcoin Cash registry. Today those names return
-  *not implemented* and self-certifying names work fully.
+- **Not consensus-free for bare names.** `mysite.fn` (no key suffix) requires
+  agreeing on *who owns `mysite`*, which does need consensus.
+  [Layer 2](/guide/layer2) borrows it from a Bitcoin Cash registry, enabled by
+  default; unclaimed bare names simply resolve to not-found.
 - **Not production-hardened.** This is an actively developed project. Treat it as
   powerful, promising, and early.
 

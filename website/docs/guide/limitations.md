@@ -43,22 +43,37 @@ public bootstrap exists, off-LAN discovery is manual.
   responses; it does not verify SPV proofs, and failover is for availability, not
   cross-checking. A malicious server could withhold or misreport claims.
   Mitigation (SPV proofs / multi-server agreement) is future work.
+- **No reorg detection.** Correctness against chain reorganizations rests on
+  `FREEDOM_BCH_MINCONF` confirmations plus the resolver cache (5 minutes for
+  found owners, 30 seconds for not-found). A reorg deeper than the
+  confirmation floor is simply not noticed until the cache entry expires and
+  the chain is re-read.
 - **Sequential chain reads.** Resolving a bare name whose NFT has been
   transferred many times walks the custody chain hop by hop over a single
   connection. It is bounded (64 hops) and cached (5 min), but a heavily-traded
-  name is slower to resolve than a fresh one.
+  name is slower to resolve than a fresh one. Past 64 hops the walk stops
+  *silently* and answers with the last owner it reached — an extremely traded
+  name can resolve to a stale owner rather than an error.
 
 ## Content layer scope
 
 - **1 GiB content cap, flat chunking.** Content larger than 8 MiB is split into
   fixed-size chunks plus a manifest, up to 1 GiB total. Chunking is flat (one
-  manifest level, no DAG), and there is no content-defined chunking, so editing
-  a large file re-uploads all changed chunks; cross-file deduplication only
-  happens when chunk bytes align exactly.
+  manifest level, no DAG), and chunk boundaries are fixed offsets, not
+  content-defined: inserting bytes near the start of a file shifts every later
+  boundary, so an edit re-uploads everything from the edit point onward.
+  Cross-file deduplication only happens when chunk bytes align exactly.
 - **Hosting is bounded, owned content is not.** Hosted (other people's) content
   is capped by `FREEDOM_CONTENT_HOST_BUDGET` with LRU eviction and a TTL, but
   content you published yourself is never evicted or size-capped locally —
-  publishing a lot means hosting a lot yourself.
+  publishing a lot means hosting a lot yourself. That includes superseded
+  versions: publishing an update is a new set with a new hash, and the old one
+  stays owned (and pinned) until its blobs are removed by hand.
+- **The index sidecar is trusting.** The hosting ledger is a plain
+  `index.json` next to the blobs. If it is deleted or corrupted it is silently
+  rebuilt from the blobs on disk — and every set, *including your own
+  published content*, comes back as hosted (evictable). Re-publish to restore
+  owned status.
 - **Replication is best-effort, not guaranteed.** A publish pushes copies to 3
   peers and holders heal the count hourly, but there is no admission guarantee:
   on a small network, or if the closest peers are full or offline, fewer
@@ -81,6 +96,9 @@ public bootstrap exists, off-LAN discovery is manual.
 - **Long self-certifying names.** A self-certifying name carries a ~52-character
   key id (`label.<pubKeyID>.fn`). Bare names (Layer 2) avoid this but need a
   chain claim. A friendlier human-alias layer is future work.
+- **Record sets have no size cap.** Validation checks each record's type and
+  value (and content stays out of the DHT entirely), but nothing limits how
+  many resource records one name carries — restraint is left to the publisher.
 
 ## Operational notes
 

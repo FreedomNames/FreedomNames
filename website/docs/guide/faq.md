@@ -30,14 +30,17 @@ name, but that only applies to Layer 2 bare names, not the raw
 
 ## What record types are supported?
 
-`A` (IPv4), `AAAA` (IPv6), `TXT` (any UTF-8 text), and `CNAME` (a non-empty
-target). The set is intentionally small for now.
+`A` (IPv4), `AAAA` (IPv6), `TXT` (any UTF-8 text), `CNAME` (a non-empty
+target), and `CONTENT` (a content hash pointing the name at bytes on the
+[content network](/guide/content)). The set is intentionally small for now.
 
 ## How do updates propagate?
 
 You republish. Each publish carries a sequence number strictly above the name's
 current record, and the **newest valid record wins** across the network. Nodes
-cache resolutions, so if you want a fresh read immediately after an update you
+cache resolutions (a 100-entry LRU; entries live for the smallest record TTL —
+5 minutes if none is set — capped at the record's signed expiry; failed lookups
+are not cached), so if you want a fresh read immediately after an update you
 can clear a node's cache via
 [`DELETE /clear_cache`](/guide/http-api#delete-clear_cache).
 

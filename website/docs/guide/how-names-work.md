@@ -24,6 +24,13 @@ Because `<pubKeyID>` comes *from the key*, the name is **self-certifying**: give
 the name, anyone can check that a record was signed by the matching key. There is
 no separate directory mapping names to owners to consult (or to attack).
 
+The label may itself contain dots — `blog.mysite.<pubKeyID>.fn` is a subdomain
+label under the same key. What routes a name here (rather than to
+[Layer 2](/guide/layer2)) is the second-to-last label: if it decodes as a base36
+sha2-256 multihash it is a `<pubKeyID>`; otherwise the whole name is treated as
+a bare name. Bare names follow stricter DNS-label rules: `a-z`, `0-9` and `-`
+(not leading or trailing), 1–63 characters, no dots.
+
 ## The record
 
 Records for a name are bundled into a single signed structure, the `FNRecord`:
@@ -31,7 +38,7 @@ Records for a name are bundled into a single signed structure, the `FNRecord`:
 | Field | Meaning |
 | --- | --- |
 | `label` | the human label, e.g. `mysite` |
-| `records` | the resource records (`A` / `AAAA` / `TXT` / `CNAME`) |
+| `records` | the resource records (`A` / `AAAA` / `TXT` / `CNAME` / `CONTENT`) |
 | `seq` | monotonic sequence number (**higher wins**) |
 | `eol` | expiry (unix seconds); the record is invalid after this |
 | `pubKey` | the marshaled Ed25519 public key |
@@ -69,23 +76,37 @@ Other nodes on the network run the **same validator** whenever they receive the
 value, so a forged or unowned record is rejected everywhere, not just at the
 publishing node.
 
+Publishing also starts three clocks. The DHT drops stored values after roughly
+36 hours, so the publishing node re-puts each of its records every 8 hours to
+keep them alive. But it can only re-put the *original signed bytes* — extending
+the record's `eol` (7 days from publish) requires the owner's key — so you must
+re-run `freedom publish` within 7 days. And if the node goes offline, the record
+falls out of the DHT roughly 36 hours after the last re-put, well before the
+7-day `eol`, unless another node is still republishing it.
+
 ## Resolving
 
 To resolve `mysite.<pubKeyID>.fn`:
 
 1. Parse the name → recover `<pubKeyID>` → derive the DHT key `/fn/<pubKeyID>`.
-2. Check the local cache; on a miss, fetch the signed record from the DHT.
-3. Verify the signature and return the requested resource records.
+2. Check the local cache; a hit is returned as-is.
+3. On a miss, fetch the signed record from the DHT and return its resource
+   records. The resolver does not re-verify the signature itself: validation
+   happens at the DHT layer, where every node runs the validator before
+   accepting or serving a value.
 
 Resolution is shared by every surface: the DNS server, the HTTP API, and the CLI
 all funnel through one resolver.
 
 ## Conflict resolution: newest signed wins
 
-Two valid updates to the same name are ordered by `seq` (with `eol` as a
-tiebreaker). The CLI derives `seq` from wall-clock time on each publish, so a
-later republish always supersedes an earlier one, but only if it carries a valid
-signature from the same key. An attacker can't win the race without the key.
+Two valid updates to the same name are ordered by `seq`: higher wins, a tie
+falls to the later `eol`, and a remaining tie to the larger raw record bytes.
+The CLI derives `seq` from wall-clock time on each publish — but always strictly
+above the name's current record, so updates keep winning even for two publishes
+in the same second or a clock stepped backwards. A later republish supersedes an
+earlier one only if it carries a valid signature from the same key: an attacker
+can't win the race without the key.
 
 ## Why squatting is impossible
 

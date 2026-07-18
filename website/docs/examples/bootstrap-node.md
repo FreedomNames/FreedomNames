@@ -27,20 +27,25 @@ curl http://localhost:8420/info
 
 ```json
 {
+  "version": "0.8.1",
   "mode": "server",
   "peerID": "<peerID>",
   "listenAddresses": [
-    "/ip4/203.0.113.10/tcp/4001",
-    "/ip4/203.0.113.10/udp/4001/quic-v1"
+    "/ip4/203.0.113.10/tcp/4020",
+    "/ip4/203.0.113.10/udp/4020/quic-v1",
+    "/ip4/203.0.113.10/udp/4021/quic-v1/webtransport",
+    "/ip4/203.0.113.10/udp/4022/webrtc-direct"
   ],
   ...
 }
 ```
 
-A full bootstrap multiaddr combines a listen address with the peer ID:
+A bootstrap node listens on fixed ports: **`4020`** (TCP and QUIC), plus `4021`
+(WebTransport) and `4022` (WebRTC-direct) for browser peers. A full bootstrap
+multiaddr combines a listen address with the peer ID:
 
 ```
-/ip4/203.0.113.10/tcp/4001/p2p/<peerID>
+/ip4/203.0.113.10/tcp/4020/p2p/<peerID>
 ```
 
 ::: tip
@@ -54,13 +59,13 @@ On each other node, set `FREEDOM_BOOTSTRAP` to a comma-separated list of bootstr
 multiaddrs:
 
 ```sh
-FREEDOM_BOOTSTRAP="/ip4/203.0.113.10/tcp/4001/p2p/<peerID>" go run .
+FREEDOM_BOOTSTRAP="/ip4/203.0.113.10/tcp/4020/p2p/<peerID>" go run .
 ```
 
 You can list several for redundancy:
 
 ```sh
-FREEDOM_BOOTSTRAP="/ip4/203.0.113.10/tcp/4001/p2p/<id1>,/ip4/203.0.113.11/tcp/4001/p2p/<id2>" \
+FREEDOM_BOOTSTRAP="/ip4/203.0.113.10/tcp/4020/p2p/<id1>,/ip4/203.0.113.11/tcp/4020/p2p/<id2>" \
 go run .
 ```
 

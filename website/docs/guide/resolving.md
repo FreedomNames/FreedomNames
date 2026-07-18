@@ -19,8 +19,20 @@ answer for `example.com` too:
 dig @127.0.0.1 -p 8053 example.com A
 ```
 
+One caveat: forwarding uses plain UDP and does not retry truncated answers over
+TCP, so unusually large upstream responses can arrive truncated.
+
 This is what makes a Freedom Names node usable as your **only** resolver: it adds
 `.fn` without breaking the rest of the internet.
+
+## What answers to expect
+
+- A `.fn` name answers with the records matching the query type. A `CNAME`
+  record also answers `A` and `AAAA` queries (per RFC 1034), so CNAME-only
+  names stay reachable through normal clients.
+- A name that doesn't exist returns **NXDOMAIN**.
+- A lookup that times out (a slow DHT walk) returns **SERVFAIL** instead —
+  that's transient, so retrying can succeed where NXDOMAIN won't.
 
 ## Use it as your system resolver
 

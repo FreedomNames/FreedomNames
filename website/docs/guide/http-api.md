@@ -46,7 +46,8 @@ rejects anything unowned, forged, expired, or malformed.
 ```
 
 **Errors:** `400` if the body isn't a valid `FNRecord` or fails verification;
-`500` if the DHT isn't initialized or storage fails.
+`405` for methods other than POST; `500` if the DHT isn't initialized or
+storage fails.
 
 ::: tip
 You rarely POST this by hand, since signing requires the private key. Use
@@ -64,7 +65,7 @@ filtered by type.
 | Param | Required | Meaning |
 | --- | --- | --- |
 | `name` | yes | the full name to resolve |
-| `type` | no | filter to one type (`A`\|`AAAA`\|`TXT`\|`CNAME`) |
+| `type` | no | filter to one type (`A`\|`AAAA`\|`TXT`\|`CNAME`\|`CONTENT`) |
 
 ```sh
 curl "http://localhost:8420/resolve?name=mysite.<pubKeyID>.fn&type=A"
@@ -82,8 +83,9 @@ curl "http://localhost:8420/resolve?name=mysite.<pubKeyID>.fn&type=A"
 ```
 
 **Errors:** `400` if `name` is missing or malformed; `404` if the name does not
-exist; `501` for bare names (the Layer 2 registry is not built yet, do not
-retry); `502` if the lookup infrastructure failed (DHT timeout, no peers),
+exist (including a bare name that is unclaimed on
+[Layer 2](/guide/layer2)); `500` if the DHT isn't initialized yet; `502` if the
+lookup infrastructure failed (DHT timeout, no peers, Electrum unreachable),
 which means: retry later, the name may still exist.
 
 ## GET `/record`
@@ -122,6 +124,8 @@ curl http://localhost:8420/peers
 }
 ```
 
+**Errors:** `500` if the DHT isn't initialized yet (also true for `/info`).
+
 ## GET `/info`
 
 Returns general information about the node and its view of the network.
@@ -132,6 +136,7 @@ curl http://localhost:8420/info
 
 ```json
 {
+  "version": "0.8.1",
   "mode": "client",
   "peerID": "<peerID>",
   "listenAddresses": ["/ip4/…/tcp/…", "..."],
@@ -151,7 +156,7 @@ want a resolve to skip the cache and hit the DHT.
 curl -X DELETE http://localhost:8420/clear_cache
 ```
 
-Returns `200 OK` with an empty body.
+Returns `200 OK` with an empty body; any method other than DELETE gets a `405`.
 
 ## POST / GET `/content`
 
@@ -186,8 +191,10 @@ the local store, or fetched from a provider on a miss. Chunked content is
 streamed chunk by chunk as it is fetched. Received bytes are verified against
 their hashes.
 
-**Errors:** `400` missing/invalid hash; `404` not found on the network; `502`
-transient discovery/transfer failure; `503` content service disabled.
+**Errors:** `400` missing/invalid hash; `404` not found on the network; `405`
+for methods other than POST/GET; `413` if a stored body exceeds the 1 GiB max;
+`500` if storing fails locally; `502` transient discovery/transfer failure;
+`503` content service disabled.
 
 ## GET `/resolve-content`
 
@@ -202,7 +209,7 @@ Returns the raw page bytes; the content hash is echoed in the
 `X-Freedom-Content-Hash` response header.
 
 **Errors:** `400` missing name; `404` name has no CONTENT record or content
-unavailable; `502` transient failure.
+unavailable; `502` transient failure; `503` content service disabled.
 
 ## GET `/health`
 
@@ -214,8 +221,11 @@ curl http://localhost:8420/health
 ```
 
 ```json
-{ "status": "ok", "version": "0.3.0", "ready": true }
+{ "status": "ok", "version": "0.8.1", "ready": true }
 ```
+
+The endpoint answers any HTTP method, always with `200`; `ready` flips to `true`
+once the DHT is initialized.
 
 ## Next
 

@@ -49,8 +49,8 @@ Copy the `bchtest:...` address. The wallet key lives in `~/.freedom/bch.key`.
 ## 4. Fund it from a chipnet faucet
 
 Open a chipnet faucet and send a small amount to your `bchtest:` address. A few
-thousand satoshis is plenty (a claim spends two dust outputs of 546 sat plus a
-tiny fee). Chipnet faucets to try:
+thousand satoshis is plenty: a claim locks 1000 sat in the name NFT (which stays
+in your own wallet), pays a 546-sat discovery marker, plus a tiny fee. Chipnet faucets to try:
 
 - https://tbch.googol.cash/ (select chipnet)
 - Search "BCH chipnet faucet" for current options; chipnet faucets rotate.
@@ -145,6 +145,11 @@ chipnet wallet (e.g. Cashonize). The receiver then binds it to their own key:
 ./freedom-names freedom adopt mysite      # spends the NFT, rebinds it
 ```
 
+`adopt` only works once the NFT is actually held by *this* wallet (the key in
+`~/.freedom/bch.key`); until the transfer confirms there, it fails with
+`this wallet does not hold the "mysite" name NFT`. Note that until the receiver
+runs `adopt`, the name still resolves to the previous owner's records.
+
 ## Troubleshooting
 
 - **`no BCH electrum server configured`**: `FREEDOM_BCH_NETWORK` is set to an
@@ -158,3 +163,12 @@ chipnet wallet (e.g. Cashonize). The receiver then binds it to their own key:
   registered it; the first confirmed claim wins. Pick another label.
 - **`whois` says not found right after claiming**: wait for one confirmation; by
   default a claim must be confirmed (`FREEDOM_BCH_MINCONF`, default 1) to count.
+  A not-found answer is also cached for 30 seconds, so retry shortly after the
+  confirmation lands.
+- **`all N electrum endpoints failed`**: every server in the list is currently
+  unreachable. This is transient — the failure is not cached, so the next
+  lookup retries the whole list. `freedom wallet` still prints your address but
+  shows `Balance: unavailable`.
+- **`adopt` says `this wallet does not hold the ... name NFT`**: the NFT has not
+  (yet) arrived in this machine's wallet. Send it to the address shown by
+  `freedom wallet` and wait for a confirmation first.

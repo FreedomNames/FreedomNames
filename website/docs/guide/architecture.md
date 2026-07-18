@@ -29,7 +29,9 @@ Running `go run .` starts all of these at once:
 ```
 
 - **libp2p DHT peer**: the decentralized storage and resolution network. Signed
-  records are stored under `/fn/<pubKeyID>` and served to other peers.
+  records are stored under `/fn/<pubKeyID>` and served to other peers. Owned
+  records are re-put every 8 hours so they outlive the DHT's ~36-hour record
+  expiry (up to their signed 7-day `eol`).
 - **DNS server** (default `:8053`, no root needed): resolves `.fn` names through
   the resolver and transparently forwards everything else to an upstream resolver.
   Run it on `:53` (see [the `:53` port](/guide/running-a-node#the-53-port)) and
@@ -43,8 +45,11 @@ connect to in order to join the network.
 ## The resolver and cache
 
 Every surface (DNS, HTTP, CLI) funnels through **one** `Resolver`. The resolver
-checks a local cache first, then the DHT, caching any hit. Sharing one resolver
-keeps behavior identical no matter how a name is looked up.
+checks a local cache first, then the DHT, caching any hit. The cache is a
+100-entry LRU; an entry expires after the smallest record TTL in the set
+(5 minutes when none is set), never past the record's signed `eol`, and failed
+lookups are not cached. Sharing one resolver keeps behavior identical no matter
+how a name is looked up.
 
 For a self-certifying name (`label.<pubKeyID>.fn`), the resolver derives the DHT
 key directly from the `<pubKeyID>` suffix. For a bare name (`mysite.fn`), it
@@ -61,11 +66,14 @@ a validator for a key namespace (here, `fn`). Before any node accepts a value fo
 - the public key hashes to the DHT key it's being stored under (the key→name
   binding),
 - the record hasn't expired,
-- the resource records are well-formed.
+- the resource records are well-formed: a non-empty set of known types only,
+  `A`/`AAAA` values that parse as IPv4/IPv6 respectively, a non-empty `CNAME`
+  target, a valid `CONTENT` hash.
 
-And when two values compete for the same key, the validator **selects** the one
-with the higher sequence number. Because every node runs this same logic, a forged
-or stale record can't propagate.
+And when two values compete for the same key, the validator **selects** the
+winner: highest sequence number, then latest `eol`, then the larger raw bytes.
+Because every node runs this same logic, a forged or stale record can't
+propagate.
 
 ## The Layer 1 / Layer 2 seam
 
@@ -83,10 +91,12 @@ type NameRegistry interface {
   (byte-identical to `FNRecord.PubKey`), derives the DHT key from it, and then
   follows the *exact same* Layer 1 path (fetch → validate → return records).
 
-Today the registry is a stub that returns *not implemented*, so bare-name lookups
-fall back cleanly and self-certifying resolution is entirely unaffected. Crucially,
-**record data never lives on-chain**; only the name→owner binding does. Read the
-full design in [Layer 2](/guide/layer2).
+The BCH-backed registry is wired in whenever an Electrum endpoint is configured
+— the default on every known network — so bare-name lookups work out of the box.
+On a network with no Electrum servers the registry is simply absent and bare
+names resolve to not-found; self-certifying resolution is unaffected either way.
+Crucially, **record data never lives on-chain**; only the name→owner binding
+does. Read the full design in [Layer 2](/guide/layer2).
 
 ## Portability
 
