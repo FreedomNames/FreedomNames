@@ -67,18 +67,18 @@ start
 :Open <b>melroy.fn</b>; <<#37474F>>
 if (Name carries a <pubKeyID> suffix?) then (no — bare name)
   partition "Layer 2 — BCH registry" {
-    :Find the earliest confirmed claim: the name is a CashTokens NFT; <<#C2410C>>
-    :Walk the NFT's custody chain to its current UTXO; <<#C2410C>>
-    :Live token commitment reveals the owner's public key; <<#C2410C>>
+    :Find the earliest confirmed claim: the name is a CashTokens NFT; <<#12805F>>
+    :Walk the NFT's custody chain to its current UTXO; <<#12805F>>
+    :Live token commitment reveals the owner's public key; <<#12805F>>
   }
 else (yes — self-certifying)
-  :Owner's public key is embedded in the name itself; <<#0F766E>>
+  :Owner's public key is embedded in the name itself; <<#6D28D9>>
 endif
 partition "Layer 1 — DHT (naming)" {
-  :Derive the DHT key from the pubKeyID; <<#0F766E>>
-  :Fetch the signed record set (newest sequence wins); <<#0F766E>>
-  :Verify the signature against the owner's public key; <<#0F766E>>
-  :Read the CONTENT record → content hash; <<#0F766E>>
+  :Derive the DHT key from the pubKeyID; <<#6D28D9>>
+  :Fetch the signed record set (newest sequence wins); <<#6D28D9>>
+  :Verify the signature against the owner's public key; <<#6D28D9>>
+  :Read the CONTENT record → content hash; <<#6D28D9>>
 }
 partition "Content network (bytes)" {
   if (Blob in the local store?) then (yes)
@@ -92,7 +92,7 @@ partition "Content network (bytes)" {
   else (no)
   endif
 }
-:Render the page bytes; <<#7B3FF2>>
+:Render the page bytes; <<#37474F>>
 stop
 @enduml
 ```
