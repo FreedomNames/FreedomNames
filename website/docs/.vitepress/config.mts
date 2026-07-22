@@ -5,7 +5,7 @@ export default defineConfig({
   lang: 'en-US',
   title: 'Freedom Names',
   description:
-    'Decentralized DNS on a libp2p Kademlia DHT. Own a human-readable name with no central authority and no consensus: the key is the name.',
+    'Decentralized DNS on a libp2p Kademlia DHT. Self-certifying names need no registry or consensus; optional bare names use Bitcoin Cash for uniqueness.',
 
   cleanUrls: true,
   lastUpdated: true,
@@ -20,7 +20,7 @@ export default defineConfig({
       {
         property: 'og:description',
         content:
-          'Own a human-readable name with no central authority and no consensus. Records are cryptographically signed, so nobody can overwrite a name they don’t own.',
+          'Own a self-certifying name with no registry or consensus, or use a Bitcoin Cash-backed bare name. Records are signed so nobody can overwrite a name they don’t own.',
       },
     ],
     ['meta', { property: 'og:image', content: '/logo.png' }],
@@ -117,7 +117,7 @@ export default defineConfig({
 
     footer: {
       message: 'Released under the AGPL-3.0 License.',
-      copyright: 'Freedom Names. No central authority, no consensus.',
+      copyright: 'Freedom Names. No registrars. Cryptographic ownership.',
     },
   },
 })

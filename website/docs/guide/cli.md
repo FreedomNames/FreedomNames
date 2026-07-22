@@ -10,6 +10,9 @@ Invoke it through the downloaded binary:
 ./freedom-names freedom keygen mysite
 ```
 
+On Windows, replace `./freedom-names` with `.\freedom-names.exe` in the examples
+below.
+
 The default node API is `http://localhost:8420` (override with `--api`).
 
 ## Commands at a glance
@@ -35,7 +38,7 @@ Generates an Ed25519 keypair for a name and writes it to
 name.
 
 ```sh
-freedom keygen mysite
+./freedom-names freedom keygen mysite
 ```
 
 ```
@@ -52,10 +55,10 @@ The full staged set is validated eagerly, so invalid values are rejected
 immediately.
 
 ```sh
-freedom set mysite A 10.0.0.5 300
-freedom set mysite AAAA 2001:db8::1
-freedom set mysite TXT "v=spf1 -all"
-freedom set mysite CNAME target.example.com
+./freedom-names freedom set mysite A 10.0.0.5 300
+./freedom-names freedom set mysite AAAA 2001:db8::1
+./freedom-names freedom set mysite TXT "v=spf1 -all"
+./freedom-names freedom set mysite CNAME target.example.com
 ```
 
 Staged records accumulate in `~/.freedom/keys/<label>.records.json`.
@@ -69,7 +72,7 @@ Staged records accumulate in `~/.freedom/keys/<label>.records.json`.
 Removes all staged records for a name (does not touch the key).
 
 ```sh
-freedom clear mysite
+./freedom-names freedom clear mysite
 ```
 
 ## `freedom name <label>`
@@ -77,7 +80,7 @@ freedom clear mysite
 Prints the full `label.<pubKeyID>.fn` name derived from the label's key.
 
 ```sh
-freedom name mysite
+./freedom-names freedom name mysite
 # mysite.<pubKeyID>.fn
 ```
 
@@ -91,7 +94,7 @@ clock that stepped backwards. Records stay valid for 7 days; re-run publish
 before then to renew (the CLI prints the expiry).
 
 ```sh
-freedom publish mysite --api http://localhost:8420
+./freedom-names freedom publish mysite --api http://localhost:8420
 ```
 
 ```
@@ -108,8 +111,8 @@ The one-step author flow: uploads a file's bytes to a running node, points
 publishes. This is what a browser's editor triggers when a user saves a page.
 
 ```sh
-freedom keygen blog
-freedom put blog ./index.html
+./freedom-names freedom keygen blog
+./freedom-names freedom put blog ./index.html
 ```
 
 ```
@@ -133,8 +136,8 @@ Resolves a full name via a node's `/resolve` endpoint and prints the JSON
 response. Optionally filter by record type.
 
 ```sh
-freedom lookup mysite.<pubKeyID>.fn
-freedom lookup mysite.<pubKeyID>.fn --type A
+./freedom-names freedom lookup mysite.<pubKeyID>.fn
+./freedom-names freedom lookup mysite.<pubKeyID>.fn --type A
 ```
 
 ## Bare names on Bitcoin Cash

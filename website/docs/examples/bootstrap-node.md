@@ -21,8 +21,8 @@ curl http://localhost:8420/info
 
 ```json
 {
-  "version": "0.8.1",
-  "mode": "server",
+  "version": "<version>",
+  "mode": "Server",
   "peerID": "<peerID>",
   "listenAddresses": [
     "/ip4/203.0.113.10/tcp/4020",

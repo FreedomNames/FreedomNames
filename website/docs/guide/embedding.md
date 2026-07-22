@@ -44,7 +44,7 @@ curl http://127.0.0.1:8420/health
 ```
 
 ```json
-{ "status": "ok", "version": "0.8.1", "ready": true }
+{ "status": "ok", "version": "<version>", "ready": true }
 ```
 
 `version` lets the host confirm it launched the build it shipped; `ready` becomes

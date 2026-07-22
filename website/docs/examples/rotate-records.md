@@ -11,9 +11,9 @@ Say `blog` moved to a new server. Clear the old staged set, stage the new one, a
 publish:
 
 ```sh
-freedom clear blog
-freedom set blog A 198.51.100.9 300
-freedom publish blog
+./freedom-names freedom clear blog
+./freedom-names freedom set blog A 198.51.100.9 300
+./freedom-names freedom publish blog
 # Published blog.<pubKeyID>.fn (seq …, 1 record(s))
 ```
 
@@ -34,7 +34,7 @@ answer. Clear a node's cache to force a fresh DHT read:
 
 ```sh
 curl -X DELETE http://localhost:8420/clear_cache
-freedom lookup blog.<pubKeyID>.fn --type A
+./freedom-names freedom lookup blog.<pubKeyID>.fn --type A
 ```
 
 ## How "newest wins" is enforced

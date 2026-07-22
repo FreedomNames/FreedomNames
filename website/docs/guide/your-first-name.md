@@ -1,19 +1,13 @@
 # Your first name
 
 This walkthrough takes you from nothing to a resolvable `.fn` name in five steps.
-It assumes you have a [node running](/guide/running-a-node) on
-`http://localhost:8420`.
-
-::: tip
-Invoke the CLI through the downloaded binary, for example
-`./freedom-names freedom keygen mysite`. On this page we write it as
-`freedom …` for brevity.
-:::
+It assumes you have [Freedom Names running](/guide/running-a-node) on
+`http://localhost:8420` and connected to at least one peer.
 
 ## 1. Generate an owner keypair
 
 ```sh
-freedom keygen mysite
+./freedom-names freedom keygen mysite
 ```
 
 ```
@@ -30,8 +24,8 @@ self-certifying name. Keep the key file safe: **it is the name.**
 Records are staged locally first, so you can review the whole set before signing:
 
 ```sh
-freedom set mysite A 10.0.0.5 300
-freedom set mysite TXT "hello world"
+./freedom-names freedom set mysite A 10.0.0.5 300
+./freedom-names freedom set mysite TXT "hello world"
 ```
 
 Each `set` appends a resource record (re-setting an existing type+value pair
@@ -45,13 +39,13 @@ Supported types: `A`, `AAAA`, `TXT`, `CNAME`, and
 Staged records live in `~/.freedom/keys/mysite.records.json`. To start over:
 
 ```sh
-freedom clear mysite
+./freedom-names freedom clear mysite
 ```
 
 ## 3. See your full name
 
 ```sh
-freedom name mysite
+./freedom-names freedom name mysite
 ```
 
 ```
@@ -63,7 +57,7 @@ You'll use this full name to resolve. Copy it somewhere handy.
 ## 4. Sign and publish
 
 ```sh
-freedom publish mysite --api http://localhost:8420
+./freedom-names freedom publish mysite --api http://localhost:8420
 ```
 
 ```
@@ -90,7 +84,7 @@ a local node.
 Over the HTTP API, via the CLI:
 
 ```sh
-freedom lookup mysite.<pubKeyID>.fn --type A
+./freedom-names freedom lookup mysite.<pubKeyID>.fn --type A
 ```
 
 Or straight over DNS, like any resolver:
@@ -106,8 +100,8 @@ Either way you get back the `A` record you published. 🎉
 Edit your records and publish again, and the new sequence number wins:
 
 ```sh
-freedom set mysite A 10.0.0.9 300
-freedom publish mysite
+./freedom-names freedom set mysite A 10.0.0.9 300
+./freedom-names freedom publish mysite
 ```
 
 No re-registration, no waiting for propagation through a registrar. The update is

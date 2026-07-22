@@ -1,43 +1,41 @@
 # Architecture
 
-A Freedom Names node is one Go binary that runs three services over a shared
-resolver and cache. This page shows how they fit together.
+A Freedom Names node is one binary containing the naming peer, content service,
+DNS and HTTP interfaces, and optional bare-name registry integration. This page
+shows how those runtime components fit together.
 
-## The three services
+## Runtime components
 
 Running `./freedom-names` starts all of these at once:
 
 ```
-                       ┌──────────────────────────────┐
-   dig / browser  ───▶ │  DNS server       (:8053)     │
-                       │  resolves .fn, forwards rest  │
-                       └──────────────┬───────────────┘
-                                      │
-   curl / freedom CLI ──▶ ┌───────────▼──────────────┐
-                          │  HTTP API      (:8420)    │
-                          │  /publish /resolve /info  │
-                          └───────────┬──────────────┘
-                                      │
-                              ┌───────▼────────┐
-                              │    Resolver     │  cache → DHT
-                              └───────┬────────┘
-                                      │
-                       ┌──────────────▼───────────────┐
-                       │  libp2p Kademlia DHT peer      │
-                       │  stores & serves signed records│
-                       └───────────────────────────────┘
+   dig / browser ──▶ DNS server ──▶ Resolver + cache
+   CLI / curl ────▶ HTTP API ────▶ Resolver + cache
+
+   Resolver + cache ──┬──▶ DHT peer ──▶ signed records
+                      └──▶ BCH registry ──▶ owner key ──▶ DHT peer
+
+   HTTP API ──▶ Content service ──▶ blobstore + libp2p peers
 ```
 
 - **libp2p DHT peer**: the decentralized storage and resolution network. Signed
   records are stored under `/fn/<pubKeyID>` and served to other peers. Owned
   records are re-put every 8 hours so they outlive the DHT's ~36-hour record
   expiry (up to their signed 7-day `eol`).
+- **Content service**: stores page bytes in the local content-addressed
+  blobstore, advertises and fetches them over libp2p, accepts replica pushes,
+  and repairs the configured replica count.
 - **DNS server** (default `:8053`, no root needed): resolves `.fn` names through
   the resolver and transparently forwards everything else to an upstream resolver.
   Run it on `:53` (see [the `:53` port](/guide/running-a-node#the-53-port)) and
   point your OS at it, and `.fn` works everywhere.
-- **HTTP API** (default `:8420`): publish signed records and resolve names
-  programmatically. See the [HTTP API reference](/guide/http-api).
+- **HTTP API** (default `127.0.0.1:8420`): publish and resolve records, manage
+  content, and expose health and peer information. See the [HTTP API
+  reference](/guide/http-api).
+- **BCH registry integration**: for bare names only, asks the configured
+  Electrum/Fulcrum servers which public key currently owns the name. It is not
+  involved in self-certifying-name resolution, and record data remains in the
+  DHT rather than on-chain.
 
 A **bootstrap** node (`./freedom-names bootstrap`) is a server-mode peer that others
 connect to in order to join the network.
@@ -75,7 +73,7 @@ winner: highest sequence number, then latest `eol`, then the larger raw bytes.
 Because every node runs this same logic, a forged or stale record can't
 propagate.
 
-## The key-layer / registry seam
+## The self-certifying / registry seam
 
 Self-certifying names have **no consensus** and no external dependencies.
 The registry (globally-unique bare names) is bolted on through a single interface:

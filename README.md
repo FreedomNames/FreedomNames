@@ -118,17 +118,30 @@ To experiment first with free coins, point the registry at a test network:
 
 ```sh
 # chipnet (fast test network, faucet coins)
-FREEDOM_BCH_NETWORK=chipnet go run .
+FREEDOM_BCH_NETWORK=chipnet ./freedom-names
 
 # testnet4
-FREEDOM_BCH_NETWORK=testnet4 go run .
+FREEDOM_BCH_NETWORK=testnet4 ./freedom-names
 ```
 
-## Running a node
+## Download and run Freedom Names
+
+Download the prebuilt archive for your operating system and architecture from
+[GitLab Releases](https://gitlab.melroy.org/freedom-names/freedom-names/-/releases)
+(**Assets → Packages**) or [GitHub
+Releases](https://github.com/FreedomNames/FreedomNames/releases) (**Assets**).
+
+For example, the 64-bit Linux package extracts to one executable. Replace
+`0.8.3` with the version you downloaded:
 
 ```sh
-go run .
+tar -xzf freedom-names-0.8.3-linux-amd64.tar.gz
+./freedom-names
 ```
+
+Choose `linux-arm64` for 64-bit ARM Linux, `darwin-amd64` for an Intel Mac,
+`darwin-arm64` for Apple Silicon, or the matching Windows `.zip`. On Windows,
+run `.\freedom-names.exe` in PowerShell.
 
 A node runs several things at once:
 
@@ -146,8 +159,11 @@ A node runs several things at once:
 Run a **bootstrap** (server) node that others can connect to:
 
 ```sh
-go run . bootstrap
+./freedom-names bootstrap
 ```
+
+Nearby nodes discover each other with mDNS. There is no default public
+bootstrap peer yet; set `FREEDOM_BOOTSTRAP` to connect across networks.
 
 ### Configuration
 
@@ -155,14 +171,21 @@ All configuration is via environment variables (nothing is hardcoded):
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `FREEDOM_HTTP_ADDR` | `:8420` | HTTP API listen address |
+| `FREEDOM_HTTP_ADDR` | `127.0.0.1:8420` | HTTP API listen address (loopback by default) |
 | `FREEDOM_DNS_ADDR` | `:8053` | DNS server listen address |
 | `FREEDOM_UPSTREAM_DNS` | `1.1.1.1:53` | Upstream resolver for non-`.fn` queries |
 | `FREEDOM_BOOTSTRAP` | (none) | Comma-separated bootstrap peer multiaddrs |
 | `FREEDOM_CONTENT_DIR` | `~/.freedom/content` | On-disk directory for the content-addressed blobstore |
-| `FREEDOM_BCH_NETWORK` | `mainnet` | BCH network for bare names: `mainnet`, `chipnet`, or `testnet4` |
+| `FREEDOM_BCH_NETWORK` | `mainnet` | BCH network for bare names: `mainnet`, `chipnet`, `testnet4`, or `testnet3` |
 | `FREEDOM_BCH_ELECTRUM` | (built-in list per network) | Comma-separated Electrum/Fulcrum servers, tried in order with failover (`ssl://` or `tcp://`). Overrides the built-in bootstrap list |
 | `FREEDOM_BCH_MINCONF` | `1` | Confirmations required before a bare-name claim counts |
+| `FREEDOM_CONTENT_REPLICAS` | `3` | Copies pushed to other nodes per publish |
+| `FREEDOM_CONTENT_HOST_BUDGET` | `20G` | Maximum hosted content from other publishers |
+| `FREEDOM_CONTENT_HOST_TTL` | `30d` | Hosted-content eviction protection after last access or push |
+| `FREEDOM_CONTENT_HEAL_INTERVAL` | `1h` | How often holders restore missing replicas |
+| `FREEDOM_CONTENT_UP_RATE` | `0` | Upload limit in bytes/s (`0` is unlimited) |
+| `FREEDOM_CONTENT_DOWN_RATE` | `0` | Download limit in bytes/s (`0` is unlimited) |
+| `FREEDOM_CONTENT_MAX_PUSH_SIZE` | `1G` | Largest content set accepted through replica push |
 
 The DNS server defaults to the high port **`:8053`** so a node runs **without
 root**. If the DNS port fails to bind, the node logs a warning and keeps
@@ -183,20 +206,20 @@ standard `:53`. Options:
 
 ```sh
 # Generate an owner keypair for a name
-freedom keygen mysite
+./freedom-names freedom keygen mysite
 
 # Stage one or more resource records (A | AAAA | TXT | CNAME | CONTENT)
-freedom set mysite A 10.0.0.5 300
-freedom set mysite TXT "hello world"
+./freedom-names freedom set mysite A 10.0.0.5 300
+./freedom-names freedom set mysite TXT "hello world"
 
 # Print your full "mysite.<pubKeyID>.fn" name
-freedom name mysite
+./freedom-names freedom name mysite
 
 # Sign the staged records and publish them to a running node
-freedom publish mysite --api http://localhost:8420
+./freedom-names freedom publish mysite --api http://localhost:8420
 
 # Resolve a name via a running node
-freedom lookup mysite.<pubKeyID>.fn --type A
+./freedom-names freedom lookup mysite.<pubKeyID>.fn --type A
 ```
 
 Keys and staged records live under `~/.freedom/keys/`. The node's own libp2p
@@ -210,17 +233,17 @@ mainnet; prefix with `FREEDOM_BCH_NETWORK=chipnet` to practise with faucet coins
 
 ```sh
 # Show your BCH funding address, balance, and claimed-name (NFT) count
-freedom wallet
+./freedom-names freedom wallet
 
 # Claim a globally-unique bare name (mints the FN01 NFT, binds it to your key)
-freedom claim mysite
+./freedom-names freedom claim mysite
 
 # Re-bind a name NFT you already hold to your current key (e.g. after a
 # plain wallet transfer moved it) so it resolves again
-freedom adopt mysite
+./freedom-names freedom adopt mysite
 
 # Look up the on-chain owner of a bare name and its equivalent self-certifying name
-freedom whois mysite.fn
+./freedom-names freedom whois mysite.fn
 ```
 
 Once claimed, `mysite.fn` resolves through the same node/DNS/HTTP paths as a
@@ -231,11 +254,11 @@ For privacy (or guaranteed availability) run your own Fulcrum and point the node
 at it, which also overrides the built-in bootstrap list:
 
 ```sh
-FREEDOM_BCH_ELECTRUM=ssl://your-fulcrum.example:50002 go run .
+FREEDOM_BCH_ELECTRUM=ssl://your-fulcrum.example:50002 ./freedom-names
 ```
 
-Invoke the CLI via the built binary (`./freedom-names freedom keygen mysite`) or,
-during development, `go run . freedom keygen mysite`.
+Every CLI command is invoked as `./freedom-names freedom <command>` through the
+same downloaded binary that runs the node.
 
 ## Resolving from your system
 
@@ -269,7 +292,8 @@ content-addressed store keeps no MIME metadata. Unrecognized bytes fall back to
 
 ## Development
 
-Run tests (including a live over-the-wire DNS server test):
+Developers working from a source checkout can run the tests (including a live
+over-the-wire DNS server test):
 
 ```sh
 go test -race ./...

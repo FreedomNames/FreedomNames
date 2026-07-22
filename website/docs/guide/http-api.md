@@ -136,8 +136,8 @@ curl http://localhost:8420/info
 
 ```json
 {
-  "version": "0.8.1",
-  "mode": "client",
+  "version": "<version>",
+  "mode": "Auto",
   "peerID": "<peerID>",
   "listenAddresses": ["/ip4/…/tcp/…", "..."],
   "peers": ["<peerID>", "..."],
@@ -221,7 +221,7 @@ curl http://localhost:8420/health
 ```
 
 ```json
-{ "status": "ok", "version": "0.8.1", "ready": true }
+{ "status": "ok", "version": "<version>", "ready": true }
 ```
 
 The endpoint answers any HTTP method, always with `200`; `ready` flips to `true`

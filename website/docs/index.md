@@ -5,8 +5,8 @@ hero:
   name: Freedom Names
   text: DNS without gatekeepers.
   tagline: >-
-    Own a human-readable name with no central authority and no consensus.
-    The key <em>is</em> the name, so nobody can take it, squat it, or overwrite it.
+    Own a self-certifying name with no registry or consensus, or choose a short
+    Bitcoin Cash-backed bare name. Your signed records remain yours.
   image:
     src: /logo.svg
     alt: Freedom Names
@@ -49,14 +49,14 @@ features:
   - icon: 🧰
     title: Batteries included
     details: >-
-      One Go binary runs a DHT peer, a DNS server, and an HTTP API at once. A
-      <code>freedom</code> CLI generates keys, stages records, and publishes them.
+      One prebuilt binary runs a DHT peer, content service, DNS server, and HTTP
+      API. Its bundled CLI generates keys, stages records, and publishes them.
   - icon: 🧭
-    title: Clean names, later
+    title: Bare names when you want them
     details: >-
-      Bare names like <code>mysite.fn</code> are a planned Layer&nbsp;2 over a
-      Bitcoin&nbsp;Cash registry, so consensus stays on-chain while Layer&nbsp;1
-      remains pure DHT.
+      Optional names like <code>mysite.fn</code> use a CashTokens NFT on
+      Bitcoin&nbsp;Cash to establish one global owner. Only that short-name
+      ownership needs chain consensus; records stay signed and peer-to-peer.
 ---
 
 <div class="fn-home-extra">
@@ -68,8 +68,8 @@ handful of root operators and registries. Miss a payment, fall foul of a policy,
 or land in the wrong jurisdiction, and the name can be suspended, transferred, or
 seized, regardless of who actually built the site behind it.
 
-Freedom Names removes the middleman. A name is a **cryptographic fact**, not a
-permission someone grants you:
+Freedom Names removes the registrar. For a self-certifying name, ownership is a
+**cryptographic fact**, not permission someone grants you:
 
 - **You generate a keypair.** The public key hashes into the name, so the name is
   yours the moment the key exists: no registration, no approval, no fee.
@@ -78,23 +78,30 @@ permission someone grants you:
 - **Everyone can verify them.** Any node checks the signature and the key→name
   binding independently. There is no authority to trust, only math.
 
+If you prefer a short globally unique name such as `mysite.fn`, the optional
+Bitcoin Cash registry establishes its owner. The name's DNS and content records
+are still signed and distributed through Freedom Names rather than stored on
+the chain.
+
 ## A name in 60 seconds
+
+With Freedom Names running and connected to at least one peer:
 
 ```sh
 # 1. Generate an owner keypair for a name
-freedom keygen mysite
+./freedom-names freedom keygen mysite
 
 # 2. Point it at a server
-freedom set mysite A 10.0.0.5 300
+./freedom-names freedom set mysite A 10.0.0.5 300
 
 # 3. See your full self-certifying name
-freedom name mysite
+./freedom-names freedom name mysite
 #   mysite.<pubKeyID>.fn
 
-# 4. Sign the records and publish them to a running node
-freedom publish mysite --api http://localhost:8420
+# 4. Sign the records and publish them through the running instance
+./freedom-names freedom publish mysite --api http://localhost:8420
 
-# 5. Resolve it, from anywhere on the network
+# 5. Resolve it through your local DNS endpoint
 dig @127.0.0.1 -p 8053 mysite.<pubKeyID>.fn A
 ```
 

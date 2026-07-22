@@ -106,4 +106,4 @@ public bootstrap exists, off-LAN discovery is manual.
   this reason. Do not expose it on a untrusted network; anyone who can reach it
   can publish and fetch through your node.
 - **DNS on `:53` needs privileges.** The default is the high port `:8053`. For
-  system-wide `.fn` resolution, see [running a node](/guide/running-a-node#the-53-port).
+  system-wide `.fn` resolution, see [running Freedom Names](/guide/running-a-node#the-53-port).

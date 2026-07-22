@@ -192,11 +192,11 @@ network:
 ```sh
 export FREEDOM_BCH_NETWORK=chipnet
 
-freedom keygen mysite            # your owner key
-freedom wallet                   # shows a bchtest: address to fund
+./freedom-names freedom keygen mysite  # your owner key
+./freedom-names freedom wallet         # shows a bchtest: address to fund
 # fund that address from a chipnet faucet, then:
-freedom claim mysite             # mints the name NFT on-chain
-freedom whois mysite.fn          # once confirmed, shows the owner
+./freedom-names freedom claim mysite   # mints the name NFT on-chain
+./freedom-names freedom whois mysite.fn  # once confirmed, shows the owner
 ```
 
 For a real, permanent name, drop `FREEDOM_BCH_NETWORK` (mainnet is the default)

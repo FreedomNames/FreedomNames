@@ -10,27 +10,27 @@ Note its IP address.
 ## 2. Create a name for it
 
 ```sh
-freedom keygen blog
-freedom name blog
+./freedom-names freedom keygen blog
+./freedom-names freedom name blog
 # blog.<pubKeyID>.fn
 ```
 
 ## 3. Point the name at the server
 
 ```sh
-freedom set blog A 203.0.113.20 300
+./freedom-names freedom set blog A 203.0.113.20 300
 ```
 
 If your server also has IPv6:
 
 ```sh
-freedom set blog AAAA 2001:db8::20 300
+./freedom-names freedom set blog AAAA 2001:db8::20 300
 ```
 
 ## 4. Publish
 
 ```sh
-freedom publish blog
+./freedom-names freedom publish blog
 # Published blog.<pubKeyID>.fn (seq …, 1 record(s))
 ```
 

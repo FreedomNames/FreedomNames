@@ -34,3 +34,16 @@ docs/
 
 Content is plain Markdown. Edit the files under `docs/` and the dev server
 hot-reloads.
+
+## Release documentation
+
+The Getting Started pages use one concrete Linux amd64 archive name to keep the
+download and extraction example easy to copy. When publishing a new release,
+update that version in:
+
+- `README.md` at the repository root,
+- `docs/guide/what-is-freedom-names.md`, and
+- `docs/guide/running-a-node.md`.
+
+Then download that published archive, extract it, and run
+`./freedom-names --version` before deploying the documentation.

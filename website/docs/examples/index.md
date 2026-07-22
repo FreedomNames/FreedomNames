@@ -1,8 +1,14 @@
 # Examples
 
-Practical, end-to-end recipes. Each one assumes you have a
-[node running](/guide/running-a-node) on `http://localhost:8420` and the
-`freedom` CLI available.
+Practical, end-to-end recipes. Each one assumes you have
+[Freedom Names running](/guide/running-a-node) on `http://localhost:8420` and the
+downloaded `freedom-names` binary available in your current directory. DHT
+examples also require the running instance to be connected to at least one peer.
+
+::: info Windows
+The command examples use Linux/macOS syntax. In PowerShell, replace
+`./freedom-names` with `.\freedom-names.exe`.
+:::
 
 <div class="fn-examples">
 

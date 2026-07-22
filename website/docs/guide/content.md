@@ -125,8 +125,8 @@ and the fetching side. (The blobstore itself caps any single blob at a hard
 publish, all at once.
 
 ```sh
-freedom keygen blog                       # your owner key
-freedom put blog ./index.html             # upload + set CONTENT record + publish
+./freedom-names freedom keygen blog           # your owner key
+./freedom-names freedom put blog ./index.html  # upload + set CONTENT + publish
 ```
 
 ```
@@ -139,8 +139,8 @@ Under the hood `put` does roughly what you could do by hand:
 
 ```sh
 HASH=$(curl -s -X POST --data-binary @index.html http://localhost:8420/content | jq -r .hash)
-freedom set blog CONTENT "$HASH"
-freedom publish blog
+./freedom-names freedom set blog CONTENT "$HASH"
+./freedom-names freedom publish blog
 ```
 
 With one difference: where `freedom set` merges into the staged record set,

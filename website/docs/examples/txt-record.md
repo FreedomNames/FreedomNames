@@ -6,10 +6,10 @@ tokens, SPF policies, public notes, or small machine-readable metadata.
 ## Stage and publish
 
 ```sh
-freedom keygen notes            # skip if the name already exists
-freedom set notes TXT "hello from freedom names"
-freedom set notes TXT "v=spf1 -all"
-freedom publish notes
+./freedom-names freedom keygen notes  # skip if the name already exists
+./freedom-names freedom set notes TXT "hello from freedom names"
+./freedom-names freedom set notes TXT "v=spf1 -all"
+./freedom-names freedom publish notes
 ```
 
 You can stage **multiple** `TXT` records; they're all published together under the
@@ -20,7 +20,7 @@ one name.
 Filter the resolve to just `TXT`:
 
 ```sh
-freedom lookup notes.<pubKeyID>.fn --type TXT
+./freedom-names freedom lookup notes.<pubKeyID>.fn --type TXT
 ```
 
 Or over DNS:
@@ -51,7 +51,7 @@ Wrap any value containing spaces in quotes so your shell passes it as a single
 argument:
 
 ```sh
-freedom set notes TXT "this is one value"
+./freedom-names freedom set notes TXT "this is one value"
 ```
 
 ## Replace vs. append
@@ -60,9 +60,9 @@ freedom set notes TXT "this is one value"
 an identical pair just updates its TTL. To publish a fresh set, clear first:
 
 ```sh
-freedom clear notes
-freedom set notes TXT "only this now"
-freedom publish notes
+./freedom-names freedom clear notes
+./freedom-names freedom set notes TXT "only this now"
+./freedom-names freedom publish notes
 ```
 
 The new publish supersedes the old record on the network (higher sequence number).

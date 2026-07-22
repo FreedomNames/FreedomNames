@@ -1,9 +1,10 @@
 # What is Freedom Names?
 
-**Freedom Names is decentralized DNS.** It lets anyone own a human-readable name
-and publish DNS-style records for it, with **no central authority and no
-consensus**: a name is owned by whoever holds its Ed25519 keypair. Records are
-cryptographically signed, so nobody can overwrite a name they don't own.
+**Freedom Names is decentralized DNS.** Its self-certifying names need no
+central authority or consensus: a name is owned by whoever holds its Ed25519
+keypair. Optional bare names use Bitcoin Cash consensus only to establish one
+global owner. In both cases records are cryptographically signed, so nobody can
+overwrite a name they don't own.
 
 It is a single program written in Go, built on a [libp2p](https://libp2p.io)
 Kademlia DHT.
@@ -73,7 +74,7 @@ the [GitLab releases page](https://gitlab.melroy.org/freedom-names/freedom-names
 page](https://github.com/FreedomNames/FreedomNames/releases) (open **Assets**).
 
 For example, on 64-bit Linux, extract the downloaded archive and start Freedom
-Names:
+Names (replace `0.8.3` with the version you downloaded):
 
 ```sh
 tar -xzf freedom-names-0.8.3-linux-amd64.tar.gz

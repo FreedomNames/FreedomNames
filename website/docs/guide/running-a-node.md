@@ -15,7 +15,8 @@ arm64. Download the package matching your platform from either:
   **Assets**.
 
 For example, on 64-bit Linux, download
-`freedom-names-0.8.3-linux-amd64.tar.gz` and extract it:
+`freedom-names-0.8.3-linux-amd64.tar.gz` and extract it. Replace `0.8.3` with
+the version shown on the release page when a newer release is available:
 
 ```sh
 tar -xzf freedom-names-0.8.3-linux-amd64.tar.gz
