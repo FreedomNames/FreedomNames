@@ -74,10 +74,10 @@ the [GitLab releases page](https://gitlab.melroy.org/freedom-names/freedom-names
 page](https://github.com/FreedomNames/FreedomNames/releases) (open **Assets**).
 
 For example, on 64-bit Linux, extract the downloaded archive and start Freedom
-Names (replace `0.8.3` with the version you downloaded):
+Names (replace `0.8.4` with the version you downloaded):
 
 ```sh
-tar -xzf freedom-names-0.8.3-linux-amd64.tar.gz
+tar -xzf freedom-names-0.8.4-linux-amd64.tar.gz
 ./freedom-names
 ```
 

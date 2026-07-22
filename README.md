@@ -132,10 +132,10 @@ Download the prebuilt archive for your operating system and architecture from
 Releases](https://github.com/FreedomNames/FreedomNames/releases) (**Assets**).
 
 For example, the 64-bit Linux package extracts to one executable. Replace
-`0.8.3` with the version you downloaded:
+`0.8.4` with the version you downloaded:
 
 ```sh
-tar -xzf freedom-names-0.8.3-linux-amd64.tar.gz
+tar -xzf freedom-names-0.8.4-linux-amd64.tar.gz
 ./freedom-names
 ```
 
