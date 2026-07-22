@@ -75,8 +75,15 @@ docs-deploy:
     key: vitepress
     paths:
       - website/node_modules/
+  # Only redeploy when the site (or this job's own definition) actually changes,
+  # so a Go-only commit does not rebuild and re-publish an identical site.
+  # `.gitlab-ci.yml` is watched too: without it, a change to the build steps
+  # below would never reach production.
   rules:
     - if: $CI_PROJECT_NAMESPACE == "freedom-names" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        - website/**/*
+        - .gitlab-ci.yml
   script:
     - cd website
     - npm ci
