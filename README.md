@@ -49,28 +49,28 @@ start
 :Open <b>melroy.fn</b>;
 if (Name carries a <pubKeyID> suffix?) then (no — bare name)
   partition "Layer 2 — BCH registry" {
-    :Find the earliest confirmed claim:\nthe name is a CashTokens NFT;
-    :Walk the NFT's custody chain\nto its current UTXO;
-    :Live token commitment reveals\nthe owner's public key;
+    :Find the earliest confirmed claim: the name is a CashTokens NFT;
+    :Walk the NFT's custody chain to its current UTXO;
+    :Live token commitment reveals the owner's public key;
   }
 else (yes — self-certifying)
-  :Owner's public key is embedded\nin the name itself;
+  :Owner's public key is embedded in the name itself;
 endif
 partition "Layer 1 — DHT (naming)" {
   :Derive the DHT key from the pubKeyID;
-  :Fetch the signed record set\n(newest sequence wins);
-  :Verify the signature against\nthe owner's public key;
-  :Read the CONTENT record\n→ content hash;
+  :Fetch the signed record set (newest sequence wins);
+  :Verify the signature against the owner's public key;
+  :Read the CONTENT record → content hash;
 }
 partition "Content network (bytes)" {
   if (Blob in the local store?) then (yes)
   else (no)
-    :Ask the DHT who provides the hash\n(publisher + pushed replicas);
+    :Ask the DHT who provides the hash (publisher + pushed replicas);
     :Stream the blob from any provider;
   endif
-  :Verify the bytes against the hash\n(wrong content is impossible);
+  :Verify the bytes against the hash (wrong content is impossible);
   if (Blob is a chunk manifest?) then (yes)
-    :Fetch each chunk the same way,\nreassemble as a stream;
+    :Fetch each chunk the same way, reassemble as a stream;
   else (no)
   endif
 }
