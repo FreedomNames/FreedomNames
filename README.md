@@ -45,36 +45,54 @@ the key signs records, and the content's *hash* is its address:
 
 ```plantuml
 @startuml
+skinparam ranksep 25
+skinparam nodesep 14
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam ArrowColor #37474F
+skinparam ArrowFontColor #37474F
+skinparam activity {
+  BorderColor #FFFFFF
+  FontColor #FFFFFF
+  DiamondBackgroundColor #FFC94D
+  DiamondBorderColor #E09B00
+  DiamondFontColor #3D2C00
+}
+skinparam partition {
+  BorderColor #90A4AE
+  FontColor #37474F
+}
+
 start
-:Open <b>melroy.fn</b>;
+:Open <b>melroy.fn</b>; <<#37474F>>
 if (Name carries a <pubKeyID> suffix?) then (no — bare name)
   partition "Layer 2 — BCH registry" {
-    :Find the earliest confirmed claim:\nthe name is a CashTokens NFT;
-    :Walk the NFT's custody chain\nto its current UTXO;
-    :Live token commitment reveals\nthe owner's public key;
+    :Find the earliest confirmed claim: the name is a CashTokens NFT; <<#12805F>>
+    :Walk the NFT's custody chain to its current UTXO; <<#12805F>>
+    :Live token commitment reveals the owner's public key; <<#12805F>>
   }
 else (yes — self-certifying)
-  :Owner's public key is embedded\nin the name itself;
+  :Owner's public key is embedded in the name itself; <<#6D28D9>>
 endif
 partition "Layer 1 — DHT (naming)" {
-  :Derive the DHT key from the pubKeyID;
-  :Fetch the signed record set\n(newest sequence wins);
-  :Verify the signature against\nthe owner's public key;
-  :Read the CONTENT record\n→ content hash;
+  :Derive the DHT key from the pubKeyID; <<#6D28D9>>
+  :Fetch the signed record set (newest sequence wins); <<#6D28D9>>
+  :Verify the signature against the owner's public key; <<#6D28D9>>
+  :Read the CONTENT record → content hash; <<#6D28D9>>
 }
 partition "Content network (bytes)" {
   if (Blob in the local store?) then (yes)
   else (no)
-    :Ask the DHT who provides the hash\n(publisher + pushed replicas);
-    :Stream the blob from any provider;
+    :Ask the DHT who provides the hash (publisher + pushed replicas); <<#1D6FBF>>
+    :Stream the blob from any provider; <<#1D6FBF>>
   endif
-  :Verify the bytes against the hash\n(wrong content is impossible);
+  :Verify the bytes against the hash (wrong content is impossible); <<#1D6FBF>>
   if (Blob is a chunk manifest?) then (yes)
-    :Fetch each chunk the same way,\nreassemble as a stream;
+    :Fetch each chunk the same way, reassemble as a stream; <<#1D6FBF>>
   else (no)
   endif
 }
-:Render the page bytes;
+:Render the page bytes; <<#37474F>>
 stop
 @enduml
 ```
