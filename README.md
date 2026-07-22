@@ -48,7 +48,6 @@ the key signs records, and the content's *hash* is its address:
 skinparam ranksep 25
 skinparam nodesep 14
 skinparam defaultFontSize 12
-skinparam ConditionEndStyle hline
 skinparam activity {
   BackgroundColor #F7F7F7
   BorderColor #999999
