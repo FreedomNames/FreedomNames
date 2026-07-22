@@ -17,6 +17,7 @@ import (
 
 type Response struct {
 	Version         string   `json:"version"`
+	Role            string   `json:"role"`
 	Mode            string   `json:"mode"`
 	PeerID          string   `json:"peerID"`
 	ListenAddresses []string `json:"listenAddresses"`
@@ -26,16 +27,34 @@ type Response struct {
 	Protocols       []string `json:"protocols"`
 }
 
-func StartHTTPServer(freedomDht FreedomDHT, resolver *Resolver, cache Cache, content *ContentService, addr string) {
+// Node roles reported by /health and /info. This is a fixed vocabulary, not
+// free text: a spawning host (e.g. LibreWeb) uses it to tell a node it may
+// adopt from a bootstrap node it must not. Add values here, never inline.
+const (
+	RoleNode      = "node"
+	RoleBootstrap = "bootstrap"
+)
+
+// roleFor maps the bootstrap flag to its reported role string.
+func roleFor(bootstrapMode bool) string {
+	if bootstrapMode {
+		return RoleBootstrap
+	}
+	return RoleNode
+}
+
+func StartHTTPServer(freedomDht FreedomDHT, resolver *Resolver, cache Cache, content *ContentService, addr string, bootstrapMode bool) {
+	role := roleFor(bootstrapMode)
+
 	// Set up HTTP API endpoints
 	mux := http.NewServeMux()
 	mux.HandleFunc("/publish", PublishHandler(freedomDht))
 	mux.HandleFunc("/resolve", ResolveHandler(freedomDht, resolver))
 	mux.HandleFunc("/record", RecordHandler(freedomDht))
 	mux.HandleFunc("/peers", AllPeersHandler(freedomDht))
-	mux.HandleFunc("/info", InfoHandler(freedomDht))
+	mux.HandleFunc("/info", InfoHandler(freedomDht, role))
 	mux.HandleFunc("/clear_cache", ClearCacheHandler(cache))
-	mux.HandleFunc("/health", HealthHandler(freedomDht))
+	mux.HandleFunc("/health", HealthHandler(freedomDht, role))
 	// Content endpoints (LibreWeb's page-bytes layer).
 	mux.HandleFunc("/content", ContentHandler(content))
 	mux.HandleFunc("/resolve-content", ResolveContentHandler(resolver, content))
@@ -237,7 +256,7 @@ func AllPeersHandler(freedomDht FreedomDHT) http.HandlerFunc {
 }
 
 // InfoHandler returns general information about the DHT
-func InfoHandler(freedomDht FreedomDHT) http.HandlerFunc {
+func InfoHandler(freedomDht FreedomDHT, role string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !freedomDht.IsInitialized() {
 			http.Error(w, "DHT not initialized", http.StatusInternalServerError)
@@ -280,6 +299,7 @@ func InfoHandler(freedomDht FreedomDHT) http.HandlerFunc {
 
 		response := Response{
 			Version:         nodeVersion,
+			Role:            role,
 			Mode:            mode,
 			PeerID:          peerID,
 			ListenAddresses: listenAddrList,

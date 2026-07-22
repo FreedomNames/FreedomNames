@@ -70,3 +70,72 @@ func TestEnvHelpers(t *testing.T) {
 		t.Errorf("envInt negative = %d, want fallback", got)
 	}
 }
+
+// TestHTTPAddrDefaultByRole pins the role-dependent HTTP API default. A
+// bootstrap node must not land on 8420, so it can run alongside a normal node
+// (notably one spawned by LibreWeb) without either failing to bind.
+func TestHTTPAddrDefaultByRole(t *testing.T) {
+	// Ensure the env does not leak in from the developer's shell.
+	t.Setenv("FREEDOM_HTTP_ADDR", "")
+
+	cases := []struct {
+		name          string
+		bootstrapMode bool
+		want          string
+	}{
+		{"normal node keeps 8420", false, "127.0.0.1:8420"},
+		{"bootstrap node uses 8430", true, "127.0.0.1:8430"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := LoadConfigForRole(tc.bootstrapMode)
+			if cfg.HTTPAddr != tc.want {
+				t.Errorf("HTTPAddr = %q, want %q", cfg.HTTPAddr, tc.want)
+			}
+			if cfg.BootstrapMode != tc.bootstrapMode {
+				t.Errorf("BootstrapMode = %v, want %v", cfg.BootstrapMode, tc.bootstrapMode)
+			}
+		})
+	}
+
+	// LoadConfig is the normal-node case, for CLI paths that never run a node.
+	if cfg := LoadConfig(); cfg.HTTPAddr != "127.0.0.1:8420" || cfg.BootstrapMode {
+		t.Errorf("LoadConfig() = {HTTPAddr:%q BootstrapMode:%v}, want the normal-node defaults",
+			cfg.HTTPAddr, cfg.BootstrapMode)
+	}
+}
+
+// TestHTTPAddrPrecedence guards the env -> flag chain. envOr cannot tell "unset"
+// from "set to the default", so a role-dependent default applied after the
+// config load would silently clobber an explicit FREEDOM_HTTP_ADDR. These cases
+// would catch that regression.
+func TestHTTPAddrPrecedence(t *testing.T) {
+	t.Run("env wins over the bootstrap default", func(t *testing.T) {
+		t.Setenv("FREEDOM_HTTP_ADDR", "127.0.0.1:9999")
+
+		if cfg := LoadConfigForRole(true); cfg.HTTPAddr != "127.0.0.1:9999" {
+			t.Errorf("HTTPAddr = %q, want the explicit env value", cfg.HTTPAddr)
+		}
+	})
+
+	t.Run("env set to the normal default still wins", func(t *testing.T) {
+		// The exact case envOr cannot distinguish: a bootstrap node explicitly
+		// pointed at 8420 must stay there, not be moved to 8430.
+		t.Setenv("FREEDOM_HTTP_ADDR", "127.0.0.1:8420")
+
+		if cfg := LoadConfigForRole(true); cfg.HTTPAddr != "127.0.0.1:8420" {
+			t.Errorf("HTTPAddr = %q, want the explicit 127.0.0.1:8420", cfg.HTTPAddr)
+		}
+	})
+
+	t.Run("flag wins over env and the bootstrap default", func(t *testing.T) {
+		t.Setenv("FREEDOM_HTTP_ADDR", "127.0.0.1:9999")
+
+		cfg := LoadConfigForRole(true)
+		applyNodeFlags(cfg, []string{"bootstrap", "--http-addr", "127.0.0.1:7777"})
+		if cfg.HTTPAddr != "127.0.0.1:7777" {
+			t.Errorf("HTTPAddr = %q, want the flag value", cfg.HTTPAddr)
+		}
+	})
+}

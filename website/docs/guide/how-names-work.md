@@ -24,7 +24,7 @@ Because `<pubKeyID>` comes *from the key*, the name is **self-certifying**: give
 the name, anyone can check that a record was signed by the matching key. There is
 no separate directory mapping names to owners to consult (or to attack).
 
-The label may itself contain dots — `blog.mysite.<pubKeyID>.fn` is a subdomain
+The label may itself contain dots: `blog.mysite.<pubKeyID>.fn` is a subdomain
 label under the same key. What routes a name here (rather than to
 [bare names](/guide/bare-names)) is the second-to-last label: if it decodes as a base36
 sha2-256 multihash it is a `<pubKeyID>`; otherwise the whole name is treated as
@@ -78,8 +78,8 @@ publishing node.
 
 Publishing also starts three clocks. The DHT drops stored values after roughly
 36 hours, so the publishing node re-puts each of its records every 8 hours to
-keep them alive. But it can only re-put the *original signed bytes* — extending
-the record's `eol` (7 days from publish) requires the owner's key — so you must
+keep them alive. But it can only re-put the *original signed bytes*; extending
+the record's `eol` (7 days from publish) requires the owner's key, so you must
 re-run `freedom publish` within 7 days. And if the node goes offline, the record
 falls out of the DHT roughly 36 hours after the last re-put, well before the
 7-day `eol`, unless another node is still republishing it.
@@ -102,7 +102,7 @@ all funnel through one resolver.
 
 Two valid updates to the same name are ordered by `seq`: higher wins, a tie
 falls to the later `eol`, and a remaining tie to the larger raw record bytes.
-The CLI derives `seq` from wall-clock time on each publish — but always strictly
+The CLI derives `seq` from wall-clock time on each publish, but always strictly
 above the name's current record, so updates keep winning even for two publishes
 in the same second or a clock stepped backwards. A later republish supersedes an
 earlier one only if it carries a valid signature from the same key: an attacker

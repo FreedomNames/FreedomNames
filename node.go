@@ -119,7 +119,7 @@ func NewNode(ctx context.Context, cfg *Config) *FreedomNameNode {
 	}
 
 	// In case of the bootstrap node, we need to listen on a specific port
-	if len(os.Args) > 1 && os.Args[1] == "bootstrap" {
+	if cfg.BootstrapMode {
 		log.Println("Starting bootstrap node!")
 		opts = append(opts, []libp2p.Option{
 			libp2p.ListenAddrStrings(
@@ -170,7 +170,7 @@ func NewNode(ctx context.Context, cfg *Config) *FreedomNameNode {
 	}
 
 	// If in bootstrap mode become server and do not bootstrap
-	if len(os.Args) > 1 && os.Args[1] == "bootstrap" {
+	if cfg.BootstrapMode {
 		// Start the DHT in server mode
 		dhtOpts = append(dhtOpts, dht.Mode(dht.ModeServer))
 	} else {

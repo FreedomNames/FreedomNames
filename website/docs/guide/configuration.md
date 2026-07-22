@@ -5,7 +5,7 @@ node is entirely driven by its environment.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `FREEDOM_HTTP_ADDR` | `127.0.0.1:8420` | HTTP API listen address (loopback by default) |
+| `FREEDOM_HTTP_ADDR` | `127.0.0.1:8420` (bootstrap: `127.0.0.1:8430`) | HTTP API listen address (loopback by default) |
 | `FREEDOM_DNS_ADDR` | `:8053` | DNS server listen address |
 | `FREEDOM_UPSTREAM_DNS` | `1.1.1.1:53` | Upstream resolver for non-`.fn` queries |
 | `FREEDOM_CONTENT_DIR` | `~/.freedom/content` | Content-addressed blobstore directory |

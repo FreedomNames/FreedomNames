@@ -14,7 +14,7 @@ control surface, so expose it beyond `127.0.0.1` only deliberately.
 | [`/resolve-content`](#get-resolve-content) | GET | Name to page bytes in one call |
 | [`/peers`](#get-peers) | GET | Routing-table peers + connected hosts |
 | [`/info`](#get-info) | GET | Version, mode, peer ID, addresses, network size |
-| [`/health`](#get-health) | GET | Liveness + version handshake |
+| [`/health`](#get-health) | GET | Liveness + version + role handshake |
 | [`/clear_cache`](#delete-clear_cache) | DELETE | Purge the local resolution cache |
 
 ## POST `/publish`
@@ -137,6 +137,7 @@ curl http://localhost:8420/info
 ```json
 {
   "version": "<version>",
+  "role": "node",
   "mode": "Auto",
   "peerID": "<peerID>",
   "listenAddresses": ["/ip4/…/tcp/…", "..."],
@@ -221,11 +222,29 @@ curl http://localhost:8420/health
 ```
 
 ```json
-{ "status": "ok", "version": "<version>", "ready": true }
+{ "status": "ok", "version": "<version>", "ready": true, "role": "node" }
 ```
 
 The endpoint answers any HTTP method, always with `200`; `ready` flips to `true`
 once the DHT is initialized.
+
+`role` is one of a fixed vocabulary, not free text:
+
+| value | meaning |
+|---|---|
+| `node` | a normal node (DNS + HTTP API, default HTTP port `8420`) |
+| `bootstrap` | a bootstrap node (fixed p2p ports, no DNS, default HTTP port `8430`) |
+
+**`role` is the supported way for a spawning host to tell node types apart.** Do
+not infer the type from listen ports: a bootstrap node can be configured onto
+different ports, and `mode` does not identify one either (a normal node on `Auto`
+is promoted to `Server` once it is publicly reachable).
+
+The field is **always present, on every response, including while `ready` is
+still `false`**. That guarantee is deliberate: `/info` returns `500` until the
+DHT is initialized, so a host that probed `/info` could read a still-starting
+node as "nothing listening here" and start a second one. `/health` always
+answers.
 
 ## Next
 

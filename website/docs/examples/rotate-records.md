@@ -2,7 +2,7 @@
 
 Changing what a name points at is just publishing a new signed record. The network
 keeps the one with the **highest sequence number**, and the CLI derives that number
-from wall-clock time — always strictly above the name's current record, so a later
+from wall-clock time, always strictly above the name's current record, so a later
 publish wins even twice within the same second or after a backward clock step.
 
 ## Change an IP address
