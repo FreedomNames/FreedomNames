@@ -64,35 +64,35 @@ skinparam partition {
 }
 
 start
-#37474F:Open <b>melroy.fn</b>;
+:Open <b>melroy.fn</b>; <<#37474F>>
 if (Name carries a <pubKeyID> suffix?) then (no — bare name)
   partition "Layer 2 — BCH registry" {
-    #C2410C:Find the earliest confirmed claim: the name is a CashTokens NFT;
-    #C2410C:Walk the NFT's custody chain to its current UTXO;
-    #C2410C:Live token commitment reveals the owner's public key;
+    :Find the earliest confirmed claim: the name is a CashTokens NFT; <<#C2410C>>
+    :Walk the NFT's custody chain to its current UTXO; <<#C2410C>>
+    :Live token commitment reveals the owner's public key; <<#C2410C>>
   }
 else (yes — self-certifying)
-  #0F766E:Owner's public key is embedded in the name itself;
+  :Owner's public key is embedded in the name itself; <<#0F766E>>
 endif
 partition "Layer 1 — DHT (naming)" {
-  #0F766E:Derive the DHT key from the pubKeyID;
-  #0F766E:Fetch the signed record set (newest sequence wins);
-  #0F766E:Verify the signature against the owner's public key;
-  #0F766E:Read the CONTENT record → content hash;
+  :Derive the DHT key from the pubKeyID; <<#0F766E>>
+  :Fetch the signed record set (newest sequence wins); <<#0F766E>>
+  :Verify the signature against the owner's public key; <<#0F766E>>
+  :Read the CONTENT record → content hash; <<#0F766E>>
 }
 partition "Content network (bytes)" {
   if (Blob in the local store?) then (yes)
   else (no)
-    #1D6FBF:Ask the DHT who provides the hash (publisher + pushed replicas);
-    #1D6FBF:Stream the blob from any provider;
+    :Ask the DHT who provides the hash (publisher + pushed replicas); <<#1D6FBF>>
+    :Stream the blob from any provider; <<#1D6FBF>>
   endif
-  #1D6FBF:Verify the bytes against the hash (wrong content is impossible);
+  :Verify the bytes against the hash (wrong content is impossible); <<#1D6FBF>>
   if (Blob is a chunk manifest?) then (yes)
-    #1D6FBF:Fetch each chunk the same way, reassemble as a stream;
+    :Fetch each chunk the same way, reassemble as a stream; <<#1D6FBF>>
   else (no)
   endif
 }
-#7B3FF2:Render the page bytes;
+:Render the page bytes; <<#7B3FF2>>
 stop
 @enduml
 ```
