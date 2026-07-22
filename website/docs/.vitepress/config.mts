@@ -79,7 +79,7 @@ export default defineConfig({
           items: [
             { text: 'The content network', link: '/guide/content' },
             { text: 'Embedding a node', link: '/guide/embedding' },
-            { text: 'Layer 2: bare names', link: '/guide/layer2' },
+            { text: 'Bare names', link: '/guide/bare-names' },
             { text: 'Testing on a real network', link: '/guide/testing-a-network' },
             { text: 'Known limitations', link: '/guide/limitations' },
             { text: 'FAQ', link: '/guide/faq' },

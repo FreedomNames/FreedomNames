@@ -9,7 +9,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 )
 
-// This file holds the Layer 2 (BCH bare-name registry) CLI subcommands:
+// This file holds the BCH bare-name registry CLI subcommands:
 // wallet, claim, adopt, whois. They talk directly to an Electrum server
 // configured via FREEDOM_BCH_* (see config.go) — they do not need a running
 // freedom node.

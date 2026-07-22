@@ -28,7 +28,7 @@ bootstrap peer, and there is no official public one yet. Run your own bootstrap
 node and share its multiaddr, or set `FREEDOM_BOOTSTRAP` explicitly. Until a
 public bootstrap exists, off-LAN discovery is manual.
 
-## Layer 2 (Bitcoin Cash) caveats
+## Bare-name (Bitcoin Cash) caveats
 
 - **First-come, first-served, no stake.** The earliest confirmed claim for a bare
   name wins. There is no bidding or stake-weighting (unlike LBRY); a later,
@@ -94,7 +94,7 @@ public bootstrap exists, off-LAN discovery is manual.
   offline owner's name lapses after a week. Re-run `freedom publish` (or
   `freedom put`) to renew.
 - **Long self-certifying names.** A self-certifying name carries a ~52-character
-  key id (`label.<pubKeyID>.fn`). Bare names (Layer 2) avoid this but need a
+  key id (`label.<pubKeyID>.fn`). Bare names avoid this but need a
   chain claim. A friendlier human-alias layer is future work.
 - **Record sets have no size cap.** Validation checks each record's type and
   value (and content stays out of the DHT entirely), but nothing limits how

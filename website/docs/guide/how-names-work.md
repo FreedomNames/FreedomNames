@@ -26,7 +26,7 @@ no separate directory mapping names to owners to consult (or to attack).
 
 The label may itself contain dots — `blog.mysite.<pubKeyID>.fn` is a subdomain
 label under the same key. What routes a name here (rather than to
-[Layer 2](/guide/layer2)) is the second-to-last label: if it decodes as a base36
+[bare names](/guide/bare-names)) is the second-to-last label: if it decodes as a base36
 sha2-256 multihash it is a `<pubKeyID>`; otherwise the whole name is treated as
 a bare name. Bare names follow stricter DNS-label rules: `a-z`, `0-9` and `-`
 (not leading or trailing), 1–63 characters, no dots.
@@ -116,7 +116,7 @@ differs. Alice can't "take" Bob's `mysite`, and neither of them registered
 `mysite` in any shared registry. They each just hold a key.
 
 The trade-off is the visible key suffix. Making `mysite.fn` (no suffix) globally
-unique is the job of [Layer 2](/guide/layer2), which *does* need consensus and
+unique is the job of the [name registry](/guide/bare-names), which *does* need consensus and
 gets it from an existing blockchain rather than inventing one.
 
 ## Next

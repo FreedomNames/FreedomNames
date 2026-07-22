@@ -237,7 +237,7 @@ func CanonicalName(name string) string {
 
 // IsPubKeyID reports whether s is a well-formed self-certifying pubkey id:
 // the base36 encoding of a sha2-256 multihash. This is the authoritative test
-// for Layer 1 vs Layer 2 routing — no length heuristics.
+// for self-certifying vs bare-name routing — no length heuristics.
 func IsPubKeyID(s string) bool {
 	raw, err := base36.DecodeString(s)
 	if err != nil {

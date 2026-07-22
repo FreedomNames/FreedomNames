@@ -44,7 +44,7 @@ The client's `peers` array should list the bootstrap. (A client behind NAT is
 not itself added to the bootstrap's table; that asymmetry is normal Kademlia
 behaviour.)
 
-## 1. Name replication (Layer 1)
+## 1. Name replication (self-certifying)
 
 Publish a name on one node, resolve it on the other:
 
@@ -66,7 +66,7 @@ table`), and the bootstrap resolves a record it never saw locally.
 If publish reports "no peers", the routing table has not converged yet: wait
 longer and check `/peers`.
 
-## 2. Bare-name claim (Layer 2, chipnet)
+## 2. Bare-name claim (chipnet)
 
 This proves the pure-Go CashTokens transaction passes real consensus. It needs
 free chipnet coins. See the dedicated walkthrough:

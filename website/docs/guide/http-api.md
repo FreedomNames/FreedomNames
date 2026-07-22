@@ -84,7 +84,7 @@ curl "http://localhost:8420/resolve?name=mysite.<pubKeyID>.fn&type=A"
 
 **Errors:** `400` if `name` is missing or malformed; `404` if the name does not
 exist (including a bare name that is unclaimed on
-[Layer 2](/guide/layer2)); `500` if the DHT isn't initialized yet; `502` if the
+[bare names](/guide/bare-names)); `500` if the DHT isn't initialized yet; `502` if the
 lookup infrastructure failed (DHT timeout, no peers, Electrum unreachable),
 which means: retry later, the name may still exist.
 

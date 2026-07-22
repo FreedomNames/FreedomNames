@@ -13,7 +13,7 @@ type RecordStore interface {
 // resolution surface (DNS server, HTTP API, CLI).
 //
 // Self-certifying names resolve directly: the pubKeyID suffix yields the DHT key.
-// Bare names ("mysite.fn") are routed through the optional NameRegistry (Layer 2)
+// Bare names ("mysite.fn") are routed through the optional NameRegistry
 // to find the controlling owner's public key first.
 type Resolver struct {
 	store    RecordStore
@@ -27,7 +27,7 @@ func NewResolver(store RecordStore, cache Cache) *Resolver {
 	return &Resolver{store: store, cache: cache}
 }
 
-// WithRegistry attaches a Layer 2 name registry for resolving bare names.
+// WithRegistry attaches a name registry for resolving bare names.
 func (r *Resolver) WithRegistry(registry NameRegistry) *Resolver {
 	r.registry = registry
 	return r
@@ -59,7 +59,7 @@ func (r *Resolver) Resolve(ctx context.Context, name string) ([]RR, error) {
 
 // dhtKeyForName derives the DHT key for a name. Self-certifying names use their
 // pubKeyID suffix directly; bare names are resolved to an owner pubkey via the
-// Layer 2 registry.
+// name registry.
 func (r *Resolver) dhtKeyForName(name string) (string, error) {
 	if !isBareName(name) {
 		return DHTKeyForName(name)

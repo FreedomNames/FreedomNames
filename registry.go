@@ -7,7 +7,7 @@ import (
 )
 
 // ErrRegistryNotFound is returned when a bare name has no controlling owner
-// (including when no Layer 2 registry is configured, so the name is unclaimable).
+// (including when no name registry is configured, so the name is unclaimable).
 var ErrRegistryNotFound = errors.New("name not found in registry")
 
 // FN protocol tags carried in the OP_RETURN of registry transactions.
@@ -55,9 +55,9 @@ func markerScript(normalizedName string) []byte {
 }
 
 // NameRegistry maps a bare, human-readable name ("mysite.fn") to the public key
-// of its controlling owner. This is the Layer 2 seam: Layer 1 (self-certifying
-// "label.<pubKeyID>.fn" names) never needs it, but a blockchain registry can
-// provide globally-unique bare names by implementing this interface.
+// of its controlling owner. This is the registry seam: self-certifying names
+// ("label.<pubKeyID>.fn") never need it, but a blockchain registry can provide
+// globally-unique bare names by implementing this interface.
 //
 // The returned pubKey is a marshaled libp2p public key, identical in form to
 // FNRecord.PubKey, so the caller can derive the DHT key via DHTKeyForPubKey and

@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 # Live multi-node verification harness for issue #1.
-# Builds the binary, then runs the automated legs (Layer 1 replication + content
-# fetch). The Layer 2 claim needs funded coins, so it is opt-in.
+# Builds the binary, then runs the automated legs (self-certifying replication +
+# content fetch). The bare-name claim needs funded coins, so it is opt-in.
 #
-#   scripts/verify-network/run-all.sh            # automated legs only
-#   scripts/verify-network/run-all.sh --with-l2  # also run the guided L2 claim
+#   scripts/verify-network/run-all.sh                   # automated legs only
+#   scripts/verify-network/run-all.sh --with-bare-names # also run the guided claim
 #
 # Env:
-#   FREEDOM_BCH_NETWORK=mainnet   run the L2 leg on mainnet (real coins)
+#   FREEDOM_BCH_NETWORK=mainnet   run the bare-name leg on mainnet (real coins)
 
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/../.." && pwd)
 . "$HERE/lib.sh"
 
-WITH_L2=""
-for a in "$@"; do [ "$a" = "--with-l2" ] && WITH_L2=1; done
+WITH_BARE_NAMES=""
+for a in "$@"; do [ "$a" = "--with-bare-names" ] && WITH_BARE_NAMES=1; done
 
 export WORKDIR=$(mktemp -d /tmp/fn-verify.XXXXXX)
 export BIN="$WORKDIR/freedom-names"
@@ -37,24 +37,24 @@ run_leg() {
   fi
 }
 
-run_leg "layer1-replication" "$HERE/01-layer1-replication.sh" || true
-run_leg "content-fetch"      "$HERE/02-content-fetch.sh"      || true
+run_leg "selfcert-replication" "$HERE/01-selfcert-replication.sh" || true
+run_leg "content-fetch"        "$HERE/02-content-fetch.sh"        || true
 
-if [ -n "$WITH_L2" ]; then
-  step "Layer 2 claim (guided, needs funded coins)"
+if [ -n "$WITH_BARE_NAMES" ]; then
+  step "Bare-name claim (guided, needs funded coins)"
   # Forward FREEDOM_BCH_NETWORK (defaults to chipnet inside the leg) so
-  # `FREEDOM_BCH_NETWORK=mainnet run-all.sh --with-l2` actually reaches the leg.
-  mkdir -p "$WORKDIR/layer2"
-  if WORKDIR="$WORKDIR/layer2" BIN="$BIN" \
+  # `FREEDOM_BCH_NETWORK=mainnet run-all.sh --with-bare-names` reaches the leg.
+  mkdir -p "$WORKDIR/barename"
+  if WORKDIR="$WORKDIR/barename" BIN="$BIN" \
      FREEDOM_BCH_NETWORK="${FREEDOM_BCH_NETWORK:-chipnet}" \
-     "$HERE/03-layer2-claim.sh"; then
-    RESULTS+=("PASS  layer2-claim")
+     "$HERE/03-barename-claim.sh"; then
+    RESULTS+=("PASS  barename-claim")
   else
-    RESULTS+=("FAIL  layer2-claim")
+    RESULTS+=("FAIL  barename-claim")
   fi
 else
-  info "skipping Layer 2 claim (pass --with-l2 to run it; it needs funded coins)"
-  RESULTS+=("SKIP  layer2-claim (run with --with-l2)")
+  info "skipping bare-name claim (pass --with-bare-names to run it; it needs funded coins)"
+  RESULTS+=("SKIP  barename-claim (run with --with-bare-names)")
 fi
 
 step "Summary"

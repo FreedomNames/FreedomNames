@@ -56,11 +56,11 @@ number) wins.
 
 ## What it is not (yet)
 
-- **Not a blockchain.** Layer 1 has *no consensus at all*, and doesn't need any,
+- **Not a blockchain.** Self-certifying names have *no consensus at all*, and need none,
   because self-certifying names can't collide.
 - **Not consensus-free for bare names.** `mysite.fn` (no key suffix) requires
   agreeing on *who owns `mysite`*, which does need consensus.
-  [Layer 2](/guide/layer2) borrows it from a Bitcoin Cash registry, enabled by
+  [bare names](/guide/bare-names) borrow it from a Bitcoin Cash registry, enabled by
   default; unclaimed bare names simply resolve to not-found.
 - **Not production-hardened.** This is an actively developed project. Treat it as
   powerful, promising, and early.

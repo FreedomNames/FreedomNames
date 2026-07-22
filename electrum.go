@@ -25,7 +25,7 @@ import (
 //
 // A client holds a list of endpoints and fails over between them: on connect it
 // tries each in turn until one is reachable and speaks the protocol, so a single
-// dead public server never takes Layer 2 down. In the spirit of a decentralized
+// dead public server never takes the registry down. In the spirit of a decentralized
 // network, the default lists (config.go) carry several independent operators.
 type electrumClient struct {
 	endpoints []string

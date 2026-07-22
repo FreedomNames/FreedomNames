@@ -50,7 +50,7 @@ func TestElectrumAllEndpointsDown(t *testing.T) {
 }
 
 // TestDefaultBCHElectrumServers checks each known network selects a non-empty
-// list and an unknown one disables Layer 2 (empty) rather than guessing.
+// list and an unknown one disables the registry (empty) rather than guessing.
 func TestDefaultBCHElectrumServers(t *testing.T) {
 	for _, network := range []string{"mainnet", "chipnet", "testnet4", "testnet3"} {
 		if got := defaultBCHElectrumServers(network); len(got) == 0 {
@@ -58,6 +58,6 @@ func TestDefaultBCHElectrumServers(t *testing.T) {
 		}
 	}
 	if got := defaultBCHElectrumServers("regtest"); got != nil {
-		t.Errorf("unknown network: expected nil (L2 disabled), got %v", got)
+		t.Errorf("unknown network: expected nil (registry disabled), got %v", got)
 	}
 }

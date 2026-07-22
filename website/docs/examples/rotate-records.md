@@ -52,5 +52,5 @@ a hierarchy, just a newer signed record.
 
 Rotating the *keypair* behind a self-certifying name would change `<pubKeyID>`, and
 therefore the name, so it's effectively a new name. Keeping the **same human name**
-while changing the underlying key is a Layer 2 feature (the covenant **transfer**
-operation for bare names). See [Layer 2](/guide/layer2).
+while changing the underlying key is a registry feature (the covenant **transfer**
+operation for bare names). See [Bare names](/guide/bare-names).

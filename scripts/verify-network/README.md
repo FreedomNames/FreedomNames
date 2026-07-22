@@ -3,10 +3,10 @@
 Scripts that verify the three capabilities that only exercise with real peers
 connected, and cannot be proven by unit tests or a single node:
 
-1. **Layer 1** — DHT record replication across independent nodes.
+1. **Self-certifying names** — DHT record replication across independent nodes.
 2. **Phase 3** — peer-to-peer content fetch (a node fetches a blob it never
    stored, via DHT provider records).
-3. **Layer 2** — a funded `claim` → `whois` cycle on a real BCH network,
+3. **Bare names** — a funded `claim` → `whois` cycle on a real BCH network,
    proving the pure-Go CashTokens transaction is accepted by real consensus.
 
 Legs 1 and 2 are **fully automated** (two nodes on one machine, isolated ports
@@ -18,11 +18,11 @@ control, so it walks you through funding and then runs and checks the claim.
 From the repo root:
 
 ```sh
-# automated legs only (Layer 1 + content):
+# automated legs only (self-certifying + content):
 scripts/verify-network/run-all.sh
 
-# also run the guided Layer 2 claim (chipnet, free faucet coins):
-scripts/verify-network/run-all.sh --with-l2
+# also run the guided bare-name claim (chipnet, free faucet coins):
+scripts/verify-network/run-all.sh --with-bare-names
 ```
 
 The harness builds the binary itself. Each leg brings up fresh nodes and tears
@@ -44,16 +44,16 @@ Each script is standalone; set `BIN` to a built binary:
 
 ```sh
 go build -o /tmp/freedom-names .
-BIN=/tmp/freedom-names scripts/verify-network/01-layer1-replication.sh
+BIN=/tmp/freedom-names scripts/verify-network/01-selfcert-replication.sh
 BIN=/tmp/freedom-names scripts/verify-network/02-content-fetch.sh
-BIN=/tmp/freedom-names scripts/verify-network/03-layer2-claim.sh [label]
+BIN=/tmp/freedom-names scripts/verify-network/03-barename-claim.sh [label]
 ```
 
-Run the Layer 2 leg on mainnet with real coins:
+Run the bare-name leg on mainnet with real coins:
 
 ```sh
 FREEDOM_BCH_NETWORK=mainnet BIN=/tmp/freedom-names \
-  scripts/verify-network/03-layer2-claim.sh myrealname
+  scripts/verify-network/03-barename-claim.sh myrealname
 ```
 
 ## Two real machines
@@ -69,7 +69,7 @@ extra concern there is firewalling: the bootstrap's libp2p port must be reachabl
 
 ## What a pass means for v1.0
 
-- **Leg 1 PASS**: names replicate — Layer 1 works across nodes.
+- **Leg 1 PASS**: names replicate — self-certifying names work across nodes.
 - **Leg 2 PASS**: content transfers peer-to-peer — Phase 3 works across nodes.
 - **Leg 3 PASS**: a real, funded claim was accepted by BCH consensus and
   resolves — the highest-risk unknown is closed.

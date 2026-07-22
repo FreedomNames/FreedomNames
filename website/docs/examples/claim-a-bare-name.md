@@ -72,7 +72,7 @@ a little BCH (or request another faucet payment) and retry.
 
 ## 5. Create the owner key for the name
 
-The bare name is bound to a normal Freedom Names owner key (the same kind Layer 1
+The bare name is bound to a normal Freedom Names owner key (the same kind self-certifying
 uses), so records work identically:
 
 ```sh
@@ -113,7 +113,7 @@ mysite.fn
 
 `whois` read the chain, found the earliest confirmed claim, walked the NFT to its
 current holder, and returned your owner key. The `self-certifying` line is the
-equivalent Layer 1 name that always points at the same records.
+equivalent self-certifying name that always points at the same records.
 
 ## 8. Publish records and resolve over DNS
 

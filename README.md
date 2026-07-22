@@ -3,17 +3,24 @@
 Decentralized DNS built on a libp2p Kademlia DHT, written in Go.
 
 Freedom Names lets anyone own a human-readable name and publish DNS-style records
-for it, with **no central authority**. It works in two layers:
+for it, with **no central authority**. There are two kinds of name:
 
-- **Layer 1**: self-certifying `label.<pubKeyID>.fn` names, owned by whoever
+- **Self-certifying names**: `label.<pubKeyID>.fn`, owned by whoever
   holds the matching Ed25519 keypair. Records are cryptographically signed, so
   nobody can overwrite a name they don't own, and **no consensus is needed**:
   the key *is* the name.
-- **Layer 2**: globally-unique *bare* names (`mysite.fn`, no key suffix). Here
+- **Bare names**: globally-unique short names (`mysite.fn`, no key suffix). Here
   a claim is a CashTokens NFT on **Bitcoin Cash**, and global uniqueness is
   settled by **BCH chain consensus** ("first confirmed claim wins").
 
-Alongside both layers, a node runs a **peer-to-peer content network** so a name
+Both give you a real name. A self-certifying name already carries a
+human-readable label you choose — it just also carries a key-derived suffix,
+which makes it long to share. Bare names drop the suffix, and *that* is what
+requires consensus. Note this is **not** a blockchain "layer 2": Bitcoin Cash
+scales on-chain and CashTokens are native on-chain primitives; Freedom Names
+only *reads* the chain to settle who owns a bare name.
+
+Alongside both, a node runs a **peer-to-peer content network** so a name
 can point at an actual page, not just DNS records. This is what lets Freedom
 Names back a decentralized-web browser such as LibreWeb, replacing IPFS.
 
@@ -33,7 +40,7 @@ key→name binding before accepting any update, and the newest record (highest
 sequence number) wins.
 
 Globally-unique *bare* names (`mysite.fn`, no key suffix) are handled by
-**Layer 2**: a claimed name is a CashTokens NFT on Bitcoin Cash, and its
+the **name registry**: a claimed name is a CashTokens NFT on Bitcoin Cash, and its
 uniqueness is enforced by BCH chain consensus. Resolvers all agree because they
 follow the same on-chain rule: the earliest *confirmed* valid claim wins (ties
 broken by smaller txid), and ownership can only move by a transaction that
@@ -66,7 +73,7 @@ skinparam partition {
 start
 :Open <b>melroy.fn</b>; <<#37474F>>
 if (Name carries a <pubKeyID> suffix?) then (no — bare name)
-  partition "Layer 2 — BCH registry" {
+  partition "Bare names — BCH registry" {
     :Find the earliest confirmed claim: the name is a CashTokens NFT; <<#12805F>>
     :Walk the NFT's custody chain to its current UTXO; <<#12805F>>
     :Live token commitment reveals the owner's public key; <<#12805F>>
@@ -74,7 +81,7 @@ if (Name carries a <pubKeyID> suffix?) then (no — bare name)
 else (yes — self-certifying)
   :Owner's public key is embedded in the name itself; <<#6D28D9>>
 endif
-partition "Layer 1 — DHT (naming)" {
+partition "Self-certifying — DHT (naming)" {
   :Derive the DHT key from the pubKeyID; <<#6D28D9>>
   :Fetch the signed record set (newest sequence wins); <<#6D28D9>>
   :Verify the signature against the owner's public key; <<#6D28D9>>
@@ -97,13 +104,13 @@ stop
 @enduml
 ```
 
-Layer 2 defaults to BCH **mainnet**, since bare names are a real,
+Bare names default to BCH **mainnet**, since they are a real,
 globally-unique namespace. A node reaches the chain through public
 Electrum/Fulcrum servers: it ships with a built-in bootstrap list per network
 and **fails over** between them, so no single server is a point of failure (and
-you can run your own, see below). Layer 1 works without any of this.
+you can run your own, see below). Self-certifying names work without any of this.
 
-To experiment first with free coins, point Layer 2 at a test network:
+To experiment first with free coins, point the registry at a test network:
 
 ```sh
 # chipnet (fast test network, faucet coins)
@@ -149,7 +156,7 @@ All configuration is via environment variables (nothing is hardcoded):
 | `FREEDOM_UPSTREAM_DNS` | `1.1.1.1:53` | Upstream resolver for non-`.fn` queries |
 | `FREEDOM_BOOTSTRAP` | (none) | Comma-separated bootstrap peer multiaddrs |
 | `FREEDOM_CONTENT_DIR` | `~/.freedom/content` | On-disk directory for the content-addressed blobstore |
-| `FREEDOM_BCH_NETWORK` | `mainnet` | BCH network for Layer 2: `mainnet`, `chipnet`, or `testnet4` |
+| `FREEDOM_BCH_NETWORK` | `mainnet` | BCH network for bare names: `mainnet`, `chipnet`, or `testnet4` |
 | `FREEDOM_BCH_ELECTRUM` | (built-in list per network) | Comma-separated Electrum/Fulcrum servers, tried in order with failover (`ssl://` or `tcp://`). Overrides the built-in bootstrap list |
 | `FREEDOM_BCH_MINCONF` | `1` | Confirmations required before a bare-name claim counts |
 
@@ -168,7 +175,7 @@ standard `:53`. Options:
 
 ## Managing names with the CLI
 
-### Layer 1: self-certifying names
+### Self-certifying names
 
 ```sh
 # Generate an owner keypair for a name
@@ -191,7 +198,7 @@ freedom lookup mysite.<pubKeyID>.fn --type A
 Keys and staged records live under `~/.freedom/keys/`. The node's own libp2p
 identity (`private.key`) is separate, so names are portable between nodes.
 
-### Layer 2: bare names on Bitcoin Cash
+### Bare names on Bitcoin Cash
 
 These commands talk **directly to an Electrum server** (no running node needed);
 they operate on a single-key BCH wallet at `~/.freedom/bch.key`. They default to
@@ -208,12 +215,12 @@ freedom claim mysite
 # plain wallet transfer moved it) so it resolves again
 freedom adopt mysite
 
-# Look up the on-chain owner of a bare name and its equivalent Layer 1 name
+# Look up the on-chain owner of a bare name and its equivalent self-certifying name
 freedom whois mysite.fn
 ```
 
 Once claimed, `mysite.fn` resolves through the same node/DNS/HTTP paths as a
-Layer 1 name; the node reads the owner straight from the BCH chain.
+self-certifying name; the node reads the owner straight from the BCH chain.
 
 **Privacy note:** any public Electrum server sees which bare names you resolve.
 For privacy (or guaranteed availability) run your own Fulcrum and point the node
