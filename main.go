@@ -139,7 +139,7 @@ func main() {
 		log.Printf("Content store at %s", cfg.ContentDir)
 	}
 
-	// The BCH registry (Layer 2) resolves globally-unique bare names via Bitcoin
+	// The BCH name registry resolves globally-unique bare names via Bitcoin
 	// Cash. When no electrum endpoint is configured it is left off, and bare
 	// names simply resolve to not-found; self-certifying names always work.
 	resolver := NewResolver(freedomDht, cache)

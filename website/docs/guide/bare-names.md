@@ -1,38 +1,61 @@
-# Layer 2: globally-unique bare names
+# Bare names
 
-Layer 1 gives every owner an unforgeable name, but it carries a key suffix
-(`mysite.<pubKeyID>.fn`). To offer clean, globally-unique **bare** names like
-`mysite.fn`, a decentralized network has to agree on *who owns `mysite`*. That
-needs consensus. Rather than build a new chain, Layer 2 leans on an existing
+A **bare name** is a short, fully human-readable name like `mysite.fn` — no key
+suffix, globally unique. Because there is no suffix to tell two claimants apart,
+a decentralized network has to agree on *who owns `mysite`*. That needs
+consensus. Rather than build a new chain, Freedom Names leans on an existing
 one: **Bitcoin Cash**.
 
+::: info Both mechanisms give you a name
+Self-certifying names already contain a human-readable label you choose —
+`mysite.<pubKeyID>.fn` is yours the moment you generate a keypair, with no
+registry, no consensus, and no coins. The catch is the key-derived suffix, which
+makes the name long and awkward to share.
+
+The name registry exists to offer the short version (`mysite.fn`). That
+shortness is exactly what requires consensus, which is why bare names need
+Bitcoin Cash and [self-certifying names](/guide/how-names-work) do not.
+:::
+
+::: warning Not a blockchain "layer 2"
+Freedom Names is **not** built on top of Bitcoin Cash the way a rollup or a
+payment channel is. BCH scales on-chain by design and CashTokens are native
+on-chain primitives — no second layer required.
+
+Nothing is settled off-chain: **resolving** a bare name only *reads* the chain,
+and registering or transferring one writes to it directly — `freedom claim` and
+`freedom adopt` broadcast ordinary BCH transactions (see [the on-chain
+protocol](#the-on-chain-protocol-fn-v1) below).
+:::
+
 ::: info Status
-Layer 2 is enabled by default on **mainnet**: a claimed name is a real,
+Bare names are enabled by default on **mainnet**: a claimed name is a real,
 tradeable CashTokens NFT. The node reads the chain through public
 Electrum/Fulcrum servers, using a built-in per-network bootstrap list with
 automatic failover. To experiment first, switch to a test network with
 `FREEDOM_BCH_NETWORK=chipnet` (or `testnet4` / `testnet3`) and use faucet coins.
-Self-certifying (Layer 1) names always resolve regardless.
+Self-certifying names always resolve regardless.
 :::
 
-## Why a second layer
+## Why a name registry
 
-Layer 1 (key-based records) has **no consensus** because self-certifying names
-cannot collide: `mysite.<aliceKey>.fn` and `mysite.<bobKey>.fn` are just
+Self-certifying names (key-based records) need **no consensus** because they
+cannot collide: `mysite.<aliceKey>.fn` and `mysite.<bobKey>.fn` are simply
 different names. The trade-off is the visible key suffix.
 
 A bare name has no suffix, so two people *can* both want `mysite`. Deciding who
-wins is a consensus problem. Layer 2 borrows Bitcoin Cash's consensus: the
+wins is a consensus problem. The registry borrows Bitcoin Cash's consensus: the
 first confirmed claim wins, and the claim is a **CashTokens NFT** you actually
 hold in your wallet.
 
 The node treats BCH as an **off-chain resolver**: it *reads* the chain to
-answer "who owns `mysite`?". Consensus stays entirely on BCH; Layer 1 stays
-pure-DHT.
+answer "who owns `mysite`?". Consensus stays entirely on BCH; the key layer
+stays pure-DHT.
 
 ## The seam in code
 
-Layer 1 does not depend on Layer 2. The whole boundary is one interface:
+The key layer does not depend on the registry. The whole boundary is one
+interface:
 
 ```go
 type NameRegistry interface {
@@ -42,13 +65,14 @@ type NameRegistry interface {
 
 - The resolver sends **self-certifying** names straight to the DHT.
 - For **bare** names it calls `ResolveOwner` to get the owner's public key,
-  derives the DHT key from it, and then follows the *exact same* Layer 1 path.
+  derives the DHT key from it, and then follows the *exact same* path as a
+  self-certifying name.
 
 `ResolveOwner` returns a **marshaled public key**, byte-identical to
 `FNRecord.PubKey`. So once the owner is known, resolution (derive DHT key, fetch
-signed record, validate, return records) is identical to Layer 1. **The record
-data never lives on-chain**; only the name-to-owner binding does. That keeps
-chain writes tiny and record edits free and instant.
+signed record, validate, return records) is identical to a self-certifying
+name. **The record data never lives on-chain**; only the name-to-owner binding
+does. That keeps chain writes tiny and record edits free and instant.
 
 ## The on-chain protocol (FN v1)
 
@@ -151,11 +175,11 @@ rejected outright; there is no punycode/IDNA mapping for Unicode names. The
 **same** function runs on the client (when claiming) and in every resolver, so
 a name means exactly one thing everywhere.
 
-## How the two layers compose
+## How the two compose
 
-A bare name always *also* resolves via its owner's Layer 1 records; Layer 2 only
-supplies the name-to-owner binding, and Layer 1 supplies the records. The two
-layers **compose rather than conflict**: `freedom whois mysite.fn` even prints
+A bare name always *also* resolves via its owner's signed DHT records; the registry only
+supplies the name-to-owner binding, and the DHT supplies the records. The two
+mechanisms **compose rather than conflict**: `freedom whois mysite.fn` even prints
 the equivalent self-certifying `mysite.<pubKeyID>.fn` name.
 
 ## Trying it on chipnet
@@ -168,7 +192,7 @@ network:
 ```sh
 export FREEDOM_BCH_NETWORK=chipnet
 
-freedom keygen mysite            # your Layer 1 owner key
+freedom keygen mysite            # your owner key
 freedom wallet                   # shows a bchtest: address to fund
 # fund that address from a chipnet faucet, then:
 freedom claim mysite             # mints the name NFT on-chain

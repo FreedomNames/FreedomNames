@@ -81,7 +81,7 @@ for the flow.
 
 IPFS gave LibreWeb content transport (add/get blocks) but not naming, and pulled
 in a large daemon. Freedom Names provides both naming (self-certifying and, via
-Layer 2, globally-unique bare names) and content transport in one small binary,
+the registry for globally-unique bare names) and content transport in one small binary,
 with the same content-addressing guarantee: a hash always yields exactly those
 bytes, or nothing.
 

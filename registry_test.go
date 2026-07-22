@@ -7,7 +7,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 )
 
-// mockRegistry maps bare names to owner pubkeys for testing the Layer 2 seam.
+// mockRegistry maps bare names to owner pubkeys for testing the registry seam.
 type mockRegistry struct {
 	owners map[string][]byte
 }
@@ -43,7 +43,7 @@ func TestBareNameResolvesViaRegistry(t *testing.T) {
 	cache, _ := NewMemoryCache()
 	priv := newTestKey(t)
 
-	// Publish the owner's record set (as Layer 1 would).
+	// Publish the owner's record set (as the key layer would).
 	rec, err := BuildAndSignRecord(priv, "mysite",
 		[]RR{{Type: "A", Value: "10.0.0.9", TTL: 300}}, 1)
 	if err != nil {

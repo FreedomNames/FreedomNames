@@ -10,7 +10,7 @@ node is entirely driven by its environment.
 | `FREEDOM_UPSTREAM_DNS` | `1.1.1.1:53` | Upstream resolver for non-`.fn` queries |
 | `FREEDOM_CONTENT_DIR` | `~/.freedom/content` | Content-addressed blobstore directory |
 | `FREEDOM_BOOTSTRAP` | *(none)* | Comma-separated bootstrap peer multiaddrs |
-| `FREEDOM_BCH_NETWORK` | `mainnet` | BCH network for Layer 2: `mainnet`, `chipnet`, `testnet4`, or `testnet3` |
+| `FREEDOM_BCH_NETWORK` | `mainnet` | BCH network for bare names: `mainnet`, `chipnet`, `testnet4`, or `testnet3` |
 | `FREEDOM_BCH_ELECTRUM` | *(built-in list per network)* | Comma-separated Electrum/Fulcrum servers, tried in order with failover (`ssl://host:port`). Overrides the built-in bootstrap list |
 | `FREEDOM_BCH_MINCONF` | `1` | Confirmations before a name claim counts |
 | `FREEDOM_CONTENT_REPLICAS` | `3` | Copies pushed to other nodes per publish (target holders = this + 1) |
@@ -39,13 +39,13 @@ only the bind host and keeps the port of the current HTTP address (the
 `FREEDOM_HTTP_ADDR`/`--http-addr` value, `8420` if that has no port). See
 [embedding a node](/guide/embedding).
 
-The `FREEDOM_BCH_*` variables drive [Layer 2](/guide/layer2) (globally-unique
+The `FREEDOM_BCH_*` variables drive [bare names](/guide/bare-names) (globally-unique
 bare names on Bitcoin Cash), which is on by default on **mainnet**. The node
 reaches the chain through a built-in per-network list of public Electrum Cash
 (Fulcrum) servers, trying them in order with **failover**. Set
 `FREEDOM_BCH_NETWORK` to a test network (`chipnet`, `testnet4`, `testnet3`) to
 experiment with faucet coins, or `FREEDOM_BCH_ELECTRUM` to a comma-separated list
-of your own servers. Layer 1 names always resolve regardless of these settings.
+of your own servers. Self-certifying names always resolve regardless of these settings.
 
 The DNS server defaults to the high port **`:8053`**, so a node runs **without
 root**. If the DNS port can't be bound, the node logs a warning and keeps running;

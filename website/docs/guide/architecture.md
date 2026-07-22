@@ -53,7 +53,7 @@ how a name is looked up.
 
 For a self-certifying name (`label.<pubKeyID>.fn`), the resolver derives the DHT
 key directly from the `<pubKeyID>` suffix. For a bare name (`mysite.fn`), it
-routes through the optional Layer 2 registry to find the owner's public key first
+routes through the optional name registry to find the owner's public key first
 (see below).
 
 ## The validator
@@ -75,10 +75,10 @@ winner: highest sequence number, then latest `eol`, then the larger raw bytes.
 Because every node runs this same logic, a forged or stale record can't
 propagate.
 
-## The Layer 1 / Layer 2 seam
+## The key-layer / registry seam
 
-Layer 1 (self-certifying names) has **no consensus** and no external dependencies.
-Layer 2 (globally-unique bare names) is bolted on through a single interface:
+Self-certifying names have **no consensus** and no external dependencies.
+The registry (globally-unique bare names) is bolted on through a single interface:
 
 ```go
 type NameRegistry interface {
@@ -89,14 +89,14 @@ type NameRegistry interface {
 - The resolver sends self-certifying names straight to the DHT.
 - For bare names it calls `ResolveOwner`, gets back a **marshaled public key**
   (byte-identical to `FNRecord.PubKey`), derives the DHT key from it, and then
-  follows the *exact same* Layer 1 path (fetch → validate → return records).
+  follows the *exact same* path (fetch → validate → return records).
 
 The BCH-backed registry is wired in whenever an Electrum endpoint is configured
 — the default on every known network — so bare-name lookups work out of the box.
 On a network with no Electrum servers the registry is simply absent and bare
 names resolve to not-found; self-certifying resolution is unaffected either way.
 Crucially, **record data never lives on-chain**; only the name→owner binding
-does. Read the full design in [Layer 2](/guide/layer2).
+does. Read the full design in [Bare names](/guide/bare-names).
 
 ## Portability
 

@@ -139,14 +139,14 @@ freedom lookup mysite.<pubKeyID>.fn
 freedom lookup mysite.<pubKeyID>.fn --type A
 ```
 
-## Bare names on Bitcoin Cash (Layer 2)
+## Bare names on Bitcoin Cash
 
 These commands register globally-unique bare names (`mysite.fn`, no key suffix)
 on Bitcoin Cash. They talk directly to an Electrum server and do **not** need a
 running node. They default to **mainnet**; set `FREEDOM_BCH_NETWORK=chipnet` (or
 `testnet4` / `testnet3`) to rehearse for free with faucet coins. Servers come
 from a built-in per-network list with failover unless you override
-`FREEDOM_BCH_ELECTRUM`. See [Layer 2](/guide/layer2) for the full protocol.
+`FREEDOM_BCH_ELECTRUM`. See [Bare names](/guide/bare-names) for the full protocol.
 
 ### `freedom wallet`
 
@@ -176,7 +176,7 @@ self-certifying `<label>.<pubKeyID>.fn` name.
 | --- | --- |
 | `~/.freedom/keys/<label>.key` | the owner private key for a name |
 | `~/.freedom/keys/<label>.records.json` | staged records awaiting publish |
-| `~/.freedom/bch.key` | the BCH wallet key (funds Layer 2 claims) |
+| `~/.freedom/bch.key` | the BCH wallet key (funds bare-name claims) |
 
 The node's own libp2p identity (`private.key`) is **separate**, so your names are
 portable between nodes.

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Layer 1: a name published on node A must resolve on node B via the DHT.
+# Self-certifying names: a name published on node A must resolve on node B via the DHT.
 # Two nodes on this one machine, different ports and HOME dirs, peered over
-# loopback. Proves cross-node record replication (issue #1, Layer 1 leg).
+# loopback. Proves cross-node record replication (issue #1, self-certifying leg).
 #
 # Usage: run via run-all.sh, or standalone after building the binary:
-#   BIN=./freedom-names scripts/verify-network/01-layer1-replication.sh
+#   BIN=./freedom-names scripts/verify-network/01-selfcert-replication.sh
 
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -20,7 +20,7 @@ API_B="http://127.0.0.1:8421"
 
 trap cleanup_nodes EXIT
 
-step "Layer 1: start bootstrap node A"
+step "Self-certifying: start bootstrap node A"
 # Node A is the bootstrap so B has a known peer to dial.
 ( cd "$WORKDIR" && env HOME="$HOME_A" \
     FREEDOM_HTTP_ADDR=127.0.0.1:8420 FREEDOM_DNS_ADDR=127.0.0.1:8053 \
@@ -33,7 +33,7 @@ MADDR=$(bootstrap_multiaddr "$API_A")
 [ -n "$MADDR" ] || fail "could not read node A's LAN multiaddr from /info"
 info "bootstrap multiaddr: $MADDR"
 
-step "Layer 1: start client node B, peered to A"
+step "Self-certifying: start client node B, peered to A"
 start_node "$WORKDIR/node-b.log" \
   HOME="$HOME_B" \
   FREEDOM_BOOTSTRAP="$MADDR" \
@@ -42,14 +42,14 @@ start_node "$WORKDIR/node-b.log" \
 wait_http "$API_B/health" 30 || fail "node B did not come up (see $WORKDIR/node-b.log)"
 pass "node B healthy"
 
-step "Layer 1: wait for the DHT routing tables to converge"
+step "Self-certifying: wait for the DHT routing tables to converge"
 if wait_peers "$API_B" 60; then
   pass "node B sees at least one peer"
 else
   fail "node B never populated its routing table (check firewall / logs)"
 fi
 
-step "Layer 1: publish on B, resolve on A"
+step "Self-certifying: publish on B, resolve on A"
 LABEL="lantest$RANDOM"
 env HOME="$HOME_B" "$BIN" freedom keygen "$LABEL" >/dev/null
 env HOME="$HOME_B" "$BIN" freedom set "$LABEL" A 203.0.113.7 >/dev/null
@@ -71,5 +71,5 @@ else
   fail "node A could not resolve the name. Response: $GOT"
 fi
 
-step "Layer 1: DONE"
+step "Self-certifying: DONE"
 info "workdir kept at $WORKDIR (logs, keys)"

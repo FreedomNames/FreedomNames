@@ -18,8 +18,8 @@ type Config struct {
 	Bootstrap   []string // bootstrap peer multiaddrs
 	ContentDir  string   // content-addressed blobstore directory
 
-	// Layer 2 (BCH registry for globally-unique bare names).
-	BCHElectrum []string // electrum servers, tried in order with failover (empty disables L2)
+	// BCH name registry for globally-unique bare names.
+	BCHElectrum []string // electrum servers, tried in order with failover (empty disables bare names)
 	BCHNetwork  string   // "mainnet" | "chipnet" | "testnet4" | "testnet3"
 	BCHMinConf  int64    // confirmations required for a claim to count
 
@@ -168,7 +168,7 @@ func envInt(key string, fallback int) int {
 
 // Built-in Electrum/Fulcrum bootstrap servers, one list per BCH network. The
 // client (electrum.go) tries them in order and fails over, so a single dead
-// server never takes Layer 2 down, fitting for a decentralized namespace.
+// server never takes the registry down, fitting for a decentralized namespace.
 // Sourced from Electron Cash's public server lists (SSL endpoints only; .onion
 // servers are omitted since we dial plain TLS, not Tor).
 //
@@ -205,7 +205,7 @@ var (
 )
 
 // defaultBCHElectrumServers returns the built-in Electrum bootstrap list for a
-// network. An unknown network yields an empty list (Layer 2 disabled) rather
+// network. An unknown network yields an empty list (registry disabled) rather
 // than silently pointing at the wrong chain.
 func defaultBCHElectrumServers(network string) []string {
 	switch network {
