@@ -117,7 +117,7 @@ export default defineConfig({
 
     footer: {
       message: 'Released under the AGPL-3.0 License.',
-      copyright: 'Freedom Names. No registrars. Cryptographic ownership.',
+      copyright: 'Copyright © Melroy van den Berg',
     },
   },
 })
