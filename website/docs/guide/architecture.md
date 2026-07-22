@@ -38,7 +38,10 @@ Running `./freedom-names` starts all of these at once:
   DHT rather than on-chain.
 
 A **bootstrap** node (`./freedom-names bootstrap`) is a server-mode peer that others
-connect to in order to join the network.
+connect to in order to join the network. It listens on fixed p2p ports
+(`4020`/`4021`/`4022`), serves its HTTP API on `8430` rather than `8420` (so it
+can coexist with a normal node on one machine), and runs no DNS server: it is a
+rendezvous point for peers, not a resolver for local clients.
 
 ## The resolver and cache
 
@@ -89,8 +92,9 @@ type NameRegistry interface {
   (byte-identical to `FNRecord.PubKey`), derives the DHT key from it, and then
   follows the *exact same* path (fetch → validate → return records).
 
-The BCH-backed registry is wired in whenever an Electrum endpoint is configured
-— the default on every known network — so bare-name lookups work out of the box.
+The BCH-backed registry is wired in whenever an Electrum endpoint is configured,
+which is the default on every known network, so bare-name lookups work out of
+the box.
 On a network with no Electrum servers the registry is simply absent and bare
 names resolve to not-found; self-certifying resolution is unaffected either way.
 Crucially, **record data never lives on-chain**; only the name→owner binding

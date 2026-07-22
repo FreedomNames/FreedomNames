@@ -162,6 +162,11 @@ Run a **bootstrap** (server) node that others can connect to:
 ./freedom-names bootstrap
 ```
 
+A bootstrap node uses fixed p2p ports (`4020`/`4021`/`4022`), serves its HTTP API
+on `127.0.0.1:8430` instead of `8420`, and starts no DNS server. The different
+API port lets it run alongside a normal node on the same machine; both are still
+overridable via `FREEDOM_HTTP_ADDR`.
+
 Nearby nodes discover each other with mDNS. There is no default public
 bootstrap peer yet; set `FREEDOM_BOOTSTRAP` to connect across networks.
 
@@ -171,7 +176,7 @@ All configuration is via environment variables (nothing is hardcoded):
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `FREEDOM_HTTP_ADDR` | `127.0.0.1:8420` | HTTP API listen address (loopback by default) |
+| `FREEDOM_HTTP_ADDR` | `127.0.0.1:8420` (bootstrap: `127.0.0.1:8430`) | HTTP API listen address (loopback by default) |
 | `FREEDOM_DNS_ADDR` | `:8053` | DNS server listen address |
 | `FREEDOM_UPSTREAM_DNS` | `1.1.1.1:53` | Upstream resolver for non-`.fn` queries |
 | `FREEDOM_BOOTSTRAP` | (none) | Comma-separated bootstrap peer multiaddrs |

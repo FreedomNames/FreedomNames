@@ -44,11 +44,27 @@ curl http://127.0.0.1:8420/health
 ```
 
 ```json
-{ "status": "ok", "version": "<version>", "ready": true }
+{ "status": "ok", "version": "<version>", "ready": true, "role": "node" }
 ```
 
 `version` lets the host confirm it launched the build it shipped; `ready` becomes
 true once the DHT and host are initialized.
+
+`role` tells the host **what kind of node answered**: `node` for a normal node,
+`bootstrap` for a bootstrap node. Probe `/health` on the port you are about to
+use before spawning:
+
+- **No response**: nothing is there; start your node.
+- **`role: "node"`**: a normal node is already running. Adopt it if you want to
+  share, but remember you did not start it, so do not stop it on exit.
+- **`role: "bootstrap"`**: do not adopt it; a bootstrap node runs no DNS and is
+  not a general-purpose node. (Bootstrap nodes default to `8430`, so this only
+  happens if one was deliberately pointed at your port.)
+- **No `role` field**: a node older than 0.8.4. Treat it as a normal node.
+
+Probe `/health`, not `/info`: `/info` returns `500` until the DHT is initialized,
+so a still-starting node would look like no node at all, and you would start a
+second one. `role` is always present on `/health`, even while `ready` is `false`.
 
 ## Loading a page
 

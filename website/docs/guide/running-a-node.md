@@ -67,6 +67,12 @@ discover the network:
 ./freedom-names bootstrap
 ```
 
+It uses fixed p2p ports (`4020`/`4021`/`4022`), serves its HTTP API on
+`127.0.0.1:8430` instead of `8420`, and starts no DNS server. The different API
+port means a bootstrap node and a normal node can run on the same machine
+without either failing to bind. See
+[Run a bootstrap node](/examples/bootstrap-node) for the full walkthrough.
+
 Point other Freedom Names instances at it with the `FREEDOM_BOOTSTRAP`
 environment variable (a comma-separated list of multiaddrs). See
 [Configuration](/guide/configuration).

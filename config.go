@@ -18,6 +18,14 @@ type Config struct {
 	Bootstrap   []string // bootstrap peer multiaddrs
 	ContentDir  string   // content-addressed blobstore directory
 
+	// BootstrapMode reports whether this process runs as a bootstrap node
+	// (`freedom-names bootstrap`): fixed p2p ports, DHT server mode, an HTTP
+	// API on 8430 and no DNS server. Resolved once in main() and read
+	// everywhere else, so the `bootstrap` positional is parsed in exactly one
+	// place. Not to be confused with Bootstrap above, which is the list of
+	// peers *this* node dials to join the network.
+	BootstrapMode bool
+
 	// BCH name registry for globally-unique bare names.
 	BCHElectrum []string // electrum servers, tried in order with failover (empty disables bare names)
 	BCHNetwork  string   // "mainnet" | "chipnet" | "testnet4" | "testnet3"
@@ -41,14 +49,39 @@ var defaultBootstrapPeers = []string{
 	// "/dnsaddr/bootstrap.freedom-names.example/p2p/12D3Koo...",
 }
 
-// LoadConfig reads configuration from the environment with defaults.
+// defaultHTTPAddr is the HTTP API address a node uses when FREEDOM_HTTP_ADDR is
+// unset. A bootstrap node defaults to a different port so it can run alongside a
+// normal node (notably one spawned by LibreWeb) without either failing to bind.
+// Both remain overridable via FREEDOM_HTTP_ADDR / --http-addr.
+func defaultHTTPAddr(bootstrapMode bool) string {
+	if bootstrapMode {
+		return "127.0.0.1:8430"
+	}
+	return "127.0.0.1:8420"
+}
+
+// LoadConfig reads configuration from the environment with defaults, for a
+// normal (non-bootstrap) node. CLI paths that never run a node use this.
 func LoadConfig() *Config {
+	return LoadConfigForRole(false)
+}
+
+// LoadConfigForRole reads configuration from the environment with defaults,
+// choosing role-dependent defaults for a bootstrap node.
+//
+// The role must be passed in rather than patched onto the returned Config:
+// envOr cannot distinguish "unset" from "set to the default value", so
+// overwriting HTTPAddr afterwards would silently clobber an explicit
+// FREEDOM_HTTP_ADDR. Passing the fallback in leaves the env -> flag precedence
+// chain (see applyNodeFlags) intact.
+func LoadConfigForRole(bootstrapMode bool) *Config {
 	cfg := &Config{
+		BootstrapMode: bootstrapMode,
 		// Bind the HTTP API to loopback by default: it is an unauthenticated
 		// local control surface (a browser spawns the node), so it must not be
 		// exposed on all interfaces. Override with FREEDOM_HTTP_ADDR=:8420 to
 		// share it on a LAN deliberately.
-		HTTPAddr: envOr("FREEDOM_HTTP_ADDR", "127.0.0.1:8420"),
+		HTTPAddr: envOr("FREEDOM_HTTP_ADDR", defaultHTTPAddr(bootstrapMode)),
 		// Default to the high port :8053 so nodes run without root. (We avoid
 		// :5353, which collides with mDNS/avahi on most desktops.) Set
 		// FREEDOM_DNS_ADDR=:53 (with setcap or a :53->:8053 forwarder) for

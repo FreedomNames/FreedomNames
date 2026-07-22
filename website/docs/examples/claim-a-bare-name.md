@@ -163,7 +163,7 @@ runs `adopt`, the name still resolves to the previous owner's records.
   A not-found answer is also cached for 30 seconds, so retry shortly after the
   confirmation lands.
 - **`all N electrum endpoints failed`**: every server in the list is currently
-  unreachable. This is transient — the failure is not cached, so the next
+  unreachable. This is transient: the failure is not cached, so the next
   lookup retries the whole list. `freedom wallet` still prints your address but
   shows `Balance: unavailable`.
 - **`adopt` says `this wallet does not hold the ... name NFT`**: the NFT has not

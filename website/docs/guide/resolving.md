@@ -31,7 +31,7 @@ This is what makes a Freedom Names node usable as your **only** resolver: it add
   record also answers `A` and `AAAA` queries (per RFC 1034), so CNAME-only
   names stay reachable through normal clients.
 - A name that doesn't exist returns **NXDOMAIN**.
-- A lookup that times out (a slow DHT walk) returns **SERVFAIL** instead —
+- A lookup that times out (a slow DHT walk) returns **SERVFAIL** instead:
   that's transient, so retrying can succeed where NXDOMAIN won't.
 
 ## Use it as your system resolver

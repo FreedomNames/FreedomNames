@@ -1,13 +1,13 @@
 # Bare names
 
-A **bare name** is a short, fully human-readable name like `mysite.fn` — no key
+A **bare name** is a short, fully human-readable name like `mysite.fn`, with no key
 suffix, globally unique. Because there is no suffix to tell two claimants apart,
 a decentralized network has to agree on *who owns `mysite`*. That needs
 consensus. Rather than build a new chain, Freedom Names leans on an existing
 one: **Bitcoin Cash**.
 
 ::: info Both mechanisms give you a name
-Self-certifying names already contain a human-readable label you choose —
+Self-certifying names already contain a human-readable label you choose,
 `mysite.<pubKeyID>.fn` is yours the moment you generate a keypair, with no
 registry, no consensus, and no coins. The catch is the key-derived suffix, which
 makes the name long and awkward to share.
@@ -20,10 +20,10 @@ Bitcoin Cash and [self-certifying names](/guide/how-names-work) do not.
 ::: warning Not a blockchain "layer 2"
 Freedom Names is **not** built on top of Bitcoin Cash the way a rollup or a
 payment channel is. BCH scales on-chain by design and CashTokens are native
-on-chain primitives — no second layer required.
+on-chain primitives, with no second layer required.
 
 Nothing is settled off-chain: **resolving** a bare name only *reads* the chain,
-and registering or transferring one writes to it directly — `freedom claim` and
+and registering or transferring one writes to it directly: `freedom claim` and
 `freedom adopt` broadcast ordinary BCH transactions (see [the on-chain
 protocol](#the-on-chain-protocol-fn-v1) below).
 :::
@@ -83,13 +83,13 @@ identified by a tag in an `OP_RETURN` output:
 
 1. **mints a mutable NFT** whose commitment is `hash160(ownerPubKey)`, sent to
    your own address as a 1000-sat output. This NFT *is* the name deed. The mint
-   must spend a coin at output index 0 (the CashTokens genesis rule — see the
+   must spend a coin at output index 0 (the CashTokens genesis rule; see the
    [walkthrough](/examples/claim-a-bare-name) if `claim` reports "no eligible
    genesis UTXO").
 2. carries `OP_RETURN FN01 <name> <ownerPubKey>`, revealing the full Ed25519
    owner key the commitment hashes.
 3. pays a small **dust marker** (546 sat) to a standard P2PKH address whose
-   pubkey hash is `hash160("FN:" + name)` — a hash with no known key, so the
+   pubkey hash is `hash160("FN:" + name)`, a hash with no known key, so the
    dust is effectively unspendable. Every claim/rebind pays this same marker, so
    all activity for a name is discoverable with a single query, and the locked
    dust is a tiny anti-spam registration cost.
@@ -124,7 +124,7 @@ A few consequences of the commitment-match rule:
 - A **plain wallet transfer** leaves the commitment unchanged, so the name keeps
   resolving to the previous owner's key until the new holder runs
   `freedom adopt`. If the live commitment matches **no** revealed key, the name
-  simply has no resolvable owner — there is no fallback binding.
+  simply has no resolvable owner: there is no fallback binding.
 - That absence of a fallback is what makes hijacking impossible: a pubkey only
   becomes authoritative by matching the live NFT commitment, so a stranger who
   merely pays the marker dust and posts an `FN02` without holding the NFT can
@@ -162,7 +162,7 @@ Two things you can override:
 ::: warning Privacy
 Any public Electrum server sees which bare names you resolve. For privacy or
 guaranteed availability, run your own Fulcrum and set `FREEDOM_BCH_ELECTRUM` to
-point at it. It must speak Electrum protocol **1.5 or newer** — the version
+point at it. It must speak Electrum protocol **1.5 or newer**: the version
 that added CashTokens data, which claims and resolution depend on.
 :::
 
@@ -170,7 +170,7 @@ that added CashTokens data, which claims and resolution depend on.
 
 Names are normalized before use: lowercased, restricted to `[a-z0-9-]` with no
 leading or trailing `-` and a length of 1 to 63. A bare name cannot contain
-dots, and anything outside that charset — including non-ASCII names — is
+dots, and anything outside that charset (including non-ASCII names) is
 rejected outright; there is no punycode/IDNA mapping for Unicode names. The
 **same** function runs on the client (when claiming) and in every resolver, so
 a name means exactly one thing everywhere.

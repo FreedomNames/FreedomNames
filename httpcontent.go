@@ -159,13 +159,19 @@ func writeContentFetchError(w http.ResponseWriter, hash string, err error) {
 
 // HealthHandler is a stable liveness + version endpoint LibreWeb polls to
 // confirm the spawned node is up and is the expected build.
-func HealthHandler(freedomDht FreedomDHT) http.HandlerFunc {
+//
+// role ("node" or "bootstrap") is always present, including while ready is
+// still false. That guarantee is load-bearing: /info 500s until the DHT is
+// initialized, so a spawning host that probed /info could read a starting
+// bootstrap node as "nothing here" and double-spawn. /health always answers.
+func HealthHandler(freedomDht FreedomDHT, role string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
 			"status":  "ok",
 			"version": nodeVersion,
 			"ready":   freedomDht.IsInitialized(),
+			"role":    role,
 		})
 	}
 }

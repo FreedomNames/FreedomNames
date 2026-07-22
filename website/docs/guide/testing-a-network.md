@@ -20,14 +20,20 @@ On the machine that will host the network, run a **bootstrap** node:
 
 Note its LAN multiaddr from the startup log, e.g.
 `/ip4/192.168.1.10/tcp/4020/p2p/12D3KooW...` (or fetch the peer id with
-`curl -s localhost:8420/info`).
+`curl -s localhost:8430/info`; a bootstrap node serves its API on `8430`).
 
-On the second machine (or a second terminal with different ports), point a
-client at it:
+On the second machine, point a client at it:
 
 ```sh
 FREEDOM_BOOTSTRAP="/ip4/192.168.1.10/tcp/4020/p2p/12D3KooW..." \
-FREEDOM_HTTP_ADDR="127.0.0.1:8421" \
+./freedom-names
+```
+
+On a **second terminal on the same machine**, the client's API port is already
+free (the bootstrap uses `8430`), but its DNS port is not, so override that one:
+
+```sh
+FREEDOM_BOOTSTRAP="/ip4/192.168.1.10/tcp/4020/p2p/12D3KooW..." \
 FREEDOM_DNS_ADDR="127.0.0.1:8054" \
 ./freedom-names
 ```
@@ -36,8 +42,8 @@ Wait ~10-30 seconds, then confirm the DHT routing tables have populated (not jus
 a raw connection):
 
 ```sh
-curl -s localhost:8420/peers   # bootstrap
-curl -s localhost:8421/peers   # client
+curl -s localhost:8430/peers   # bootstrap
+curl -s localhost:8420/peers   # client
 ```
 
 The client's `peers` array should list the bootstrap. (A client behind NAT is
@@ -52,11 +58,11 @@ Publish a name on one node, resolve it on the other:
 # on the client
 ./freedom-names freedom keygen lantest
 ./freedom-names freedom set lantest A 203.0.113.7
-./freedom-names freedom publish lantest --api http://localhost:8421
+./freedom-names freedom publish lantest --api http://localhost:8420
 
 # on the bootstrap (separate node, separate cache)
 NAME=$(./freedom-names freedom name lantest)   # or copy it from the client
-./freedom-names freedom lookup "$NAME" --api http://localhost:8420
+./freedom-names freedom lookup "$NAME" --api http://localhost:8430
 dig @127.0.0.1 -p 8053 "$NAME" A
 ```
 
@@ -90,11 +96,11 @@ Put content on one node, fetch it from another that does not have it locally:
 ```sh
 # on the client: publish a page
 echo "# hello from the client" > page.md
-./freedom-names freedom put lantest ./page.md --api http://localhost:8421
+./freedom-names freedom put lantest ./page.md --api http://localhost:8420
 
 # on the bootstrap: fetch the content hash it has never seen
 HASH=<the hash freedom put printed>
-curl "http://localhost:8420/content?hash=$HASH"
+curl "http://localhost:8430/content?hash=$HASH"
 ```
 
 Success: the bootstrap returns the exact bytes. Under the hood it asked the DHT
@@ -104,7 +110,7 @@ its hash.
 You can also test the full page-load path once the name has replicated:
 
 ```sh
-curl "http://localhost:8420/resolve-content?name=$NAME"
+curl "http://localhost:8430/resolve-content?name=$NAME"
 ```
 
 ## Troubleshooting

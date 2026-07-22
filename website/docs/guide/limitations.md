@@ -52,7 +52,7 @@ public bootstrap exists, off-LAN discovery is manual.
   transferred many times walks the custody chain hop by hop over a single
   connection. It is bounded (64 hops) and cached (5 min), but a heavily-traded
   name is slower to resolve than a fresh one. Past 64 hops the walk stops
-  *silently* and answers with the last owner it reached — an extremely traded
+  *silently* and answers with the last owner it reached, an extremely traded
   name can resolve to a stale owner rather than an error.
 
 ## Content layer scope
@@ -65,20 +65,20 @@ public bootstrap exists, off-LAN discovery is manual.
   Cross-file deduplication only happens when chunk bytes align exactly.
 - **Hosting is bounded, owned content is not.** Hosted (other people's) content
   is capped by `FREEDOM_CONTENT_HOST_BUDGET` with LRU eviction and a TTL, but
-  content you published yourself is never evicted or size-capped locally —
+  content you published yourself is never evicted or size-capped locally;
   publishing a lot means hosting a lot yourself. That includes superseded
   versions: publishing an update is a new set with a new hash, and the old one
   stays owned (and pinned) until its blobs are removed by hand.
 - **The index sidecar is trusting.** The hosting ledger is a plain
   `index.json` next to the blobs. If it is deleted or corrupted it is silently
-  rebuilt from the blobs on disk — and every set, *including your own
+  rebuilt from the blobs on disk, and every set, *including your own
   published content*, comes back as hosted (evictable). Re-publish to restore
   owned status.
 - **Replication is best-effort, not guaranteed.** A publish pushes copies to 3
   peers and holders heal the count hourly, but there is no admission guarantee:
   on a small network, or if the closest peers are full or offline, fewer
   replicas may exist. If every holder of a set goes offline at once, the
-  content is unreachable until one returns — the healing loop then restores
+  content is unreachable until one returns; the healing loop then restores
   the replica count from whichever holder survives.
 - **Replicas trust their placement.** Any peer can push content within your
   budget; there is no per-peer quota yet (the pusher's peer ID is recorded for
@@ -98,7 +98,7 @@ public bootstrap exists, off-LAN discovery is manual.
   chain claim. A friendlier human-alias layer is future work.
 - **Record sets have no size cap.** Validation checks each record's type and
   value (and content stays out of the DHT entirely), but nothing limits how
-  many resource records one name carries — restraint is left to the publisher.
+  many resource records one name carries; restraint is left to the publisher.
 
 ## Operational notes
 

@@ -84,7 +84,8 @@ const nodeUsage = `freedom-names - decentralized naming (.fn) node
 
 Usage:
   freedom-names [flags]            Run a node (DHT peer + DNS + HTTP API)
-  freedom-names bootstrap          Run a bootstrap node (fixed ports, no DNS/API)
+  freedom-names bootstrap          Run a bootstrap node (fixed p2p ports, DHT
+                                   server mode, HTTP API on :8430, no DNS)
   freedom-names freedom <command>  Manage names (see: freedom-names freedom help)
 
 Flags:
@@ -118,7 +119,13 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cfg := LoadConfig()
+	// Resolve the bootstrap role once, here: it is the only place the bare
+	// `bootstrap` positional is parsed. It picks role-dependent config defaults
+	// (so it must be known before the config load), and is then carried on cfg
+	// for the DHT setup, the DNS gate and the /health + /info role field.
+	bootstrapMode := len(os.Args) > 1 && os.Args[1] == "bootstrap"
+
+	cfg := LoadConfigForRole(bootstrapMode)
 	applyNodeFlags(cfg, os.Args[1:]) // flags override env for a spawned node
 
 	freedomDht := NewNode(ctx, cfg)
@@ -154,20 +161,29 @@ func main() {
 	// Start the DNS server (resolves .fn, forwards everything else upstream).
 	// A bind failure (e.g. :53 needs privileges) is non-fatal: the DHT and HTTP
 	// API are the core, and DNS is one optional resolution surface.
-	dnsServer := NewDNSServer(cfg.DNSAddr, cfg.UpstreamDNS, resolver)
-	if err := dnsServer.Start(); err != nil {
-		log.Printf("WARNING: DNS server disabled (DHT and HTTP API still running): %v", err)
-		switch {
-		case isPrivilegedPortErr(err):
-			log.Printf("  %s is a privileged port. Use the default high port, or", cfg.DNSAddr)
-			log.Printf("  grant the capability once: sudo setcap cap_net_bind_service=+ep ./freedom-names")
-		case isAddrInUseErr(err):
-			log.Printf("  %s is already in use. Set FREEDOM_DNS_ADDR to a free port, e.g. FREEDOM_DNS_ADDR=:8054", cfg.DNSAddr)
-		}
+	//
+	// A bootstrap node runs no DNS server at all. It is a rendezvous peer for
+	// others joining the network, not a resolver for local clients: nothing
+	// should point a stub resolver at it, and a forwarding listener is an open
+	// resolver surface that has no business on a public server.
+	if cfg.BootstrapMode {
+		log.Println("Bootstrap node: DNS server not started")
 	} else {
-		defer dnsServer.Shutdown()
+		dnsServer := NewDNSServer(cfg.DNSAddr, cfg.UpstreamDNS, resolver)
+		if err := dnsServer.Start(); err != nil {
+			log.Printf("WARNING: DNS server disabled (DHT and HTTP API still running): %v", err)
+			switch {
+			case isPrivilegedPortErr(err):
+				log.Printf("  %s is a privileged port. Use the default high port, or", cfg.DNSAddr)
+				log.Printf("  grant the capability once: sudo setcap cap_net_bind_service=+ep ./freedom-names")
+			case isAddrInUseErr(err):
+				log.Printf("  %s is already in use. Set FREEDOM_DNS_ADDR to a free port, e.g. FREEDOM_DNS_ADDR=:8054", cfg.DNSAddr)
+			}
+		} else {
+			defer dnsServer.Shutdown()
+		}
 	}
 
 	// StartHTTPServer blocks until interrupted.
-	StartHTTPServer(freedomDht, resolver, cache, content, cfg.HTTPAddr)
+	StartHTTPServer(freedomDht, resolver, cache, content, cfg.HTTPAddr, cfg.BootstrapMode)
 }
