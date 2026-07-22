@@ -7,12 +7,6 @@ several machines, stand up at least one.
 ## Start it
 
 ```sh
-go run . bootstrap
-```
-
-Or from the built binary:
-
-```sh
 ./freedom-names bootstrap
 ```
 
@@ -59,14 +53,14 @@ On each other node, set `FREEDOM_BOOTSTRAP` to a comma-separated list of bootstr
 multiaddrs:
 
 ```sh
-FREEDOM_BOOTSTRAP="/ip4/203.0.113.10/tcp/4020/p2p/<peerID>" go run .
+FREEDOM_BOOTSTRAP="/ip4/203.0.113.10/tcp/4020/p2p/<peerID>" ./freedom-names
 ```
 
 You can list several for redundancy:
 
 ```sh
 FREEDOM_BOOTSTRAP="/ip4/203.0.113.10/tcp/4020/p2p/<id1>,/ip4/203.0.113.11/tcp/4020/p2p/<id2>" \
-go run .
+./freedom-names
 ```
 
 ## Verify they connected

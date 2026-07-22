@@ -7,13 +7,10 @@ it end to end. It costs nothing real: chipnet coins come free from a faucet.
 By the end you will have minted a real CashTokens NFT that *is* your name, and
 watched `mysite.fn` resolve through the chain.
 
-## 1. Build the binary
+## 1. Download Freedom Names
 
-```sh
-git clone https://gitlab.melroy.org/freedom-names/freedom-names.git
-cd freedom-names
-go build -o freedom-names .
-```
+Download and extract the prebuilt package for your platform by following [Run
+Freedom Names](/guide/running-a-node#download-a-release).
 
 ## 2. Point at chipnet
 

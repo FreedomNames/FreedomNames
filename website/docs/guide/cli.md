@@ -4,12 +4,10 @@ The `freedom` CLI generates keys, stages records, publishes them to a running
 node, and resolves names. Keys and staged records live under
 `~/.freedom/keys/`.
 
-Invoke it via the built binary or during development with `go run .`:
+Invoke it through the downloaded binary:
 
 ```sh
 ./freedom-names freedom keygen mysite
-# or
-go run . freedom keygen mysite
 ```
 
 The default node API is `http://localhost:8420` (override with `--api`).

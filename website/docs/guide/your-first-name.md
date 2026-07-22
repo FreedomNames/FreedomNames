@@ -5,9 +5,9 @@ It assumes you have a [node running](/guide/running-a-node) on
 `http://localhost:8420`.
 
 ::: tip
-Invoke the CLI via the built binary (`./freedom-names freedom keygen mysite`)
-or, during development, `go run . freedom keygen mysite`. On this page we write it
-as `freedom …` for brevity.
+Invoke the CLI through the downloaded binary, for example
+`./freedom-names freedom keygen mysite`. On this page we write it as
+`freedom …` for brevity.
 :::
 
 ## 1. Generate an owner keypair

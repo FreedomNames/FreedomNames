@@ -65,17 +65,32 @@ number) wins.
 - **Not production-hardened.** This is an actively developed project. Treat it as
   powerful, promising, and early.
 
-## Next steps
+## Getting started
 
-<div class="fn-next">
+Download the prebuilt archive for your operating system and architecture from
+the [GitLab releases page](https://gitlab.melroy.org/freedom-names/freedom-names/-/releases)
+(open **Assets → Packages**) or the [GitHub releases
+page](https://github.com/FreedomNames/FreedomNames/releases) (open **Assets**).
 
-- New here? Read [**How names work**](/guide/how-names-work) for the mechanics.
-- Want the big picture? See the [**Architecture**](/guide/architecture).
-- Ready to try it? [**Run a node**](/guide/running-a-node) and
-  [**publish your first name**](/guide/your-first-name).
+For example, on 64-bit Linux, extract the downloaded archive and start Freedom
+Names:
 
-</div>
+```sh
+tar -xzf freedom-names-0.8.3-linux-amd64.tar.gz
+./freedom-names
+```
 
-<style>
-.fn-next ul { line-height: 1.9; }
-</style>
+Leave that terminal open. In a second terminal, verify the local API:
+
+```sh
+curl http://localhost:8420/info
+```
+
+This starts a working local instance. Nearby Freedom Names instances discover
+each other over mDNS. Publishing and resolving through the DHT requires at
+least one other peer; connecting outside your local network currently requires
+a configured bootstrap peer.
+
+For other platforms, peer configuration, and troubleshooting, see [**Run
+Freedom Names**](/guide/running-a-node). Once connected, continue with [**Your
+first name**](/guide/your-first-name).

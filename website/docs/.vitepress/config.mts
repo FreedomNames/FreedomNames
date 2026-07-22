@@ -59,7 +59,7 @@ export default defineConfig({
           text: 'Get started',
           collapsed: false,
           items: [
-            { text: 'Running a node', link: '/guide/running-a-node' },
+            { text: 'Run Freedom Names', link: '/guide/running-a-node' },
             { text: 'Your first name', link: '/guide/your-first-name' },
             { text: 'Resolving from your system', link: '/guide/resolving' },
           ],

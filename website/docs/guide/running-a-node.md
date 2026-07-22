@@ -1,36 +1,61 @@
-# Running a node
+# Run Freedom Names
 
-A Freedom Names node runs a libp2p DHT peer, a DNS server, and an HTTP API all at
-once. This page gets one running on your machine.
+Running Freedom Names starts a local libp2p DHT peer, content service, DNS
+server, and HTTP API. This page explains how to start the application, verify
+it, and optionally connect it to other peers.
 
-## Prerequisites
+## Download a release
 
-- **Go** (a recent version) to build and run the binary.
-- No special privileges: the DNS server defaults to the high port `:8053`. (For
-  system-wide `.fn` resolution on `:53`, see [below](#the-53-port).)
+Prebuilt releases are available for Linux, macOS, and Windows on both amd64 and
+arm64. Download the package matching your platform from either:
 
-Clone the repository:
+- [GitLab releases](https://gitlab.melroy.org/freedom-names/freedom-names/-/releases)
+  under **Assets → Packages**, or
+- [GitHub releases](https://github.com/FreedomNames/FreedomNames/releases) under
+  **Assets**.
+
+For example, on 64-bit Linux, download
+`freedom-names-0.8.3-linux-amd64.tar.gz` and extract it:
 
 ```sh
-git clone https://gitlab.melroy.org/freedom-names/freedom-names.git
-cd freedom-names
+tar -xzf freedom-names-0.8.3-linux-amd64.tar.gz
 ```
 
-## Start a node
+Choose `linux-arm64` for 64-bit ARM Linux, `darwin-amd64` for an Intel Mac,
+`darwin-arm64` for Apple Silicon, or the corresponding Windows `.zip` package.
+Windows users can extract the zip with **Extract All** in File Explorer.
+
+No installation or elevated privileges are required. Keep the binary wherever
+you want to run it; the DNS server uses the unprivileged port `:8053` by
+default.
+
+## Start Freedom Names
 
 ```sh
-go run .
+./freedom-names
 ```
+
+On Windows, run `.\freedom-names.exe` in PowerShell instead.
 
 That single command starts:
 
 - a **libp2p DHT peer**, the decentralized storage/resolution network,
+- a **content service** that stores and retrieves page bytes over libp2p,
 - a **DNS server** (default `:8053`) that resolves `.fn` names and forwards
   everything else upstream,
 - an **HTTP API** (default `:8420`) for publishing and resolving.
 
-You now have a working node. Leave it running in a terminal; the CLI and your
-system resolver talk to it.
+You now have a working local Freedom Names instance. Leave it running in a
+terminal; the CLI and your system resolver talk to it.
+
+::: warning Network connectivity
+Freedom Names discovers other instances on your local network through mDNS. It
+does not yet ship with a public bootstrap peer, so starting it without
+`FREEDOM_BOOTSTRAP` does not connect it to peers outside your local network. You
+can still start and inspect the local instance, but publishing and resolving
+DHT records requires at least one other peer. To connect multiple networks, run
+or configure a bootstrap node as described below.
+:::
 
 ## Run a bootstrap node
 
@@ -38,23 +63,23 @@ A **bootstrap** node is a server-mode peer that others connect to in order to
 discover the network:
 
 ```sh
-go run . bootstrap
+./freedom-names bootstrap
 ```
 
-Point other nodes at it with the `FREEDOM_BOOTSTRAP` environment variable (a
-comma-separated list of multiaddrs). See [Configuration](/guide/configuration).
+Point other Freedom Names instances at it with the `FREEDOM_BOOTSTRAP`
+environment variable (a comma-separated list of multiaddrs). See
+[Configuration](/guide/configuration).
 
 ## The `:53` port
 
-By default the DNS server listens on the high port **`:8053`**, so `go run .`
+By default the DNS server listens on the high port **`:8053`**, so Freedom Names
 works with no privileges. Query it with `dig -p 8053 …`.
 
 Your OS and browser, however, only send DNS to the standard **`:53`**. For
-system-wide `.fn` resolution, run Freedom Names on `:53`. Build the binary and
-grant it the capability once:
+system-wide `.fn` resolution on Linux, run Freedom Names on `:53` and grant the
+downloaded binary the capability once:
 
 ```sh
-go build -o freedom-names .
 sudo setcap cap_net_bind_service=+ep ./freedom-names
 FREEDOM_DNS_ADDR=:53 ./freedom-names
 ```
@@ -92,15 +117,6 @@ Make it permanent in `/etc/sysctl.conf`:
 ```ini
 net.core.rmem_max=7500000
 net.core.wmem_max=7500000
-```
-
-## Optional: auto-recompile with air
-
-Install [air](https://github.com/air-verse/air) to rebuild on save while
-developing:
-
-```sh
-air
 ```
 
 ## Next

@@ -53,23 +53,23 @@ the DHT and HTTP API are unaffected.
 
 ## Examples
 
-**Local development** works out of the box on the default `:8053`, no `sudo` needed:
+**Default local start** works on `:8053`, with no `sudo` needed:
 
 ```sh
 FREEDOM_HTTP_ADDR=127.0.0.1:8420 \
-go run .
+./freedom-names
 ```
 
 **Different upstream resolver**, forwarding non-`.fn` queries elsewhere:
 
 ```sh
-FREEDOM_UPSTREAM_DNS=9.9.9.9:53 go run .
+FREEDOM_UPSTREAM_DNS=9.9.9.9:53 ./freedom-names
 ```
 
 **Join a network via bootstrap peers**:
 
 ```sh
-FREEDOM_BOOTSTRAP="/ip4/203.0.113.10/tcp/4020/p2p/<peerID>,/ip4/…/…" go run .
+FREEDOM_BOOTSTRAP="/ip4/203.0.113.10/tcp/4020/p2p/<peerID>,/ip4/…/…" ./freedom-names
 ```
 
 ## System-wide resolution and the `:53` port
@@ -80,7 +80,6 @@ system-wide, run Freedom Names on `:53`. Since `:53` is privileged, either grant
 the binary the capability once:
 
 ```sh
-go build -o freedom-names .
 sudo setcap cap_net_bind_service=+ep ./freedom-names
 FREEDOM_DNS_ADDR=:53 ./freedom-names
 ```
@@ -121,4 +120,4 @@ net.core.wmem_max=7500000
 ## Next
 
 - [**Run a bootstrap node**](/examples/bootstrap-node) others can connect to.
-- Back to [**running a node**](/guide/running-a-node).
+- Back to [**running Freedom Names**](/guide/running-a-node).

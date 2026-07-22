@@ -5,7 +5,7 @@ resolver and cache. This page shows how they fit together.
 
 ## The three services
 
-Running `go run .` starts all of these at once:
+Running `./freedom-names` starts all of these at once:
 
 ```
                        ┌──────────────────────────────┐
@@ -39,7 +39,7 @@ Running `go run .` starts all of these at once:
 - **HTTP API** (default `:8420`): publish signed records and resolve names
   programmatically. See the [HTTP API reference](/guide/http-api).
 
-A **bootstrap** node (`go run . bootstrap`) is a server-mode peer that others
+A **bootstrap** node (`./freedom-names bootstrap`) is a server-mode peer that others
 connect to in order to join the network.
 
 ## The resolver and cache
@@ -107,5 +107,5 @@ what.
 
 ## Next
 
-- [**Run a node**](/guide/running-a-node) and watch it join the network.
+- [**Run Freedom Names**](/guide/running-a-node) and connect it to peers.
 - Reference: the [**CLI**](/guide/cli) and the [**HTTP API**](/guide/http-api).

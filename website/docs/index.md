@@ -104,7 +104,7 @@ for it owns it, full stop.
 
 <div class="fn-cta">
 
-**Ready to try it?** → [Run a node](/guide/running-a-node) ·
+**Ready to try it?** → [Run Freedom Names](/guide/running-a-node) ·
 [Publish your first name](/guide/your-first-name) ·
 [Understand the design](/guide/architecture)
 
