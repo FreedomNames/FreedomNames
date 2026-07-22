@@ -45,37 +45,48 @@ the key signs records, and the content's *hash* is its address:
 
 ```plantuml
 @startuml
-start
-:Open <b>melroy.fn</b>;
-if (Name carries a <pubKeyID> suffix?) then (no — bare name)
-  partition "Layer 2 — BCH registry" {
-    :Find the earliest confirmed claim: the name is a CashTokens NFT;
-    :Walk the NFT's custody chain to its current UTXO;
-    :Live token commitment reveals the owner's public key;
-  }
-else (yes — self-certifying)
-  :Owner's public key is embedded in the name itself;
-endif
+skinparam ranksep 30
+skinparam nodesep 16
+skinparam defaultFontSize 12
+skinparam activity {
+  BackgroundColor #F7F7F7
+  BorderColor #999999
+  DiamondBackgroundColor #FFFFFF
+  DiamondBorderColor #999999
+}
+
+(*) --> "Open <b>melroy.fn</b>"
+--> "Name carries a\n<pubKeyID> suffix?"
+
+partition "Layer 2 — BCH registry" {
+  --> [no — bare name] "Find the earliest confirmed\nclaim: a CashTokens NFT"
+  -right-> "Walk the NFT's custody\nchain to its current UTXO"
+  -right-> "Live token commitment reveals\nthe owner's public key"
+}
+
+"Name carries a\n<pubKeyID> suffix?" -right-> [yes — self-certifying] "Owner's public key is\nembedded in the name itself"
+
 partition "Layer 1 — DHT (naming)" {
-  :Derive the DHT key from the pubKeyID;
-  :Fetch the signed record set (newest sequence wins);
-  :Verify the signature against the owner's public key;
-  :Read the CONTENT record → content hash;
+  "Live token commitment reveals\nthe owner's public key" --> "Derive the DHT key\nfrom the pubKeyID"
+  "Owner's public key is\nembedded in the name itself" --> "Derive the DHT key\nfrom the pubKeyID"
+  -right-> "Fetch the signed record\nset (newest seq wins)"
+  -right-> "Verify the signature against\nthe owner's public key"
+  -right-> "Read the CONTENT\nrecord → content hash"
 }
+
 partition "Content network (bytes)" {
-  if (Blob in the local store?) then (yes)
-  else (no)
-    :Ask the DHT who provides the hash (publisher + pushed replicas);
-    :Stream the blob from any provider;
-  endif
-  :Verify the bytes against the hash (wrong content is impossible);
-  if (Blob is a chunk manifest?) then (yes)
-    :Fetch each chunk the same way, reassemble as a stream;
-  else (no)
-  endif
+  "Read the CONTENT\nrecord → content hash" --> "Blob in the\nlocal store?"
+  --> [no] "Ask the DHT who provides\nthe hash (+ pushed replicas)"
+  -right-> "Stream the blob\nfrom any provider"
+  --> "Verify the bytes against the\nhash (wrong bytes impossible)"
+  "Blob in the\nlocal store?" -right-> [yes] "Verify the bytes against the\nhash (wrong bytes impossible)"
+  "Verify the bytes against the\nhash (wrong bytes impossible)" --> "Blob is a chunk\nmanifest?"
+  -right-> [yes] "Fetch each chunk the same\nway, reassemble as a stream"
 }
-:Render the page bytes;
-stop
+
+"Fetch each chunk the same\nway, reassemble as a stream" --> "Render the page bytes"
+"Blob is a chunk\nmanifest?" --> [no] "Render the page bytes"
+"Render the page bytes" --> (*)
 @enduml
 ```
 
