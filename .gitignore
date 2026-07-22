@@ -24,6 +24,9 @@ freedom-names
 tmp
 build_release
 
+# Built docs site, moved here by the docs-deploy CI job
+public
+
 # Private key :)
 private.key
 

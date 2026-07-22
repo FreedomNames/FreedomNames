@@ -32,6 +32,25 @@ go-test:
   script:
     - go test -race ./...
 
+# Build-check the VitePress documentation site on branches that touch it, so a
+# broken docs change (dead link, bad config) fails the MR instead of the deploy
+# on main. VitePress link checking runs as part of the build.
+docs:
+  stage: test
+  image: node:24
+  cache:
+    key: vitepress
+    paths:
+      - website/node_modules/
+  rules:
+    - if: $CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
+      changes:
+        - website/**/*
+  script:
+    - cd website
+    - npm ci
+    - npm run docs:build
+
 go-build:
   stage: build
   script:
@@ -42,6 +61,37 @@ go-build:
     paths:
       - freedom-names
     expire_in: 1 week
+
+# Build the documentation site on the default branch and publish it as a
+# `public/` artifact. This is NOT GitLab Pages: the artifact is picked up by the
+# external artifact deployer, which watches for deployment jobs via webhook and
+# pushes the site to https://freedomnames.org. The `environment:` block below is
+# what makes this a deployment job (and therefore what triggers the webhook), so
+# it must stay even though nothing here talks to the server directly.
+docs-deploy:
+  stage: deploy
+  image: node:24
+  cache:
+    key: vitepress
+    paths:
+      - website/node_modules/
+  rules:
+    - if: $CI_PROJECT_NAMESPACE == "freedom-names" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  script:
+    - cd website
+    - npm ci
+    - npm run docs:build
+    # The deployer expects the site at the top level of the artifact, so lift it
+    # out of website/docs/.vitepress/ and into ./public at the repo root.
+    - mv docs/.vitepress/dist "$CI_PROJECT_DIR/public"
+  environment:
+    name: website
+    url: https://freedomnames.org
+  artifacts:
+    name: "FreedomNames website $CI_COMMIT_SHORT_SHA"
+    expire_in: 1 month
+    paths:
+      - public
 
 # Cross-compile the full release matrix (linux/windows/darwin x amd64/arm64)
 # and package each binary as a tarball (.zip for windows). Tag pipelines only.
