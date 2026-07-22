@@ -14,8 +14,29 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/../.." && pwd)
 . "$HERE/lib.sh"
 
+usage() {
+  cat <<'USAGE'
+Usage: run-all.sh [--with-bare-names]
+
+  (no flags)          run the automated legs only
+  --with-bare-names   also run the guided bare-name claim (needs funded coins)
+  -h, --help          show this help
+
+Env:
+  FREEDOM_BCH_NETWORK=mainnet   run the bare-name leg on mainnet (real coins)
+USAGE
+}
+
+# Reject unknown arguments rather than ignoring them: a silently-skipped flag
+# would exit 0 while the claim leg never ran, which reads as a passing run.
 WITH_BARE_NAMES=""
-for a in "$@"; do [ "$a" = "--with-bare-names" ] && WITH_BARE_NAMES=1; done
+for a in "$@"; do
+  case "$a" in
+    --with-bare-names) WITH_BARE_NAMES=1 ;;
+    -h|--help)         usage; exit 0 ;;
+    *)                 printf 'error: unknown argument %s\n\n' "$a" >&2; usage >&2; exit 2 ;;
+  esac
+done
 
 export WORKDIR=$(mktemp -d /tmp/fn-verify.XXXXXX)
 export BIN="$WORKDIR/freedom-names"

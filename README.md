@@ -17,8 +17,9 @@ Both give you a real name. A self-certifying name already carries a
 human-readable label you choose — it just also carries a key-derived suffix,
 which makes it long to share. Bare names drop the suffix, and *that* is what
 requires consensus. Note this is **not** a blockchain "layer 2": Bitcoin Cash
-scales on-chain and CashTokens are native on-chain primitives; Freedom Names
-only *reads* the chain to settle who owns a bare name.
+scales on-chain and CashTokens are native on-chain primitives. Resolving a name
+only *reads* the chain; writes happen when you register or transfer one
+(`freedom claim` and `freedom adopt` broadcast transactions).
 
 Alongside both, a node runs a **peer-to-peer content network** so a name
 can point at an actual page, not just DNS records. This is what lets Freedom

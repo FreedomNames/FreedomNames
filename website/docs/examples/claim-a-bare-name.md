@@ -72,8 +72,8 @@ a little BCH (or request another faucet payment) and retry.
 
 ## 5. Create the owner key for the name
 
-The bare name is bound to a normal Freedom Names owner key (the same kind self-certifying
-uses), so records work identically:
+The bare name is bound to a normal Freedom Names owner key (the same kind that
+self-certifying names use), so records work identically:
 
 ```sh
 ./freedom-names freedom keygen mysite

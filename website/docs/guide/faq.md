@@ -7,8 +7,9 @@ need one, because names are derived from public keys and therefore can't
 collide. Records live in a peer-to-peer DHT, ordered per-name by a sequence number.
 
 The optional [name registry](/guide/bare-names) *does* borrow a blockchain (Bitcoin Cash)
-to decide who owns a globally-unique bare name, but that's a separate layer that
-only reads the chain; it doesn't make self-certifying names a blockchain.
+to decide who owns a globally-unique bare name. Resolution only reads the chain
+(registering or transferring a bare name writes to it), and none of this makes
+self-certifying names a blockchain.
 
 ## Can someone squat or steal my name?
 

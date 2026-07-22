@@ -20,8 +20,12 @@ Bitcoin Cash and [self-certifying names](/guide/how-names-work) do not.
 ::: warning Not a blockchain "layer 2"
 Freedom Names is **not** built on top of Bitcoin Cash the way a rollup or a
 payment channel is. BCH scales on-chain by design and CashTokens are native
-on-chain primitives — no second layer required. Freedom Names simply *reads* the
-BCH chain to settle who owns a bare name.
+on-chain primitives — no second layer required.
+
+Nothing is settled off-chain: **resolving** a bare name only *reads* the chain,
+and registering or transferring one writes to it directly — `freedom claim` and
+`freedom adopt` broadcast ordinary BCH transactions (see [the on-chain
+protocol](#the-on-chain-protocol-fn-v1) below).
 :::
 
 ::: info Status
