@@ -2,6 +2,9 @@
 
 Decentralized DNS built on a libp2p Kademlia DHT, written in Go.
 
+📖 **Full documentation: [freedomnames.org](https://freedomnames.org)**. Guides,
+CLI and HTTP API reference, and worked examples.
+
 Freedom Names lets anyone own a human-readable name and publish DNS-style records
 for it, with **no central authority**. There are two kinds of name:
 
