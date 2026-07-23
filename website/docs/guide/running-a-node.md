@@ -106,8 +106,10 @@ curl http://localhost:8420/info
 ```
 
 You'll get JSON describing the node's mode, peer ID, listen addresses, and an
-estimate of the network size. See the [HTTP API reference](/guide/http-api) for
-every endpoint.
+estimate of the network size. A just-started node may briefly return `500` here
+until the DHT initializes; [`/health`](/guide/http-api#get-health) is an
+always-on liveness check that answers even before then. See the [HTTP API
+reference](/guide/http-api) for every endpoint.
 
 ## Optional: silence QUIC buffer warnings
 

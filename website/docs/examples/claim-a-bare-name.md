@@ -128,7 +128,7 @@ some, then resolve the bare name through a running node:
 dig @127.0.0.1 -p 8053 mysite.fn A                # via DNS
 ```
 
-The node consults the BCH registry for the bare `mysite.fn`, gets your owner key,
+The node consults Bitcoin Cash for the bare `mysite.fn`, gets your owner key,
 then resolves the signed records from the DHT, exactly as for the self-certifying
 name.
 

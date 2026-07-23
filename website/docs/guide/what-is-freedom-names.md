@@ -7,7 +7,7 @@ global owner. In both cases records are cryptographically signed, so nobody can
 overwrite a name they don't own.
 
 It is a single program written in Go, built on a [libp2p](https://libp2p.io)
-Kademlia DHT.
+Kademlia distributed hash table (DHT).
 
 ## The problem it solves
 
@@ -42,56 +42,49 @@ Records (the `A`, `AAAA`, `TXT`, `CNAME`, and `CONTENT` entries a name maps to) 
 into a signed `FNRecord` and stored in the DHT under a key derived from your
 public key. Every node independently verifies the signature and the key→name
 binding before accepting an update, and the newest record (highest sequence
-number) wins.
+number) wins. For the full mechanics, see [**How names
+work**](/guide/how-names-work).
+
+## Two kinds of name
+
+You pick a flavor per name, trading name length against what it costs to own:
+
+- **Self-certifying**: `mysite.<pubKeyID>.fn`. Yours the instant you generate a
+  keypair: no registration, no consensus, no coins. The price is the long,
+  key-derived suffix.
+- **Bare**: `mysite.fn`. Short and suffix-free, but *globally unique*, so the
+  network has to agree on who owns `mysite`, and that needs consensus. Freedom
+  Names borrows Bitcoin Cash's: claiming a bare name mints a **CashTokens NFT**
+  directly on-chain (BCH layer 1, no second layer) that commits to a hash of
+  your public key. It's a real NFT you hold in your wallet; resolving one only
+  *reads* the chain. Enabled by default.
+
+The two compose: a bare name *also* resolves through its owner's signed DHT
+records. See [**bare names**](/guide/bare-names) for the full on-chain protocol.
 
 ## What you get
 
-- **Self-sovereign names.** No registrar, no fee, no approval. Generate a key and
+- **Self-sovereign names.** No centralized registrar, no fee, no approval. Generate a key and
   the name is yours.
 - **Censorship resistance.** Records live across a peer-to-peer network, not on a
   server anyone can seize.
 - **Tamper resistance.** Signed records mean no one can forge or overwrite a name
   they don't hold the key for.
 - **Real DNS.** A built-in DNS server resolves `.fn` names and forwards everything
-  else upstream, so `.fn` "just works" once your system points at a node.
+  else upstream, so `.fn` "just works" once [your system points at a
+  node](/guide/resolving).
 
-## What it is not (yet)
+## What it is not
 
-- **Not a blockchain.** Self-certifying names have *no consensus at all*, and need none,
-  because self-certifying names can't collide.
-- **Not consensus-free for bare names.** `mysite.fn` (no key suffix) requires
-  agreeing on *who owns `mysite`*, which does need consensus.
-  [bare names](/guide/bare-names) borrow it from a Bitcoin Cash registry, enabled by
-  default; unclaimed bare names simply resolve to not-found.
+- **Not its own blockchain.** Freedom Names invents no chain and mints no coin.
+  Self-certifying names have *no consensus at all* and need none; bare names
+  reuse Bitcoin Cash's consensus for the single question of *who owns a name*,
+  and even then your records live in the DHT, never on-chain.
 - **Not production-hardened.** This is an actively developed project. Treat it as
   powerful, promising, and early.
 
-## Getting started
+## Try it
 
-Download the prebuilt archive for your operating system and architecture from
-the [GitLab releases page](https://gitlab.melroy.org/freedom-names/freedom-names/-/releases)
-(open **Assets → Packages**) or the [GitHub releases
-page](https://github.com/FreedomNames/FreedomNames/releases) (open **Assets**).
-
-For example, on 64-bit Linux, extract the downloaded archive and start Freedom
-Names (replace `0.8.4` with the version you downloaded):
-
-```sh
-tar -xzf freedom-names-0.8.4-linux-amd64.tar.gz
-./freedom-names
-```
-
-Leave that terminal open. In a second terminal, verify the local API:
-
-```sh
-curl http://localhost:8420/info
-```
-
-This starts a working local instance. Nearby Freedom Names instances discover
-each other over mDNS. Publishing and resolving through the DHT requires at
-least one other peer; connecting outside your local network currently requires
-a configured bootstrap peer.
-
-For other platforms, peer configuration, and troubleshooting, see [**Run
-Freedom Names**](/guide/running-a-node). Once connected, continue with [**Your
-first name**](/guide/your-first-name).
+Ready to run a node? The [**Quickstart**](/guide/quickstart) gets you a working
+local instance in a couple of minutes, then [**Your first
+name**](/guide/your-first-name) walks through publishing one.

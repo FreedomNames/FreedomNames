@@ -1,7 +1,7 @@
 # Architecture
 
 A Freedom Names node is one binary containing the naming peer, content service,
-DNS and HTTP interfaces, and optional bare-name registry integration. This page
+DNS and HTTP interfaces, and optional bare-name support. This page
 shows how those runtime components fit together.
 
 ## Runtime components
@@ -13,7 +13,7 @@ Running `./freedom-names` starts all of these at once:
    CLI / curl ────▶ HTTP API ────▶ Resolver + cache
 
    Resolver + cache ──┬──▶ DHT peer ──▶ signed records
-                      └──▶ BCH registry ──▶ owner key ──▶ DHT peer
+                      └──▶ BCH lookup ──▶ owner key ──▶ DHT peer
 
    HTTP API ──▶ Content service ──▶ blobstore + libp2p peers
 ```
@@ -28,11 +28,11 @@ Running `./freedom-names` starts all of these at once:
 - **DNS server** (default `:8053`, no root needed): resolves `.fn` names through
   the resolver and transparently forwards everything else to an upstream resolver.
   Run it on `:53` (see [the `:53` port](/guide/running-a-node#the-53-port)) and
-  point your OS at it, and `.fn` works everywhere.
+  [point your OS at it](/guide/resolving), and `.fn` works everywhere.
 - **HTTP API** (default `127.0.0.1:8420`): publish and resolve records, manage
   content, and expose health and peer information. See the [HTTP API
   reference](/guide/http-api).
-- **BCH registry integration**: for bare names only, asks the configured
+- **Bitcoin Cash (bare names)**: for bare names only, asks the configured
   Electrum/Fulcrum servers which public key currently owns the name. It is not
   involved in self-certifying-name resolution, and record data remains in the
   DHT rather than on-chain.
@@ -54,8 +54,8 @@ how a name is looked up.
 
 For a self-certifying name (`label.<pubKeyID>.fn`), the resolver derives the DHT
 key directly from the `<pubKeyID>` suffix. For a bare name (`mysite.fn`), it
-routes through the optional name registry to find the owner's public key first
-(see below).
+routes through the bare-name lookup on Bitcoin Cash to find the owner's public
+key first (see below).
 
 ## The validator
 
@@ -76,10 +76,10 @@ winner: highest sequence number, then latest `eol`, then the larger raw bytes.
 Because every node runs this same logic, a forged or stale record can't
 propagate.
 
-## The self-certifying / registry seam
+## The self-certifying / bare-name seam
 
 Self-certifying names have **no consensus** and no external dependencies.
-The registry (globally-unique bare names) is bolted on through a single interface:
+Bare-name support (globally-unique names) is bolted on through a single interface:
 
 ```go
 type NameRegistry interface {
@@ -92,10 +92,10 @@ type NameRegistry interface {
   (byte-identical to `FNRecord.PubKey`), derives the DHT key from it, and then
   follows the *exact same* path (fetch → validate → return records).
 
-The BCH-backed registry is wired in whenever an Electrum endpoint is configured,
-which is the default on every known network, so bare-name lookups work out of
+Bare-name lookup is wired in whenever an Electrum endpoint is configured,
+which is the default on every known network, so bare names work out of
 the box.
-On a network with no Electrum servers the registry is simply absent and bare
+On a network with no Electrum servers this lookup is simply absent and bare
 names resolve to not-found; self-certifying resolution is unaffected either way.
 Crucially, **record data never lives on-chain**; only the name→owner binding
 does. Read the full design in [Bare names](/guide/bare-names).

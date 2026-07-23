@@ -13,10 +13,10 @@ hero:
   actions:
     - theme: brand
       text: Get started
-      link: /guide/what-is-freedom-names
+      link: /guide/quickstart
     - theme: alt
-      text: Your first name
-      link: /guide/your-first-name
+      text: What is Freedom Names?
+      link: /guide/what-is-freedom-names
     - theme: alt
       text: View on GitLab
       link: https://gitlab.melroy.org/freedom-names/freedom-names
@@ -78,40 +78,14 @@ Freedom Names removes the registrar. For a self-certifying name, ownership is a
 - **Everyone can verify them.** Any node checks the signature and the key→name
   binding independently. There is no authority to trust, only math.
 
-If you prefer a short globally unique name such as `mysite.fn`, the optional
-Bitcoin Cash registry establishes its owner. The name's DNS and content records
-are still signed and distributed through Freedom Names rather than stored on
-the chain.
-
-## A name in 60 seconds
-
-With Freedom Names running and connected to at least one peer:
-
-```sh
-# 1. Generate an owner keypair for a name
-./freedom-names freedom keygen mysite
-
-# 2. Point it at a server
-./freedom-names freedom set mysite A 10.0.0.5 300
-
-# 3. See your full self-certifying name
-./freedom-names freedom name mysite
-#   mysite.<pubKeyID>.fn
-
-# 4. Sign the records and publish them through the running instance
-./freedom-names freedom publish mysite --api http://localhost:8420
-
-# 5. Resolve it through your local DNS endpoint
-dig @127.0.0.1 -p 8053 mysite.<pubKeyID>.fn A
-```
-
-That `<pubKeyID>` is the base36 hash of your public key. Because it is *derived
-from the key*, the name is self-certifying: whoever can produce a valid signature
-for it owns it, full stop.
+If you prefer a short globally unique name such as `mysite.fn`, an optional
+CashTokens NFT on Bitcoin Cash establishes its owner. The name's DNS and content
+records are still signed and distributed through Freedom Names rather than stored
+on the chain.
 
 <div class="fn-cta">
 
-**Ready to try it?** → [Run Freedom Names](/guide/running-a-node) ·
+**Ready to try it?** → [Quickstart](/guide/quickstart) ·
 [Publish your first name](/guide/your-first-name) ·
 [Understand the design](/guide/architecture)
 

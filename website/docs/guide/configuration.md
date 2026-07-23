@@ -39,8 +39,8 @@ only the bind host and keeps the port of the current HTTP address (the
 `FREEDOM_HTTP_ADDR`/`--http-addr` value, `8420` if that has no port). See
 [embedding a node](/guide/embedding).
 
-The `FREEDOM_BCH_*` variables drive [bare names](/guide/bare-names) (globally-unique
-bare names on Bitcoin Cash), which is on by default on **mainnet**. The node
+The `FREEDOM_BCH_*` variables drive [bare names](/guide/bare-names)
+(globally-unique names on Bitcoin Cash), which are on by default on **mainnet**. The node
 reaches the chain through a built-in per-network list of public Electrum Cash
 (Fulcrum) servers, trying them in order with **failover**. Set
 `FREEDOM_BCH_NETWORK` to a test network (`chipnet`, `testnet4`, `testnet3`) to

@@ -1,8 +1,8 @@
 # How names work
 
-Freedom Names replaces the registrar with a keypair. This page walks through the
-mechanics: what a name is made of, how a record is stored, and why nobody can
-overwrite a name they don't own.
+For self-certifying names, Freedom Names _replaces_ the domain name registrar with a
+keypair, nothing more. This page walks through the mechanics: what a name is made
+of, how a record is stored, and why nobody can overwrite a name they don't own.
 
 ## Anatomy of a name
 
@@ -116,8 +116,8 @@ differs. Alice can't "take" Bob's `mysite`, and neither of them registered
 `mysite` in any shared registry. They each just hold a key.
 
 The trade-off is the visible key suffix. Making `mysite.fn` (no suffix) globally
-unique is the job of the [name registry](/guide/bare-names), which *does* need consensus and
-gets it from an existing blockchain rather than inventing one.
+unique is the job of [bare names](/guide/bare-names), which *do* need consensus and
+get it from an existing blockchain rather than inventing one.
 
 ## Next
 

@@ -51,6 +51,7 @@ export default defineConfig({
           collapsed: false,
           items: [
             { text: 'What is Freedom Names?', link: '/guide/what-is-freedom-names' },
+            { text: 'Use cases', link: '/guide/use-cases' },
             { text: 'How names work', link: '/guide/how-names-work' },
             { text: 'Architecture', link: '/guide/architecture' },
           ],
@@ -59,6 +60,7 @@ export default defineConfig({
           text: 'Get started',
           collapsed: false,
           items: [
+            { text: 'Quickstart', link: '/guide/quickstart' },
             { text: 'Run Freedom Names', link: '/guide/running-a-node' },
             { text: 'Your first name', link: '/guide/your-first-name' },
             { text: 'Resolving from your system', link: '/guide/resolving' },
@@ -79,6 +81,7 @@ export default defineConfig({
           items: [
             { text: 'The content network', link: '/guide/content' },
             { text: 'Embedding a node', link: '/guide/embedding' },
+            { text: 'LibreWeb', link: '/guide/libreweb' },
             { text: 'Bare names', link: '/guide/bare-names' },
             { text: 'Testing on a real network', link: '/guide/testing-a-network' },
             { text: 'Known limitations', link: '/guide/limitations' },

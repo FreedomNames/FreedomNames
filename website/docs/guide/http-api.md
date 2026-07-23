@@ -148,6 +148,8 @@ curl http://localhost:8420/info
 }
 ```
 
+**Errors:** `500` if the DHT isn't initialized yet.
+
 ## DELETE `/clear_cache`
 
 Purges the node's local resolution cache. Useful after publishing an update if you

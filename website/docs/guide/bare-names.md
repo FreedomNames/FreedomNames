@@ -9,10 +9,10 @@ one: **Bitcoin Cash**.
 ::: info Both mechanisms give you a name
 Self-certifying names already contain a human-readable label you choose,
 `mysite.<pubKeyID>.fn` is yours the moment you generate a keypair, with no
-registry, no consensus, and no coins. The catch is the key-derived suffix, which
-makes the name long and awkward to share.
+registration, no consensus, and no coins. The catch is the key-derived suffix,
+which makes the name long and awkward to share.
 
-The name registry exists to offer the short version (`mysite.fn`). That
+Bare names exist to offer the short version (`mysite.fn`). That
 shortness is exactly what requires consensus, which is why bare names need
 Bitcoin Cash and [self-certifying names](/guide/how-names-work) do not.
 :::
@@ -37,24 +37,24 @@ automatic failover. To experiment first, switch to a test network with
 Self-certifying names always resolve regardless.
 :::
 
-## Why a name registry
+## Why bare names need consensus
 
 Self-certifying names (key-based records) need **no consensus** because they
 cannot collide: `mysite.<aliceKey>.fn` and `mysite.<bobKey>.fn` are simply
 different names. The trade-off is the visible key suffix.
 
 A bare name has no suffix, so two people *can* both want `mysite`. Deciding who
-wins is a consensus problem. The registry borrows Bitcoin Cash's consensus: the
+wins is a consensus problem. Bare names borrow Bitcoin Cash's consensus: the
 first confirmed claim wins, and the claim is a **CashTokens NFT** you actually
 hold in your wallet.
 
-The node treats BCH as an **off-chain resolver**: it *reads* the chain to
-answer "who owns `mysite`?". Consensus stays entirely on BCH; the key layer
-stays pure-DHT.
+The node treats BCH as a **read-only resolver source**: it *reads* on-chain
+state to answer "who owns `mysite`?". Consensus stays entirely on BCH; the key
+layer stays pure-DHT.
 
 ## The seam in code
 
-The key layer does not depend on the registry. The whole boundary is one
+The key layer does not depend on bare names at all. The whole boundary is one
 interface:
 
 ```go
@@ -177,8 +177,8 @@ a name means exactly one thing everywhere.
 
 ## How the two compose
 
-A bare name always *also* resolves via its owner's signed DHT records; the registry only
-supplies the name-to-owner binding, and the DHT supplies the records. The two
+A bare name always *also* resolves via its owner's signed DHT records; the on-chain
+lookup only supplies the name-to-owner binding, and the DHT supplies the records. The two
 mechanisms **compose rather than conflict**: `freedom whois mysite.fn` even prints
 the equivalent self-certifying `mysite.<pubKeyID>.fn` name.
 

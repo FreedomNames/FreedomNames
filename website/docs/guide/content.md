@@ -49,7 +49,8 @@ pins it). Instead, the swarm holds the data:
   must equal the offer: anything less and nothing is stored or announced. A
   peer that already holds the set answers "have" without any bytes moving;
   that still counts toward the replica target and refreshes the set's TTL.
-  From the first minute, the publisher is not a single point of failure.
+  Once the initial pushes land, the publisher is no longer the only holder
+  (subject to peers being reachable).
 - **Self-healing**: every holder, publisher or replica, periodically counts
   the live providers of each content set it holds. If the count fell below the
   target (holders die, disks fail), it pushes copies to new closest peers.
@@ -74,25 +75,24 @@ Node operators stay in control of what they contribute:
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | `FREEDOM_CONTENT_REPLICAS` | `3` | copies pushed per publish (target holders = this + 1) |
-| `FREEDOM_CONTENT_HOST_BUDGET` | `20GB` | max disk spent hosting other people's content |
-| `FREEDOM_CONTENT_HOST_TTL` | `720h` (30 days) | hosted content untouched for this long loses its eviction protection; it is **not** deleted until space is needed |
+| `FREEDOM_CONTENT_HOST_BUDGET` | `20G` | max disk spent hosting other people's content |
+| `FREEDOM_CONTENT_HOST_TTL` | `30d` | hosted content untouched for this long loses its eviction protection; it is **not** deleted until space is needed |
 | `FREEDOM_CONTENT_HEAL_INTERVAL` | `1h` | how often replica counts are checked and topped up (`0` disables healing) |
 | `FREEDOM_CONTENT_UP_RATE` | unlimited | bytes/second serving + pushing content (e.g. `10MB`) |
 | `FREEDOM_CONTENT_DOWN_RATE` | unlimited | bytes/second fetching + receiving pushes |
-| `FREEDOM_CONTENT_MAX_PUSH_SIZE` | `1GB` | largest single content set accepted from a push (1 GiB is also a hard wire-level ceiling; setting this higher has no effect) |
+| `FREEDOM_CONTENT_MAX_PUSH_SIZE` | `1G` | largest single content set accepted from a push (1 GiB is also a hard wire-level ceiling; setting this higher has no effect) |
 
 Rate limits apply only to bulk content transfer; DHT and naming traffic are
 never limited. Low rates still allow a minimum burst of 64 KiB.
 
 Your **own published content is never evicted** and never counts against the
 hosting budget. Hosted content (pushed to you, or cached from your fetches) is
-only ever removed to make room: while the budget has space, nothing is deleted
-, not even TTL-expired sets. This is deliberate: every replica a node keeps is
+only ever removed to make room. While the budget has space, nothing is deleted,
+not even TTL-expired sets. This is deliberate: every replica a node keeps is
 content the network can still serve, so a node never *proactively* destroys
-availability: there is no cleanup timer, only eviction priority at the moment
-space is genuinely needed. When a new set needs room, eviction picks
-TTL-expired sets first (least recently accessed first) and falls back to plain
-LRU. Any access or re-push from a healing peer refreshes a set's clock, so
+availability. There is no cleanup timer, only eviction priority at the moment
+space is genuinely needed. When a new set needs room, eviction picks TTL-expired
+sets first (least recently accessed first) and falls back to plain LRU. Any access or re-push from a healing peer refreshes a set's clock, so
 content with a living swarm effectively never expires. Note that publishing an
 *updated* page is a new content set with a new hash: the old version remains
 owned (and so pinned) locally until you delete its blobs by hand.

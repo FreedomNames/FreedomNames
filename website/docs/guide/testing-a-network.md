@@ -29,14 +29,9 @@ FREEDOM_BOOTSTRAP="/ip4/192.168.1.10/tcp/4020/p2p/12D3KooW..." \
 ./freedom-names
 ```
 
-On a **second terminal on the same machine**, the client's API port is already
-free (the bootstrap uses `8430`), but its DNS port is not, so override that one:
-
-```sh
-FREEDOM_BOOTSTRAP="/ip4/192.168.1.10/tcp/4020/p2p/12D3KooW..." \
-FREEDOM_DNS_ADDR="127.0.0.1:8054" \
-./freedom-names
-```
+Running both on **one machine** needs no port overrides: the bootstrap serves its
+API on `8430` and runs no DNS server, so a default client (API `8420`, DNS `8053`,
+ephemeral p2p ports) coexists with it as-is.
 
 Wait ~10-30 seconds, then confirm the DHT routing tables have populated (not just
 a raw connection):
@@ -59,11 +54,12 @@ Publish a name on one node, resolve it on the other:
 ./freedom-names freedom keygen lantest
 ./freedom-names freedom set lantest A 203.0.113.7
 ./freedom-names freedom publish lantest --api http://localhost:8420
+NAME=$(./freedom-names freedom name lantest)
+dig @127.0.0.1 -p 8053 "$NAME" A   # the client's own DNS server resolves it
 
 # on the bootstrap (separate node, separate cache)
 NAME=$(./freedom-names freedom name lantest)   # or copy it from the client
 ./freedom-names freedom lookup "$NAME" --api http://localhost:8430
-dig @127.0.0.1 -p 8053 "$NAME" A
 ```
 
 Success: `publish` returns `Published ...` (not `failed to find any peer in
@@ -79,7 +75,7 @@ free chipnet coins. See the dedicated walkthrough:
 [Claim a bare name](/examples/claim-a-bare-name). In short:
 
 ```sh
-export FREEDOM_BCH_ELECTRUM=ssl://chipnet.bch.ninja:50002
+export FREEDOM_BCH_NETWORK=chipnet        # uses chipnet's built-in server list
 ./freedom-names freedom wallet            # fund the shown address from a faucet
 ./freedom-names freedom keygen mysite
 ./freedom-names freedom claim mysite      # broadcasts the mint tx

@@ -1,14 +1,15 @@
-# Embedding a node (LibreWeb)
+# Embedding a node
 
-Freedom Names is designed to be the whole backend for a decentralized-web
-browser: names *and* content, one local binary. This page describes how a host
-application (such as the LibreWeb browser) spawns and drives a node, replacing an
-IPFS daemon.
+Freedom Names is designed to be the whole backend for a decentralized-web app:
+names *and* content, one local binary. This page describes how a host application
+spawns and drives a node, replacing an IPFS daemon. For a real example see
+[LibreWeb](/guide/libreweb), and the [use cases](/guide/use-cases) for where this
+fits.
 
 ## The model
 
-The browser spawns `freedom-names` as a child process, then talks to it over its
-local HTTP API. For every page load it makes **one** request:
+The host application spawns `freedom-names` as a child process, then talks to it
+over its local HTTP API. For every page load it makes **one** request:
 
 ```
 GET http://127.0.0.1:8420/resolve-content?name=<the .fn name>
@@ -78,11 +79,11 @@ GET /resolve-content?name=blog.<pubKeyID>.fn
   the network.
 - **502**: a transient discovery/transfer failure; retry.
 
-All errors are JSON (`{"error":"..."}`) so the browser can show a friendly page.
+All errors are JSON (`{"error":"..."}`) so the host can show a friendly message.
 
-## Authoring from the browser
+## Authoring from the host app
 
-When the user publishes a page from an in-browser editor, the host uploads and
+When the user publishes a page from an in-app editor, the host uploads and
 points a name at it in one call chain:
 
 ```
@@ -95,11 +96,11 @@ for the flow.
 
 ## Why this replaces IPFS
 
-IPFS gave LibreWeb content transport (add/get blocks) but not naming, and pulled
-in a large daemon. Freedom Names provides both naming (self-certifying and, via
-the registry for globally-unique bare names) and content transport in one small binary,
-with the same content-addressing guarantee: a hash always yields exactly those
-bytes, or nothing.
+IPFS gives content transport (add/get blocks) but not naming, and pulls
+in a large daemon. Freedom Names provides both naming (self-certifying names,
+plus globally-unique bare names on Bitcoin Cash) and content transport in one
+small binary, with the same content-addressing guarantee: a hash always yields
+exactly those bytes, or nothing.
 
 ## Next
 

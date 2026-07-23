@@ -6,8 +6,8 @@ No. Self-certifying names have **no consensus at all** and no chain. They don't
 need one, because names are derived from public keys and therefore can't
 collide. Records live in a peer-to-peer DHT, ordered per-name by a sequence number.
 
-The optional [name registry](/guide/bare-names) *does* borrow a blockchain (Bitcoin Cash)
-to decide who owns a globally-unique bare name. Resolution only reads the chain
+[Bare names](/guide/bare-names) *do* borrow a blockchain (Bitcoin Cash)
+to decide who owns a globally-unique name. Resolution only reads the chain
 (registering or transferring a bare name writes to it), and none of this makes
 self-certifying names a blockchain.
 
@@ -24,10 +24,9 @@ The key **is** the name. If you lose the private key under
 `~/.freedom/keys/<label>.key`, you can no longer publish updates for that
 self-certifying name. Back it up like you would any critical secret.
 
-The registry adds a **transfer** operation that lets an owner rotate the keypair
-a *bare* name points at (useful after a key compromise) while keeping the human
-name, but that only applies to bare names, not the raw
-`label.<pubKeyID>.fn` form.
+[Bare names](/guide/bare-names) add a **transfer** operation that rotates the
+keypair a bare name points at (useful after a key compromise) while keeping the
+human name; the raw `label.<pubKeyID>.fn` form has no such operation.
 
 ## What record types are supported?
 
@@ -55,9 +54,9 @@ Names node can act as your only resolver. See
 ## Why the visible key suffix?
 
 Because self-certification requires the name to carry (a hash of) the key. That's
-the cost of needing **no registry and no consensus**. Clean bare names like
-`mysite.fn` are the job of the [name registry](/guide/bare-names), which pays for
-global uniqueness with on-chain consensus.
+the cost of needing **no registration and no consensus**. Clean bare names like
+`mysite.fn` instead pay for global uniqueness with
+[on-chain consensus](/guide/bare-names).
 
 ## Is it production-ready?
 
@@ -71,7 +70,7 @@ guarantees are solid, but this is a young project, so expect sharp edges.
   server**, so `.fn` works with ordinary tooling.
 - **ENS / Handshake**: those put the whole namespace on a blockchain. Freedom
   Names keeps self-certifying names **chain-free**, and only reaches for a chain (BCH)
-  in the [registry](/guide/bare-names), for *bare* names, and even then, only the name→owner
+  for [bare names](/guide/bare-names), and even then, only the name→owner
   binding is on-chain, never the records.
 
 ## Where's the code?
