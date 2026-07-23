@@ -64,6 +64,30 @@ Use a **publicly reachable** address for a bootstrap node; other machines must b
 able to open a connection to it. Make sure the relevant TCP/UDP ports are open.
 :::
 
+## Firewall / ports
+
+A bootstrap node enables UPnP port mapping (`NATPortMap`), so on many home
+routers the ports open themselves. When UPnP is off or unavailable, forward these
+four ports to the node **inbound**:
+
+| Port | Protocol | Transport |
+|---|---|---|
+| `4020` | TCP | plain TCP |
+| `4020` | UDP | QUIC |
+| `4021` | UDP | QUIC WebTransport |
+| `4022` | UDP | WebRTC-direct |
+
+Port `4020` is needed on **both** TCP and UDP; they are separate transports that
+share the number. So in total: TCP `4020`, and UDP `4020`, `4021`, `4022`.
+
+Do **not** expose the HTTP API (`8430`): it binds to `127.0.0.1` and is an
+unauthenticated control surface, so it must stay on loopback. A bootstrap node
+runs no DNS server, so there is no DNS port to open either.
+
+A normal node has nothing to forward: it uses ephemeral p2p ports and reaches the
+network through this bootstrap node's relay and hole-punching, which is why the
+bootstrap node is the one that needs a public address and open ports.
+
 ## Point other nodes at it
 
 On each other node, set `FREEDOM_BOOTSTRAP` to a comma-separated list of bootstrap
