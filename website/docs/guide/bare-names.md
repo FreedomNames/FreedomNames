@@ -46,7 +46,8 @@ different names. The trade-off is the visible key suffix.
 A bare name has no suffix, so two people *can* both want `mysite`. Deciding who
 wins is a consensus problem. Bare names borrow Bitcoin Cash's consensus: the
 first confirmed claim wins, and the claim is a **CashTokens NFT** you actually
-hold in your wallet.
+hold in your wallet. You claim it once and it is yours for good, with nothing to
+renew (see [Permanence](#permanence)).
 
 The node treats BCH as a **read-only resolver source**: it *reads* on-chain
 state to answer "who owns `mysite`?". Consensus stays entirely on BCH; the key
@@ -100,8 +101,65 @@ the NFT, set its commitment to `hash160(newOwnerPubKey)`, and attach
 you can also **send it in any token-aware wallet**; the new holder then runs
 `freedom adopt <name>` once to bind it to their own key.
 
-A claim is **permanent**: names never expire, and there is no renewal or
-revocation mechanism. Ownership only changes when the NFT itself moves.
+## Permanence
+
+::: tip A claim is permanent
+You pay **once** and the name is yours indefinitely. There is no expiry, no
+renewal, no subscription, and no authority that can revoke it. Ownership changes
+only when *you* move the NFT.
+:::
+
+This describes **FN v1**, the protocol as it ships today. Unlike a DNS domain, a
+bare name is not leased: nothing in v1 tracks a registration date or a term, so
+nothing can lapse:
+
+- **No expiry.** A name has no end date. A claim confirmed today resolves the
+  same way in ten years, whether or not you ever touch it again.
+- **No renewal.** There is no yearly fee and no "renew" command. The only cost
+  is the one-off claim transaction: a 1000-sat NFT output you keep, a 546-sat
+  dust marker, plus a normal BCH network fee.
+- **No revocation.** There is no registrar, no takedown path, and no key that
+  can override the chain. Resolvers only read; nobody can write on your behalf.
+- **No dormancy rule.** Nodes going offline, records expiring in the DHT, or the
+  name never being resolved make no difference. The on-chain binding is
+  independent of whether anyone is publishing under it.
+
+The name-to-owner binding lives on Bitcoin Cash, so it lasts exactly as long as
+that chain does, and it survives you losing your Freedom Names node, changing
+hosts, or being offline for years.
+
+### What *does* change ownership
+
+Only the NFT moving:
+
+- **You transfer it deliberately**, either by rebinding to a new key (`FN02`) or
+  by sending the token in a wallet, after which the new holder runs
+  `freedom adopt`. That is how a name is sold or handed over.
+- **You lose the NFT** (lost wallet seed, or spending it away by accident). The
+  name stays claimed forever, but you can no longer rebind it. Back up the
+  wallet holding the name NFT, not just your Freedom Names owner key.
+
+Losing your Ed25519 *owner* key is recoverable: as long as you still hold the
+NFT, rebind to a fresh key with `FN02`. Losing the *NFT* is not.
+
+::: warning Permanent also means unrecyclable
+Because names never expire, a claimed name is never released back into the pool,
+even if it is abandoned. First confirmed claim wins, permanently. There is no
+dispute process and no trademark procedure; if a name matters to you, claim it
+early.
+:::
+
+### This is the v1 rule
+
+Permanence is how **v1** chooses to keep ownership minimal: a name is a token,
+and the first confirmed claim wins. It is a property of the current protocol
+rather than a promise about every future version. A v2 may introduce
+tradeable-name marketplaces and stake-weighted conflict resolution (see
+[Reserved for later](#reserved-for-later)), which would give abandoned or
+disputed names more nuance than "claimed forever".
+
+Nothing along those lines has shipped, and nothing in v1 can expire a name you
+hold today.
 
 ## Resolution
 
@@ -207,4 +265,5 @@ and fund the `bitcoincash:` address instead. See the full walkthrough in
 
 The design leaves room for a v2 that adds tradeable-name marketplaces and
 stake-weighted conflict resolution (LBRY-style). v1 keeps it minimal: a name is
-a token, first confirmed claim wins.
+a token, first confirmed claim wins, and that claim is
+[permanent](#permanence).

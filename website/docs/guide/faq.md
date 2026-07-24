@@ -18,6 +18,24 @@ from *your* public key. Someone else's `mysite` is a **different name** because
 their key suffix differs. And nobody can overwrite your records without producing a
 valid signature from your key, which they don't have.
 
+## Do bare names expire?
+
+No. In **v1**, a claim is permanent: you pay the one-off claim transaction and
+the name is yours indefinitely. There is no expiry date, no renewal fee, and no
+authority that can revoke it. Ownership changes only when you move the name's
+CashTokens NFT yourself.
+
+The flip side is that names are never recycled, even when abandoned: first
+confirmed claim wins, permanently. See
+[Permanence](/guide/bare-names#permanence) for the details, including what
+happens if you lose the NFT.
+
+This is a **v1 rule, not a permanent guarantee about the protocol**. v1 keeps
+ownership deliberately minimal (a name is a token, first confirmed claim wins);
+a future v2 may add tradeable-name marketplaces and stake-weighted conflict
+resolution. Names already claimed under v1 are unaffected by anything that has
+shipped so far.
+
 ## What if I lose my key?
 
 The key **is** the name. If you lose the private key under
