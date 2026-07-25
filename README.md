@@ -150,9 +150,9 @@ A node runs several things at once:
   content-addressed blobstore + a stream protocol), so a name can point at an
   actual page, not just DNS records. This is what lets Freedom Names back a
   decentralized-web browser such as LibreWeb, replacing IPFS,
-- a **DNS server** (default `:8053`) that resolves `.fn` names and forwards
-  everything else upstream. Point your OS/browser at it (or bridge it to `:53`,
-  see below) and `.fn` just works,
+- a **DNS server** (default `:8053`) that resolves `.fn` names for anyone and
+  forwards everything else upstream for local clients. Point your OS/browser at
+  it (or bridge it to `:53`, see below) and `.fn` just works,
 - an **HTTP API** (default `127.0.0.1:8420`) for publishing, resolving, and
   content.
 
@@ -243,7 +243,14 @@ through a hostname, list it in `FREEDOM_HTTP_ALLOWED_HOSTS`.
 ```
 
 Keys and staged records live under `~/.freedom/keys/`. The node's own libp2p
-identity (`private.key`) is separate, so names are portable between nodes.
+identity (`~/.freedom/private.key`) is separate, so names are portable between
+nodes. (A `private.key` already sitting in the working directory is still used,
+so an existing node keeps its peer id.)
+
+Records are bounded, because every node in the DHT neighbourhood carries them:
+at most **32 resource records** per name, a **`TXT` value of 255 bytes** (the
+DNS character-string limit), a **`CNAME` target of 253**, and a **label of
+190**. `set` and `publish` reject anything larger.
 
 ### Bare names on Bitcoin Cash
 
@@ -289,7 +296,9 @@ dig @127.0.0.1 -p 8053 mysite.<pubKeyID>.fn A
 ```
 
 Non-`.fn` queries are transparently forwarded to the upstream resolver, so the
-Freedom Names node can act as your system resolver.
+Freedom Names node can act as your system resolver. Forwarding is done for
+clients on this machine and the local network; remote clients get `REFUSED`
+(see [Configuration](#configuration)), while `.fn` is answered for everyone.
 
 ## HTTP API
 

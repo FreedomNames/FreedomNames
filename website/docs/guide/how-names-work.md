@@ -48,6 +48,24 @@ The signature covers a **canonical** encoding of the record (fixed field order,
 records sorted by type then value) so that signing and verification are stable
 regardless of JSON ordering.
 
+### Size limits
+
+A record is replicated to a whole neighbourhood of DHT peers and republished for
+as long as it lives, so every node on the network carries it. Records are
+therefore bounded, and anything over the limit is rejected at publish time
+rather than becoming a payload the network has to haul around:
+
+| Limit | Value | Why |
+| --- | --- | --- |
+| resource records per name | 32 | one name, one modest record set |
+| `label` length | 190 bytes | the label plus the `<pubKeyID>.fn` suffix has to fit a DNS name |
+| `TXT` value | 255 bytes | the DNS character-string limit — a longer value cannot be put on the wire at all |
+| `CNAME` target | 253 bytes | the DNS name limit |
+
+Need more than 255 bytes of text? Stage [several `TXT`
+records](/examples/txt-record), or put the payload in
+[content](/guide/content) and point a `CONTENT` record at it.
+
 ## Where records live
 
 Each record is stored in the DHT under a key derived from its own public key:

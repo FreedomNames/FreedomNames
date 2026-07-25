@@ -19,8 +19,16 @@ answer for `example.com` too:
 dig @127.0.0.1 -p 8053 example.com A
 ```
 
-One caveat: forwarding uses plain UDP and does not retry truncated answers over
-TCP, so unusually large upstream responses can arrive truncated.
+Two caveats:
+
+- Forwarding uses plain UDP and does not retry truncated answers over TCP, so
+  unusually large upstream responses can arrive truncated.
+- Forwarding is only done for **local clients** (loopback, private and
+  link-local addresses). Asking a node on a public IP to resolve `example.com`
+  for you gets `REFUSED`, because forwarding for anyone would make it an
+  [open resolver](/guide/configuration#who-the-dns-server-answers). `.fn`
+  queries are answered for everyone. Set `FREEDOM_DNS_RECURSION=any` if you
+  really do want a public forwarder.
 
 This is what makes a Freedom Names node usable as your **only** resolver: it adds
 `.fn` without breaking the rest of the internet.

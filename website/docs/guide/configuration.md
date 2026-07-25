@@ -8,6 +8,8 @@ node is entirely driven by its environment.
 | `FREEDOM_HTTP_ADDR` | `127.0.0.1:8420` (bootstrap: `127.0.0.1:8430`) | HTTP API listen address (loopback by default) |
 | `FREEDOM_DNS_ADDR` | `:8053` | DNS server listen address |
 | `FREEDOM_UPSTREAM_DNS` | `1.1.1.1:53` | Upstream resolver for non-`.fn` queries |
+| `FREEDOM_DNS_RECURSION` | `local` | Who may have non-`.fn` queries forwarded upstream. `local` = this machine and the local network; `any` = a public open resolver |
+| `FREEDOM_HTTP_ALLOWED_HOSTS` | *(none)* | Extra `Host` header values the HTTP API accepts, beyond `localhost` and IP literals |
 | `FREEDOM_CONTENT_DIR` | `~/.freedom/content` | Content-addressed blobstore directory |
 | `FREEDOM_BOOTSTRAP` | *(none)* | Comma-separated bootstrap peer multiaddrs |
 | `FREEDOM_BCH_NETWORK` | `mainnet` | BCH network for bare names: `mainnet`, `chipnet`, `testnet4`, or `testnet3` |
@@ -32,6 +34,19 @@ The HTTP API binds to **`127.0.0.1`** by default: it is an unauthenticated local
 control surface (a browser or app spawns the node), so it must not be exposed on
 all interfaces. Set `FREEDOM_HTTP_ADDR=:8420` to share it on a LAN deliberately.
 
+Because it is unauthenticated, the API also defends itself against being driven
+by a web page you merely visited:
+
+- Requests whose `Host` header is a **domain name** are refused with `403`. That
+  is how a DNS-rebinding attack reaches a service on `localhost`. `localhost`
+  and IP literals (`127.0.0.1`, `[::1]`, a LAN address) are accepted; if you
+  reach the API through a real hostname, list it in
+  `FREEDOM_HTTP_ALLOWED_HOSTS`.
+- Requests that change something (`POST`, `DELETE`) carrying an `Origin` header
+  from another site are refused with `403` — cross-site request forgery. A
+  browser always sends `Origin` on those; `curl`, the CLI and an embedding app
+  send none and are unaffected.
+
 A spawning host can also override these with **flags**, which take precedence
 over the environment: `--http-addr HOST:PORT`, `--api-bind HOST`,
 `--content-dir DIR`, `--dns-addr HOST:PORT`. Note that `--api-bind` replaces
@@ -50,6 +65,28 @@ of your own servers. Self-certifying names always resolve regardless of these se
 The DNS server defaults to the high port **`:8053`**, so a node runs **without
 root**. If the DNS port can't be bound, the node logs a warning and keeps running;
 the DHT and HTTP API are unaffected.
+
+### Who the DNS server answers
+
+The DNS listen address covers **every interface** by default, so it is worth
+being precise about what a stranger who reaches it can ask for:
+
+- **`.fn` queries: answered for anyone.** These are authoritative, public data —
+  the same answer everyone gets, straight from the DHT.
+- **Everything else: forwarded only for local clients** (loopback, and private
+  or link-local addresses). A node that forwarded arbitrary queries for the
+  whole internet would be an **open resolver**: a tool strangers can bounce
+  amplified traffic off at a third party. Remote clients get `REFUSED`.
+
+Every setup in these docs points a resolver at `127.0.0.1`, so this costs you
+nothing. If you deliberately want a public forwarder, opt in:
+
+```sh
+FREEDOM_DNS_RECURSION=any ./freedom-names
+```
+
+The node logs a warning at startup when you do. Only run that on a resolver you
+intend to expose, with your own rate limiting in front of it.
 
 ## Examples
 

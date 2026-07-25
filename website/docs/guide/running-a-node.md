@@ -42,8 +42,8 @@ That single command starts:
 
 - a **libp2p DHT peer**, the decentralized storage/resolution network,
 - a **content service** that stores and retrieves page bytes over libp2p,
-- a **DNS server** (default `:8053`) that resolves `.fn` names and forwards
-  everything else upstream,
+- a **DNS server** (default `:8053`) that resolves `.fn` names for anyone and
+  forwards everything else upstream for local clients,
 - an **HTTP API** (default `:8420`) for publishing and resolving.
 
 You now have a working local Freedom Names instance. Leave it running in a
