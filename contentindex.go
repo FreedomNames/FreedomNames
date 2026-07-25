@@ -288,16 +288,20 @@ func (ix *ContentIndex) hostedBytesLocked() int64 {
 // Reserve admits a hosted set and holds its size against the budget until the
 // caller reports the outcome with Release. Every admitted transfer must be
 // paired with exactly one Release, or the budget leaks.
+//
+// The admission test and the reservation happen under a single lock hold. Doing
+// them as two steps would leave exactly the gap this exists to close: both
+// callers test against the same usage, then both reserve.
 func (ix *ContentIndex) Reserve(size, budget, maxSize int64, ttl time.Duration, now time.Time) bool {
 	if ix == nil {
 		return true // store-only service (tests): no policy
 	}
-	if !ix.Admit(size, budget, maxSize, ttl, now) {
+	ix.mu.Lock()
+	defer ix.mu.Unlock()
+	if !ix.admitLocked(size, budget, maxSize, ttl, now) {
 		return false
 	}
-	ix.mu.Lock()
 	ix.reserved += size
-	ix.mu.Unlock()
 	return true
 }
 
@@ -327,11 +331,17 @@ func (ix *ContentIndex) Admit(size, budget, maxSize int64, ttl time.Duration, no
 	if ix == nil {
 		return true // store-only service (tests): no policy
 	}
+	ix.mu.Lock()
+	defer ix.mu.Unlock()
+	return ix.admitLocked(size, budget, maxSize, ttl, now)
+}
+
+// admitLocked is Admit's body. Caller holds mu, so an admission can be made
+// atomic with whatever the caller does about it (see Reserve).
+func (ix *ContentIndex) admitLocked(size, budget, maxSize int64, ttl time.Duration, now time.Time) bool {
 	if size > maxSize || size > budget {
 		return false
 	}
-	ix.mu.Lock()
-	defer ix.mu.Unlock()
 
 	evicted := false
 	defer func() {

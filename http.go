@@ -159,11 +159,16 @@ func hostAllowed(rawHost string, allowed []string) bool {
 }
 
 // originAllowed reports whether a mutating request's Origin may act on this
-// API. A missing Origin (every non-browser client) passes; a present one must
-// name the same host the request was addressed to.
+// API. A missing Origin (every non-browser client: curl, the CLI, an embedding
+// app) passes; a present one must name the same host the request was addressed
+// to.
+//
+// "null" is NOT treated as missing. A sandboxed iframe sends Origin: null, so
+// an attacker's page can opt into that value at will — accepting it would hand
+// back the cross-site request forgery this is here to stop.
 func originAllowed(r *http.Request) bool {
 	origin := r.Header.Get("Origin")
-	if origin == "" || origin == "null" {
+	if origin == "" {
 		return true
 	}
 	u, err := url.Parse(origin)

@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -59,6 +61,9 @@ func TestLocalAPIGuardRejectsRebindingAndCrossOrigin(t *testing.T) {
 		// A cross-origin GET leaks nothing (the reply is unreadable without
 		// CORS headers, which we never send) so it is not blocked.
 		{"cross-origin GET", http.MethodGet, "localhost:8420", "https://attacker.example", http.StatusOK},
+		// A sandboxed iframe sends Origin: null, so an attacker's page can
+		// choose that value: it must not be treated as "no Origin".
+		{"null origin POST", http.MethodPost, "localhost:8420", "null", http.StatusForbidden},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -223,5 +228,55 @@ func TestReserveBlocksConcurrentBudgetOvershoot(t *testing.T) {
 	ix.Release(size)
 	if got := ix.HostedBytes(); got != 0 {
 		t.Fatalf("hosted bytes = %d after an extra release, want 0", got)
+	}
+}
+
+// TestReserveIsAtomicUnderConcurrency is the test the first cut of the fix
+// would have failed: testing the budget and taking the reservation as two
+// separate lock holds leaves both callers passing the same check. Pushes arrive
+// on independent streams, so this is the real shape of the race.
+func TestReserveIsAtomicUnderConcurrency(t *testing.T) {
+	dir := t.TempDir()
+	store, err := NewBlobStore(dir)
+	if err != nil {
+		t.Fatalf("store: %v", err)
+	}
+	ix, err := LoadContentIndex(dir, store)
+	if err != nil {
+		t.Fatalf("index: %v", err)
+	}
+
+	const (
+		budget  = 10_000
+		size    = 1_000
+		callers = 64
+	)
+	// Exactly 10 of the 64 racing reservations can fit in the budget.
+	want := budget / size
+
+	var (
+		wg      sync.WaitGroup
+		start   = make(chan struct{})
+		granted atomic.Int64
+	)
+	now := time.Now()
+	for range callers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start // release them all at once to maximise overlap
+			if ix.Reserve(size, budget, budget, time.Hour, now) {
+				granted.Add(1)
+			}
+		}()
+	}
+	close(start)
+	wg.Wait()
+
+	if got := granted.Load(); got != int64(want) {
+		t.Fatalf("%d concurrent reservations granted, want exactly %d (budget %d / size %d)", got, want, budget, size)
+	}
+	if got := ix.HostedBytes(); got != int64(want)*size {
+		t.Fatalf("reserved bytes = %d, want %d", got, int64(want)*size)
 	}
 }

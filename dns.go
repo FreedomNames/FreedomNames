@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/netip"
+	"sync/atomic"
 	"time"
 
 	"codeberg.org/miekg/dns"
@@ -30,8 +31,12 @@ type DNSServer struct {
 	recurseAny bool
 	// inflight bounds concurrent .fn lookups; see maxInflightFN.
 	inflight chan struct{}
-	udp      *dns.Server
-	tcp      *dns.Server
+	// dropped counts shed lookups; lastDropLog is the unix-nano timestamp of
+	// the last warning, so the warning itself stays rate limited.
+	dropped     atomic.Int64
+	lastDropLog atomic.Int64
+	udp         *dns.Server
+	tcp         *dns.Server
 }
 
 // maxInflightFN bounds how many .fn queries may be walking the DHT at once.
@@ -131,7 +136,10 @@ func (s *DNSServer) handleFN(ctx context.Context, w dns.ResponseWriter, r *dns.M
 	case s.inflight <- struct{}{}:
 		defer func() { <-s.inflight }()
 	default:
-		log.Printf("DNS: refusing %s, %d lookups already in flight", name, maxInflightFN)
+		// Throttled: the cap is reached precisely when queries are flooding in,
+		// and a line per refused query would turn a lookup flood into a log
+		// flood.
+		s.logOverloaded(name)
 		r.Reset()
 		r.Response = true
 		r.RecursionAvailable = true
@@ -195,6 +203,23 @@ func (s *DNSServer) handleForward(ctx context.Context, w dns.ResponseWriter, r *
 		return
 	}
 	respond(w, resp)
+}
+
+// overloadLogInterval is the minimum gap between "lookups in flight" warnings.
+const overloadLogInterval = 10 * time.Second
+
+// logOverloaded reports that a lookup was shed, at most once per
+// overloadLogInterval, counting the ones it swallowed so the log still conveys
+// the scale.
+func (s *DNSServer) logOverloaded(name string) {
+	dropped := s.dropped.Add(1)
+	last := s.lastDropLog.Load()
+	now := time.Now().UnixNano()
+	if now-last < int64(overloadLogInterval) || !s.lastDropLog.CompareAndSwap(last, now) {
+		return
+	}
+	log.Printf("DNS: shedding lookups (%d refused so far, %d already in flight), most recently %s",
+		dropped, maxInflightFN, name)
 }
 
 // forwardingAllowed reports whether a client may use this node as a recursive
