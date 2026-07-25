@@ -106,6 +106,7 @@ export default defineConfig({
 
     socialLinks: [
       { icon: 'gitlab', link: 'https://gitlab.melroy.org/freedom-names/freedom-names' },
+      { icon: 'github', link: 'https://github.com/FreedomNames/FreedomNames' },
       { icon: 'telegram', link: 'https://t.me/freedomnames', ariaLabel: 'Telegram' },
       { icon: 'matrix', link: 'https://matrix.to/#/#freedomnames:melroy.org', ariaLabel: 'Matrix chat' },
     ],
