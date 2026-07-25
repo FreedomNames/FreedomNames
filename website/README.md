@@ -7,7 +7,7 @@ built with [VitePress](https://vitepress.dev).
 
 ```sh
 npm install
-npm run docs:dev
+npm run dev
 ```
 
 Open the printed local URL (default `http://localhost:5173`).
@@ -15,8 +15,8 @@ Open the printed local URL (default `http://localhost:5173`).
 ## Build
 
 ```sh
-npm run docs:build     # outputs static site to docs/.vitepress/dist
-npm run docs:preview   # serve the built site locally
+npm run build     # outputs static site to docs/.vitepress/dist
+npm run preview   # serve the built site locally
 ```
 
 ## Structure

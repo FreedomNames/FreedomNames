@@ -127,7 +127,7 @@ func TestDNSServerAnswersFN(t *testing.T) {
 	addr := pc.LocalAddr().String()
 	pc.Close()
 
-	srv := NewDNSServer(addr, "127.0.0.1:53", resolver)
+	srv := NewDNSServer(addr, "127.0.0.1:53", resolver, false)
 	if err := srv.Start(); err != nil {
 		t.Fatalf("start dns server: %v", err)
 	}

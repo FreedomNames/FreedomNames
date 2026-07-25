@@ -15,6 +15,12 @@ tokens, SPF policies, public notes, or small machine-readable metadata.
 You can stage **multiple** `TXT` records; they're all published together under the
 one name.
 
+Each value is capped at **255 bytes**, the DNS character-string limit — a longer
+one cannot be put on the wire, so `set` rejects it rather than letting you
+publish a record no resolver could answer with. Split a longer payload across
+several `TXT` records, or store it as [content](/guide/content) and point a
+`CONTENT` record at it. A name carries at most 32 records in total.
+
 ## Read it back
 
 Filter the resolve to just `TXT`:

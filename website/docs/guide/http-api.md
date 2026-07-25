@@ -5,6 +5,30 @@ resolving records, moving content, and inspecting the node. The CLI talks to thi
 same API. The API binds to loopback by default; it is an unauthenticated local
 control surface, so expose it beyond `127.0.0.1` only deliberately.
 
+Because it is unauthenticated, three classes of request are refused with `403`
+before they reach any route, so a web page you merely visited cannot drive the
+node behind your back:
+
+- a `Host` header that is a **domain name** rather than `localhost` or an IP
+  literal (this is how DNS rebinding reaches a service on `localhost`) — add
+  yours to `FREEDOM_HTTP_ALLOWED_HOSTS` if you front the API with a hostname
+  (with or without the port: both are matched);
+- any request carrying `Sec-Fetch-Site: cross-site`, i.e. one another site
+  caused your browser to make;
+- a request whose `Origin` header names another site (cross-site request
+  forgery).
+
+Note that `GET` is **not** a safe method here: [`/content`](#post-get-content)
+and [`/resolve-content`](#get-resolve-content) fetch from the network on a miss
+and *keep* what they fetch, announcing this node to the DHT as a provider of it.
+A plain `<img src="http://localhost:8420/content?hash=…">` on someone else's
+page sends no `Origin` at all, so the `Sec-Fetch-Site` check is what stops a
+page you visited from choosing what your node hosts and advertises.
+
+`curl`, the `freedom` CLI and an embedding app send none of these headers, so
+nothing in this reference changes for them; nor does typing a URL into the
+address bar, or a page served from this same node.
+
 | Route | Method | Purpose |
 | --- | --- | --- |
 | [`/publish`](#post-publish) | POST | Store a signed `FNRecord` |
@@ -46,8 +70,12 @@ rejects anything unowned, forged, expired, or malformed.
 ```
 
 **Errors:** `400` if the body isn't a valid `FNRecord` or fails verification;
-`405` for methods other than POST; `500` if the DHT isn't initialized or
-storage fails.
+`405` for methods other than POST; `413` if the body exceeds 1 MiB; `500` if the
+DHT isn't initialized or storage fails.
+
+Verification enforces the [record size
+limits](/guide/how-names-work#size-limits), so an oversized record set comes
+back as `400`, not as a record the network refuses to carry later.
 
 ::: tip
 You rarely POST this by hand, since signing requires the private key. Use

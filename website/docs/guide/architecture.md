@@ -26,7 +26,9 @@ Running `./freedom-names` starts all of these at once:
   blobstore, advertises and fetches them over libp2p, accepts replica pushes,
   and repairs the configured replica count.
 - **DNS server** (default `:8053`, no root needed): resolves `.fn` names through
-  the resolver and transparently forwards everything else to an upstream resolver.
+  the resolver for any client, and transparently forwards everything else to an
+  upstream resolver for local clients (see
+  [who it answers](/guide/configuration#who-the-dns-server-answers)).
   Run it on `:53` (see [the `:53` port](/guide/running-a-node#the-53-port)) and
   [point your OS at it](/guide/resolving), and `.fn` works everywhere.
 - **HTTP API** (default `127.0.0.1:8420`): publish and resolve records, manage
@@ -102,10 +104,10 @@ does. Read the full design in [Bare names](/guide/bare-names).
 
 ## Portability
 
-The node's own libp2p identity (`private.key`) is separate from your **name**
-keys, which live under `~/.freedom/keys/`. That means your names are portable: you
-can publish them from any node, and moving to a new node doesn't change who owns
-what.
+The node's own libp2p identity (`~/.freedom/private.key`) is separate from your
+**name** keys, which live under `~/.freedom/keys/`. That means your names are
+portable: you can publish them from any node, and moving to a new node doesn't
+change who owns what.
 
 ## Next
 

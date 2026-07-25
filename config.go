@@ -18,6 +18,16 @@ type Config struct {
 	Bootstrap   []string // bootstrap peer multiaddrs
 	ContentDir  string   // content-addressed blobstore directory
 
+	// DNSRecursionAny lets ANY client use this node to forward non-.fn queries
+	// upstream. Off by default: forwarding for the whole internet is an open
+	// resolver, i.e. a reflection/amplification tool. See forwardingAllowed.
+	DNSRecursionAny bool
+
+	// HTTPAllowedHosts is the extra Host header values the HTTP API accepts
+	// beyond localhost and bare IP literals. Empty by default; needed only when
+	// the API is reached through a hostname (see hostAllowed).
+	HTTPAllowedHosts []string
+
 	// BootstrapMode reports whether this process runs as a bootstrap node
 	// (`freedom-names bootstrap`): fixed p2p ports, DHT server mode, an HTTP
 	// API on 8430 and no DNS server. Resolved once in main() and read
@@ -106,6 +116,12 @@ func LoadConfigForRole(bootstrapMode bool) *Config {
 	}
 	if v := os.Getenv("FREEDOM_BOOTSTRAP"); v != "" {
 		cfg.Bootstrap = splitAndTrim(v)
+	}
+	// Recursion for remote clients is opt-in and spelled out explicitly, so it
+	// can never be enabled by a typo in an unrelated variable.
+	cfg.DNSRecursionAny = strings.EqualFold(os.Getenv("FREEDOM_DNS_RECURSION"), "any")
+	if v := os.Getenv("FREEDOM_HTTP_ALLOWED_HOSTS"); v != "" {
+		cfg.HTTPAllowedHosts = splitAndTrim(strings.ToLower(v))
 	}
 	if v := os.Getenv("FREEDOM_BCH_MINCONF"); v != "" {
 		if n, err := strconv.ParseInt(v, 10, 64); err == nil && n >= 1 {

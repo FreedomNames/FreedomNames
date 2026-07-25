@@ -8,6 +8,7 @@ import (
 func (freedomName *FreedomNameNode) statsLoop() {
 	// Collect stats every 30 seconds
 	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:

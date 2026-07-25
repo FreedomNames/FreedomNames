@@ -49,7 +49,7 @@ docs:
   script:
     - cd website
     - npm ci
-    - npm run docs:build
+    - npm run build
 
 go-build:
   stage: build
@@ -87,7 +87,7 @@ docs-deploy:
   script:
     - cd website
     - npm ci
-    - npm run docs:build
+    - npm run build
     # The deployer expects the site at the top level of the artifact, so lift it
     # out of website/docs/.vitepress/ and into ./public at the repo root.
     - mv docs/.vitepress/dist "$CI_PROJECT_DIR/public"

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -371,10 +372,35 @@ func BootstrapPeerInfos(addrs []string) []peer.AddrInfo {
 	return infos
 }
 
+// nodeKeyPath returns where this node's libp2p identity key lives. A key
+// already sitting in the working directory is honoured, so nodes that predate
+// the move keep their peer id; otherwise a new key goes to ~/.freedom, next to
+// the other secrets. Writing a private key into whatever directory the node
+// happened to be launched from (a repo checkout, /tmp, a shared drive) is not a
+// safe default.
+func nodeKeyPath() string {
+	const legacy = "private.key"
+	if _, err := os.Stat(legacy); err == nil {
+		return legacy
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return legacy // no home directory to speak of; keep the old behaviour
+	}
+	dir := filepath.Join(home, ".freedom")
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return legacy
+	}
+	return filepath.Join(dir, "private.key")
+}
+
 func loadOrGenerateKey() (crypto.PrivKey, error) {
-	keyFile := "private.key"
+	keyFile := nodeKeyPath()
 	// Check if key file exists
-	if _, err := os.Stat(keyFile); err == nil {
+	if info, err := os.Stat(keyFile); err == nil {
+		if mode := info.Mode().Perm(); mode&0077 != 0 {
+			log.Printf("WARNING: node identity key %s is group/world readable (mode %04o); run: chmod 600 %s", keyFile, mode, keyFile)
+		}
 		// Load key from file
 		keyData, err := os.ReadFile(keyFile)
 		if err != nil {
@@ -397,6 +423,7 @@ func loadOrGenerateKey() (crypto.PrivKey, error) {
 	if err := os.WriteFile(keyFile, keyData, 0600); err != nil { // Store securely
 		return nil, err
 	}
+	log.Printf("Generated node identity key at %s", keyFile)
 
 	return priv, nil
 }

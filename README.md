@@ -150,9 +150,9 @@ A node runs several things at once:
   content-addressed blobstore + a stream protocol), so a name can point at an
   actual page, not just DNS records. This is what lets Freedom Names back a
   decentralized-web browser such as LibreWeb, replacing IPFS,
-- a **DNS server** (default `:8053`) that resolves `.fn` names and forwards
-  everything else upstream. Point your OS/browser at it (or bridge it to `:53`,
-  see below) and `.fn` just works,
+- a **DNS server** (default `:8053`) that resolves `.fn` names for anyone and
+  forwards everything else upstream for local clients. Point your OS/browser at
+  it (or bridge it to `:53`, see below) and `.fn` just works,
 - an **HTTP API** (default `127.0.0.1:8420`) for publishing, resolving, and
   content.
 
@@ -179,6 +179,8 @@ All configuration is via environment variables (nothing is hardcoded):
 | `FREEDOM_HTTP_ADDR` | `127.0.0.1:8420` (bootstrap: `127.0.0.1:8430`) | HTTP API listen address (loopback by default) |
 | `FREEDOM_DNS_ADDR` | `:8053` | DNS server listen address |
 | `FREEDOM_UPSTREAM_DNS` | `1.1.1.1:53` | Upstream resolver for non-`.fn` queries |
+| `FREEDOM_DNS_RECURSION` | `local` | Who may have non-`.fn` queries forwarded upstream. `local` serves this machine and the local network; `any` makes the node a public open resolver (see below) |
+| `FREEDOM_HTTP_ALLOWED_HOSTS` | (none) | Extra `Host` header values the HTTP API accepts, beyond `localhost` and IP literals |
 | `FREEDOM_BOOTSTRAP` | (none) | Comma-separated bootstrap peer multiaddrs |
 | `FREEDOM_CONTENT_DIR` | `~/.freedom/content` | On-disk directory for the content-addressed blobstore |
 | `FREEDOM_BCH_NETWORK` | `mainnet` | BCH network for bare names: `mainnet`, `chipnet`, `testnet4`, or `testnet3` |
@@ -205,6 +207,19 @@ standard `:53`. Options:
 - Or keep `:8053` and forward `:53 → :8053` with a local resolver
   (dnsmasq/systemd-resolved), or point a stub resolver at `127.0.0.1:8053`.
 
+`.fn` names are answered for anyone who can reach the listen address — that is
+public, authoritative data. Everything *else* is only forwarded upstream for
+clients on this machine or the local network, so a node on a public IP is not an
+open resolver that strangers can bounce traffic off. Set
+`FREEDOM_DNS_RECURSION=any` only if you intend to run a public forwarder.
+
+The HTTP API is unauthenticated and bound to loopback. It additionally rejects
+requests whose `Host` header is a domain name (which is how a DNS-rebinding
+attack reaches a local service) and mutating requests carrying a foreign
+`Origin` (cross-site request forgery from a page you merely visited). Command
+line clients send neither header and are unaffected; if you reach the API
+through a hostname, list it in `FREEDOM_HTTP_ALLOWED_HOSTS`.
+
 ## Managing names with the CLI
 
 ### Self-certifying names
@@ -228,7 +243,14 @@ standard `:53`. Options:
 ```
 
 Keys and staged records live under `~/.freedom/keys/`. The node's own libp2p
-identity (`private.key`) is separate, so names are portable between nodes.
+identity (`~/.freedom/private.key`) is separate, so names are portable between
+nodes. (A `private.key` already sitting in the working directory is still used,
+so an existing node keeps its peer id.)
+
+Records are bounded, because every node in the DHT neighbourhood carries them:
+at most **32 resource records** per name, a **`TXT` value of 255 bytes** (the
+DNS character-string limit), a **`CNAME` target of 253**, and a **label of
+190**. `set` and `publish` reject anything larger.
 
 ### Bare names on Bitcoin Cash
 
@@ -274,7 +296,9 @@ dig @127.0.0.1 -p 8053 mysite.<pubKeyID>.fn A
 ```
 
 Non-`.fn` queries are transparently forwarded to the upstream resolver, so the
-Freedom Names node can act as your system resolver.
+Freedom Names node can act as your system resolver. Forwarding is done for
+clients on this machine and the local network; remote clients get `REFUSED`
+(see [Configuration](#configuration)), while `.fn` is answered for everyone.
 
 ## HTTP API
 

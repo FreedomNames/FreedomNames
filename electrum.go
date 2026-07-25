@@ -44,6 +44,31 @@ type electrumClient struct {
 // electrumDialTimeout bounds connection establishment to a single server.
 const electrumDialTimeout = 15 * time.Second
 
+// maxElectrumResponse caps one JSON-RPC response line. Electrum servers are
+// third parties chosen from a public list, so a response is untrusted input:
+// without a cap, a hostile or broken server could stream an endless line and
+// exhaust this node's memory. 8 MiB leaves ample room for the largest thing we
+// ask for (a raw transaction as hex).
+const maxElectrumResponse = 8 << 20
+
+// readLineLimited reads one newline-terminated line, failing once it exceeds
+// max bytes instead of growing without bound.
+func readLineLimited(r *bufio.Reader, max int) ([]byte, error) {
+	var line []byte
+	for {
+		chunk, err := r.ReadSlice('\n')
+		// ReadSlice hands back its internal buffer; append copies it out.
+		line = append(line, chunk...)
+		if len(line) > max {
+			return nil, fmt.Errorf("response exceeds %d bytes", max)
+		}
+		if err == bufio.ErrBufferFull {
+			continue
+		}
+		return line, err
+	}
+}
+
 // newElectrumClient creates a client over the given endpoints, tried in order
 // with failover. At least one endpoint is required. The connection is
 // established lazily on first call and re-established after errors.
@@ -203,7 +228,7 @@ func (c *electrumClient) callLocked(ctx context.Context, method string, params a
 	// Read lines until our response id shows up, skipping server
 	// notifications (which have no id or a different one).
 	for {
-		line, err := c.reader.ReadBytes('\n')
+		line, err := readLineLimited(c.reader, maxElectrumResponse)
 		if err != nil {
 			return fmt.Errorf("electrum read: %w", err)
 		}

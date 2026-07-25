@@ -24,7 +24,10 @@ func (freedomName *FreedomNameNode) eventLoop() {
 		new(event.EvtPeerConnectednessChanged),
 	})
 	if err != nil {
-		log.Printf("failed to subscribe to peer connectedness events: %s", err)
+		// sub is nil here: continuing would panic on the deferred Close and on
+		// the first receive from sub.Out().
+		log.Printf("failed to subscribe to libp2p events, event logging disabled: %s", err)
+		return
 	}
 	defer sub.Close()
 
@@ -33,7 +36,12 @@ func (freedomName *FreedomNameNode) eventLoop() {
 	for {
 		select {
 		case evt := <-sub.Out():
-			go func(evt interface{}) {
+			// Handled inline, not in a goroutine per event: these handlers only
+			// log, and the event stream is driven by remote peers connecting
+			// and disconnecting — spawning an unbounded number of goroutines
+			// from remote input is a denial-of-service lever, and the ordering
+			// of the log lines was lost for nothing.
+			func(evt interface{}) {
 				switch e := evt.(type) {
 				case event.EvtLocalProtocolsUpdated:
 					log.Printf("Event: 'Local protocols updated' - added: %+v, removed: %+v", e.Added, e.Removed)
@@ -58,7 +66,10 @@ func (freedomName *FreedomNameNode) eventLoop() {
 				case event.EvtNATDeviceTypeChanged:
 					log.Printf("Event: 'NAT device type changed' - DeviceType %v, transport: %v", e.NatDeviceType.String(), e.TransportProtocol.String())
 				case event.EvtPeerProtocolsUpdated:
-					log.Printf("Event: 'Peer protocols updated' - added: %+v, removed: %+v, peer: %+v", e.Added, e.Removed, e.Peer)
+					// %q: protocol IDs are strings a remote peer chose and sent
+					// us during identify, so they are untrusted input on their
+					// way into the log.
+					log.Printf("Event: 'Peer protocols updated' - added: %q, removed: %q, peer: %v", e.Added, e.Removed, e.Peer)
 				case event.EvtPeerIdentificationCompleted:
 					log.Printf("Event: 'Peer identification completed' - %v", e.Peer)
 				case event.EvtPeerIdentificationFailed:
@@ -75,7 +86,7 @@ func (freedomName *FreedomNameNode) eventLoop() {
 					}
 					// Get the peer addresses
 					peerAddresses := freedomName.kadDHT.Host().Network().Peerstore().Addrs(peerID)
-					log.Printf("Event: 'Peer connectedness change' - Peer %s (peerInfo: %+v) is now %s, protocols: %v, addresses: %v", peerID.String(), peerInfo, e.Connectedness, peerProtocols, peerAddresses)
+					log.Printf("Event: 'Peer connectedness change' - Peer %s is now %s, protocols: %q, addresses: %v", peerID.String(), e.Connectedness, peerProtocols, peerAddresses)
 
 					// Q: Do we really need to manage the peersstore ourselves?
 					if e.Connectedness == network.NotConnected {

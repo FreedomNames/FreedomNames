@@ -71,7 +71,7 @@ records. See [**bare names**](/guide/bare-names) for the full on-chain protocol.
 - **Tamper resistance.** Signed records mean no one can forge or overwrite a name
   they don't hold the key for.
 - **Real DNS.** A built-in DNS server resolves `.fn` names and forwards everything
-  else upstream, so `.fn` "just works" once [your system points at a
+  else upstream for you, so `.fn` "just works" once [your system points at a
   node](/guide/resolving).
 
 ## What it is not

@@ -69,6 +69,11 @@ query to an upstream resolver (`1.1.1.1:53` by default, configurable). So a Free
 Names node can act as your only resolver. See
 [Resolving from your system](/guide/resolving).
 
+Forwarding is done for clients on **your machine and your local network**, not
+for the whole internet — otherwise a node on a public IP would be an
+[open resolver](/guide/configuration#who-the-dns-server-answers). `.fn` itself is
+answered for anyone who asks.
+
 ## Why the visible key suffix?
 
 Because self-certification requires the name to carry (a hash of) the key. That's

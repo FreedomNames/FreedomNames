@@ -45,6 +45,12 @@ type ContentIndex struct {
 	sets  map[string]*contentMeta
 	blobs map[string]map[string]bool // blob hash -> set roots referencing it
 	dirty bool                       // lastAccess-only changes awaiting a flush
+
+	// reserved is the bytes promised to admitted-but-not-yet-stored sets. An
+	// inbound push is admitted before its bytes arrive, so without counting the
+	// promise, N concurrent pushes each measure the same pre-transfer usage and
+	// all pass — overshooting the operator's budget by a factor of N.
+	reserved int64
 }
 
 // indexFile is the on-disk shape.
@@ -132,9 +138,15 @@ func LoadContentIndex(dir string, store *BlobStore) (*ContentIndex, error) {
 		if len(ix.blobs[h]) > 0 {
 			continue
 		}
-		if _, size, err := store.Open(h); err == nil {
-			adopt(h, size, nil)
+		// Close the handle: without it, adopting a store full of unindexed
+		// blobs leaks one open file descriptor per blob and can exhaust the
+		// process limit before the node has finished starting.
+		rc, size, err := store.Open(h)
+		if err != nil {
+			continue
 		}
+		rc.Close()
+		adopt(h, size, nil)
 	}
 
 	if err := ix.save(); err != nil {
@@ -187,6 +199,10 @@ func (ix *ContentIndex) AddHosted(root string, size int64, chunks []string, from
 	}
 	ix.mu.Lock()
 	defer ix.mu.Unlock()
+	ix.addHostedLocked(root, size, chunks, from)
+}
+
+func (ix *ContentIndex) addHostedLocked(root string, size int64, chunks []string, from string) {
 	if _, exists := ix.sets[root]; exists {
 		ix.touchLocked(root)
 		return
@@ -264,13 +280,83 @@ func (ix *ContentIndex) HostedBytes() int64 {
 }
 
 func (ix *ContentIndex) hostedBytesLocked() int64 {
-	var total int64
+	total := ix.reserved
 	for _, m := range ix.sets {
 		if !m.Owned {
 			total += m.Size
 		}
 	}
 	return total
+}
+
+// Reserve holds size bytes of the budget for a transfer that has not arrived
+// yet, and reports whether the set could be stored once it has. Every
+// successful Reserve must be paired with exactly one Release or CommitHosted,
+// or the budget leaks.
+//
+// Reserve DELETES NOTHING. A push offer is a few dozen bytes from any peer that
+// cares to send one, and nothing obliges that peer to follow it with a transfer
+// — so if an offer alone were allowed to evict, a stranger could wipe this
+// node's hosted content for free, one abandoned offer at a time, without ever
+// uploading anything. It only asks whether the eviction policy *could* make
+// room; the deletion happens in CommitHosted, once the bytes are real.
+//
+// The test and the reservation happen under a single lock hold. Doing them as
+// two steps would leave exactly the gap this exists to close: both callers test
+// against the same usage, then both reserve.
+func (ix *ContentIndex) Reserve(size, budget, maxSize int64, ttl time.Duration, now time.Time) bool {
+	if ix == nil {
+		return true // store-only service (tests): no policy
+	}
+	ix.mu.Lock()
+	defer ix.mu.Unlock()
+	if !ix.fitLocked(size, budget, maxSize, ttl, now, false) {
+		return false
+	}
+	ix.reserved += size
+	return true
+}
+
+// Release drops a reservation taken by Reserve whose transfer never completed.
+// A completed one is consumed by CommitHosted instead.
+func (ix *ContentIndex) Release(size int64) {
+	if ix == nil {
+		return
+	}
+	ix.mu.Lock()
+	defer ix.mu.Unlock()
+	ix.releaseLocked(size)
+}
+
+func (ix *ContentIndex) releaseLocked(size int64) {
+	ix.reserved -= size
+	if ix.reserved < 0 {
+		ix.reserved = 0
+	}
+}
+
+// CommitHosted turns a reservation into a stored set: it makes room for real,
+// evicting if the budget requires it, and records the set. This is the only
+// path on which an inbound push may cost this node content it already holds,
+// and it is reached only after every blob has arrived and verified.
+//
+// It consumes the reservation whether or not it succeeds, so the caller must
+// not also Release. It returns false if the budget filled while the transfer
+// was in flight, in which case the set is not recorded.
+func (ix *ContentIndex) CommitHosted(root string, size int64, chunks []string, from string, budget, maxSize int64, ttl time.Duration, now time.Time) bool {
+	if ix == nil {
+		return true // store-only service (tests): no policy
+	}
+	ix.mu.Lock()
+	defer ix.mu.Unlock()
+	// Drop the promise before measuring, or these bytes are counted twice and
+	// the eviction pass frees twice what it needs to.
+	ix.releaseLocked(size)
+	if !ix.fitLocked(size, budget, maxSize, ttl, now, true) {
+		return false
+	}
+	ix.addHostedLocked(root, size, chunks, from)
+	return true
 }
 
 // Admit decides whether a hosted set of the given size may be stored. Nothing
@@ -285,18 +371,39 @@ func (ix *ContentIndex) Admit(size, budget, maxSize int64, ttl time.Duration, no
 	if ix == nil {
 		return true // store-only service (tests): no policy
 	}
+	ix.mu.Lock()
+	defer ix.mu.Unlock()
+	return ix.fitLocked(size, budget, maxSize, ttl, now, true)
+}
+
+// fitLocked reports whether a hosted set of the given size fits, evicting to
+// make room when apply is set. With apply false it is a dry run: it walks the
+// same eviction order and answers the same question, but deletes nothing (see
+// Reserve for why that distinction is load-bearing). Caller holds mu.
+func (ix *ContentIndex) fitLocked(size, budget, maxSize int64, ttl time.Duration, now time.Time, apply bool) bool {
 	if size > maxSize || size > budget {
 		return false
 	}
-	ix.mu.Lock()
-	defer ix.mu.Unlock()
 
-	for ix.hostedBytesLocked()+size > budget {
+	evicted := false
+	defer func() {
+		// One write for the whole eviction pass rather than one per victim:
+		// the index is rewritten in full each time it is saved.
+		if evicted {
+			ix.save()
+		}
+	}()
+
+	// Dry runs cannot delete, so they track what they would have freed instead.
+	var freed int64
+	var spared map[string]bool
+
+	for ix.hostedBytesLocked()-freed+size > budget {
 		victim := ""
 		victimExpired := false
 		var oldest int64
 		for root, m := range ix.sets {
-			if m.Owned {
+			if m.Owned || spared[root] {
 				continue
 			}
 			expired := ttl > 0 && now.Unix()-m.LastAccess > int64(ttl.Seconds())
@@ -313,13 +420,22 @@ func (ix *ContentIndex) Admit(size, budget, maxSize int64, ttl time.Duration, no
 		if victim == "" {
 			return false
 		}
-		ix.evictLocked(victim)
+		if apply {
+			ix.evictLocked(victim)
+			evicted = true
+			continue
+		}
+		freed += ix.sets[victim].Size
+		if spared == nil {
+			spared = make(map[string]bool)
+		}
+		spared[victim] = true
 	}
 	return true
 }
 
 // evictLocked removes a set: index entry plus every blob no other set still
-// references. Caller holds mu.
+// references. Caller holds mu and is responsible for persisting the change.
 func (ix *ContentIndex) evictLocked(root string) {
 	m := ix.sets[root]
 	if m == nil {
@@ -338,7 +454,6 @@ func (ix *ContentIndex) evictLocked(root string) {
 	for _, ch := range m.Chunks {
 		release(ch)
 	}
-	ix.save()
 }
 
 // Flush persists pending lastAccess updates (called opportunistically from the

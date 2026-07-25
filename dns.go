@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/netip"
+	"sync/atomic"
 	"time"
 
 	"codeberg.org/miekg/dns"
@@ -25,15 +26,38 @@ const dnsResolveTimeout = 4 * time.Second
 type DNSServer struct {
 	resolver *Resolver
 	upstream string // host:port of the upstream resolver for non-.fn queries
-	udp      *dns.Server
-	tcp      *dns.Server
+	// recurseAny lifts the local-client restriction on forwarding. Off by
+	// default: see forwardingAllowed.
+	recurseAny bool
+	// inflight bounds concurrent .fn lookups; see maxInflightFN.
+	inflight chan struct{}
+	// dropped counts shed lookups; lastDropLog is the unix-nano timestamp of
+	// the last warning, so the warning itself stays rate limited.
+	dropped     atomic.Int64
+	lastDropLog atomic.Int64
+	udp         *dns.Server
+	tcp         *dns.Server
 }
+
+// maxInflightFN bounds how many .fn queries may be walking the DHT at once.
+// Each miss is a full Kademlia walk held open for dnsResolveTimeout, and the
+// server answers whoever can reach the listen address, so without a ceiling a
+// stream of queries for names that do not exist pins an unbounded number of
+// goroutines and DHT lookups. Queries over the limit get SERVFAIL, which stub
+// resolvers retry, rather than queueing behind a timeout they have outlived.
+const maxInflightFN = 64
 
 // NewDNSServer builds a DNS server listening on addr (e.g. ":53") that resolves
 // ".fn" via the given resolver and forwards everything else to upstream
-// (e.g. "1.1.1.1:53").
-func NewDNSServer(addr, upstream string, resolver *Resolver) *DNSServer {
-	s := &DNSServer{resolver: resolver, upstream: upstream}
+// (e.g. "1.1.1.1:53"). recurseAny opts into forwarding for remote clients; see
+// forwardingAllowed for why that is not the default.
+func NewDNSServer(addr, upstream string, resolver *Resolver, recurseAny bool) *DNSServer {
+	s := &DNSServer{
+		resolver:   resolver,
+		upstream:   upstream,
+		recurseAny: recurseAny,
+		inflight:   make(chan struct{}, maxInflightFN),
+	}
 
 	mux := dns.NewServeMux()
 	mux.HandleFunc("fn.", s.handleFN)
@@ -106,6 +130,24 @@ func (s *DNSServer) handleFN(ctx context.Context, w dns.ResponseWriter, r *dns.M
 	name := q.Header().Name
 	qtype := dns.RRToType(q)
 
+	// Take a slot before starting a DHT walk, so a flood of queries cannot pin
+	// an unbounded number of concurrent lookups.
+	select {
+	case s.inflight <- struct{}{}:
+		defer func() { <-s.inflight }()
+	default:
+		// Throttled: the cap is reached precisely when queries are flooding in,
+		// and a line per refused query would turn a lookup flood into a log
+		// flood.
+		s.logOverloaded(name)
+		r.Reset()
+		r.Response = true
+		r.RecursionAvailable = true
+		r.Rcode = dns.RcodeServerFailure
+		respond(w, r)
+		return
+	}
+
 	// Bound the lookup below a typical stub-resolver patience (~5s): a slow
 	// DHT walk should fail fast here rather than answer a client that already
 	// gave up.
@@ -119,14 +161,18 @@ func (s *DNSServer) handleFN(ctx context.Context, w dns.ResponseWriter, r *dns.M
 	r.RecursionAvailable = true
 
 	if err != nil {
-		log.Printf("DNS: resolve %s: %v", name, err)
+		// %q, not %s: a query name is raw bytes off the wire. The DNS library
+		// escapes embedded dots and nothing else, so a label may carry newlines
+		// or terminal escapes, and answering .fn for anyone who asks is the
+		// design — an unauthenticated packet must not be able to write forged
+		// lines into this node's log.
+		log.Printf("DNS: resolve %q: %v", name, err)
 		if errors.Is(err, context.DeadlineExceeded) {
 			r.Rcode = dns.RcodeServerFailure // transient: lookup timed out
 		} else {
 			r.Rcode = dns.RcodeNameError // NXDOMAIN
 		}
-		r.Pack()
-		io.Copy(w, r)
+		respond(w, r)
 		return
 	}
 
@@ -135,14 +181,21 @@ func (s *DNSServer) handleFN(ctx context.Context, w dns.ResponseWriter, r *dns.M
 			r.Answer = append(r.Answer, answer)
 		}
 	}
-	r.Pack()
-	io.Copy(w, r)
+	respond(w, r)
 }
 
-// handleForward proxies non-.fn queries to the configured upstream resolver.
+// handleForward proxies non-.fn queries to the configured upstream resolver,
+// but only for clients allowed to use this node recursively.
 func (s *DNSServer) handleForward(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) {
 	if err := r.Unpack(); err != nil {
 		log.Printf("DNS: unpack: %v", err)
+		return
+	}
+	if !s.recurseAny && !forwardingAllowed(w.RemoteAddr()) {
+		r.Reset()
+		r.Response = true
+		r.Rcode = dns.RcodeRefused
+		respond(w, r)
 		return
 	}
 	resp, err := dns.Exchange(ctx, r, "udp", s.upstream)
@@ -151,12 +204,74 @@ func (s *DNSServer) handleForward(ctx context.Context, w dns.ResponseWriter, r *
 		r.Reset()
 		r.Response = true
 		r.Rcode = dns.RcodeServerFailure
-		r.Pack()
-		io.Copy(w, r)
+		respond(w, r)
 		return
 	}
-	resp.Pack()
-	io.Copy(w, resp)
+	respond(w, resp)
+}
+
+// overloadLogInterval is the minimum gap between "lookups in flight" warnings.
+const overloadLogInterval = 10 * time.Second
+
+// logOverloaded reports that a lookup was shed, at most once per
+// overloadLogInterval, counting the ones it swallowed so the log still conveys
+// the scale.
+func (s *DNSServer) logOverloaded(name string) {
+	dropped := s.dropped.Add(1)
+	last := s.lastDropLog.Load()
+	now := time.Now().UnixNano()
+	if now-last < int64(overloadLogInterval) || !s.lastDropLog.CompareAndSwap(last, now) {
+		return
+	}
+	log.Printf("DNS: shedding lookups (%d refused so far, %d already in flight), most recently %q",
+		dropped, maxInflightFN, name)
+}
+
+// forwardingAllowed reports whether a client may use this node as a recursive
+// resolver. Answering ".fn" is authoritative data anyone may ask for, but
+// forwarding *arbitrary* queries upstream for *anyone* makes the node an open
+// resolver — a reflection/amplification tool pointed at third parties. The
+// default listen address covers every interface, so recursion is restricted to
+// the clients the documented setups actually use: this machine and the local
+// network. Operators who deliberately run a public forwarder can set
+// FREEDOM_DNS_RECURSION=any.
+func forwardingAllowed(addr net.Addr) bool {
+	var ip net.IP
+	switch a := addr.(type) {
+	case *net.UDPAddr:
+		ip = a.IP
+	case *net.TCPAddr:
+		ip = a.IP
+	default:
+		host, _, err := net.SplitHostPort(addr.String())
+		if err != nil {
+			return false
+		}
+		ip = net.ParseIP(host)
+	}
+	if ip == nil {
+		return false
+	}
+	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast()
+}
+
+// respond packs a message and writes it. Pack leaves a partially-filled buffer
+// behind on failure (e.g. a record too large to represent on the wire) and the
+// writer would happily put those bytes on the wire, so a failure is turned into
+// an empty SERVFAIL instead of a malformed answer.
+func respond(w dns.ResponseWriter, m *dns.Msg) {
+	if err := m.Pack(); err != nil {
+		log.Printf("DNS: pack response: %v", err)
+		m.Reset()
+		m.Response = true
+		m.Rcode = dns.RcodeServerFailure
+		if err := m.Pack(); err != nil {
+			return
+		}
+	}
+	if _, err := io.Copy(w, m); err != nil {
+		log.Printf("DNS: write response: %v", err)
+	}
 }
 
 // toDNSRR converts a Freedom Names RR into a wire DNS RR for the given query

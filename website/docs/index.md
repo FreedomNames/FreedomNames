@@ -45,7 +45,7 @@ features:
     details: >-
       Point your OS or browser at a Freedom Names node and <code>.fn</code> names
       resolve like any domain. Everything else is transparently forwarded to your
-      upstream resolver.
+      upstream resolver, so one node can be your only resolver.
   - icon: 🧰
     title: Batteries included
     details: >-

@@ -54,6 +54,17 @@ public bootstrap exists, off-LAN discovery is manual.
   name is slower to resolve than a fresh one. Past 64 hops the walk stops
   *silently* and answers with the last owner it reached, an extremely traded
   name can resolve to a stale owner rather than an error.
+- **Address history is scanned only so far.** Anyone can pay dust to a name's
+  discovery marker, and every entry costs a round trip to an Electrum server, so
+  a lookup reads at most 512 history entries per address. Which end it reads
+  depends on what it is looking for: the earliest entries decide the winning
+  claim, while a custody transfer is by nature at the recent end. A name
+  deliberately spammed past the cap does not resolve to a stale or wrong owner —
+  a scan that runs out of budget without an answer fails as inconclusive, is
+  logged, and is *not* negative-cached, so the name resolves again once the
+  history is back within reach. The name is still unresolvable while the flood
+  is in scope, which makes this a denial-of-service avenue against a specific
+  name rather than a hijacking one.
 
 ## Content layer scope
 
@@ -96,14 +107,36 @@ public bootstrap exists, off-LAN discovery is manual.
 - **Long self-certifying names.** A self-certifying name carries a ~52-character
   key id (`label.<pubKeyID>.fn`). Bare names avoid this but need a
   chain claim. A friendlier human-alias layer is future work.
-- **Record sets have no size cap.** Validation checks each record's type and
-  value (and content stays out of the DHT entirely), but nothing limits how
-  many resource records one name carries; restraint is left to the publisher.
+- **Record sets are capped, and the caps are fixed.** A name carries at most 32
+  resource records, a `TXT` value at most 255 bytes, a `CNAME` target 253, a
+  label 190 (see [size limits](/guide/how-names-work#size-limits)). The caps are
+  compile-time constants rather than a negotiated network parameter, so raising
+  them later means every node has to agree at once.
+- **The label is not part of resolution.** A name's DHT key comes from the
+  pubkey id alone, so every label under one key resolves to that key's single
+  record set: `blog.<pubKeyID>.fn` and `shop.<pubKeyID>.fn` return the same
+  records. Use separate keys for genuinely separate names.
 
 ## Operational notes
 
 - **The HTTP API is unauthenticated.** It binds to `127.0.0.1` by default for
   this reason. Do not expose it on a untrusted network; anyone who can reach it
-  can publish and fetch through your node.
+  can publish and fetch through your node. It rejects domain-name `Host`
+  headers, requests a browser marks as cross-site, and cross-origin requests,
+  which stops a *web page* from driving it — but that is not authentication:
+  anything that can open a socket to it still has full control. The cross-site
+  check relies on `Sec-Fetch-Site`, which browsers older than roughly 2023 do
+  not send; on those, an embedded `<img>` pointed at `/content` can still make
+  your node fetch, keep and announce content of the page's choosing.
+- **DNS forwarding is limited to local clients.** `.fn` is answered for anyone;
+  everything else is only forwarded for loopback and private/link-local
+  addresses, so a public node is not an open resolver. The classification is by
+  address range alone — a spoofed source address in a private range is not
+  detected, so a node on a hostile LAN should sit behind a firewall rather than
+  rely on this. `FREEDOM_DNS_RECURSION=any` disables the restriction entirely.
+- **A busy node sheds DNS load bluntly.** At most 64 `.fn` lookups walk the DHT
+  at once; past that, queries get `SERVFAIL` and the client retries. That
+  protects the node, but under sustained load some legitimate queries fail
+  rather than queue.
 - **DNS on `:53` needs privileges.** The default is the high port `:8053`. For
   system-wide `.fn` resolution, see [running Freedom Names](/guide/running-a-node#the-53-port).
