@@ -190,10 +190,14 @@ func (cs *ContentService) handlePushStream(stream network.Stream) {
 		stream.Write([]byte{pushHave})
 		return
 	}
-	if !cs.admitHosted(int64(size)) {
+	// Reserve rather than merely check: the bytes do not land until the
+	// transfer finishes, and concurrent pushes would otherwise all be admitted
+	// against the same pre-transfer usage and blow past the hosting budget.
+	if !cs.reserveHosted(int64(size)) {
 		stream.Write([]byte{pushDecline})
 		return
 	}
+	defer cs.releaseHosted(int64(size))
 	if _, err := stream.Write([]byte{pushAccept}); err != nil {
 		return
 	}
@@ -277,13 +281,27 @@ func (cs *ContentService) handlePushStream(stream network.Stream) {
 }
 
 // admitHosted applies the operator's hosting policy (budget, per-set cap,
-// TTL-driven eviction) to a new hosted set of the given size.
+// TTL-driven eviction) to a new hosted set of the given size. Use it when the
+// bytes are already in hand; for a transfer that has yet to arrive, use
+// reserveHosted so the pending bytes count against the budget meanwhile.
 func (cs *ContentService) admitHosted(size int64) bool {
 	if cs.index == nil {
 		return true // store-only service (tests): no policy
 	}
 	return cs.index.Admit(size, cs.hostBudget, cs.maxPushSize, cs.hostTTL, time.Now())
 }
+
+// reserveHosted admits a set and holds its size against the budget until
+// releaseHosted is called. Every successful reserve needs exactly one release.
+func (cs *ContentService) reserveHosted(size int64) bool {
+	if cs.index == nil {
+		return true // store-only service (tests): no policy
+	}
+	return cs.index.Reserve(size, cs.hostBudget, cs.maxPushSize, cs.hostTTL, time.Now())
+}
+
+// releaseHosted drops a reservation taken by reserveHosted.
+func (cs *ContentService) releaseHosted(size int64) { cs.index.Release(size) }
 
 func readStatusByte(r io.Reader) (byte, error) {
 	var b [1]byte

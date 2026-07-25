@@ -94,8 +94,9 @@ FREEDOM_DNS_ADDR=:53 ./freedom-names
 
 Two kinds of keys, kept separate on purpose:
 
-- The **node's libp2p identity** (`private.key`) identifies this peer on the
-  network.
+- The **node's libp2p identity** (`~/.freedom/private.key`) identifies this peer
+  on the network. A `private.key` in the working directory is still used if one
+  is already there, so existing nodes keep their peer id.
 - Your **name keys** live under `~/.freedom/keys/` and own your `.fn` names.
 
 Because they're separate, your names are **portable**: you can publish them from

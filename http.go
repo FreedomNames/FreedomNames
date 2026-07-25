@@ -7,10 +7,14 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/libp2p/go-libp2p/core/routing"
 )
@@ -43,7 +47,7 @@ func roleFor(bootstrapMode bool) string {
 	return RoleNode
 }
 
-func StartHTTPServer(freedomDht FreedomDHT, resolver *Resolver, cache Cache, content *ContentService, addr string, bootstrapMode bool) {
+func StartHTTPServer(freedomDht FreedomDHT, resolver *Resolver, cache Cache, content *ContentService, addr string, bootstrapMode bool, allowedHosts []string) {
 	role := roleFor(bootstrapMode)
 
 	// Set up HTTP API endpoints
@@ -58,7 +62,18 @@ func StartHTTPServer(freedomDht FreedomDHT, resolver *Resolver, cache Cache, con
 	// Content endpoints (LibreWeb's page-bytes layer).
 	mux.HandleFunc("/content", ContentHandler(content))
 	mux.HandleFunc("/resolve-content", ResolveContentHandler(resolver, content))
-	server := &http.Server{Addr: addr, Handler: mux}
+	server := &http.Server{
+		Addr:    addr,
+		Handler: localAPIGuard(mux, allowedHosts),
+		// The API is unauthenticated and bound to loopback, but a listening
+		// socket is still a listening socket: without a header deadline a
+		// single peer that opens connections and never finishes a request
+		// holds them open forever (slowloris). No ReadTimeout/WriteTimeout —
+		// those would cut off legitimate large content uploads and downloads,
+		// which have no bounded duration.
+		ReadHeaderTimeout: 15 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -93,6 +108,71 @@ func StartHTTPServer(freedomDht FreedomDHT, resolver *Resolver, cache Cache, con
 	}
 }
 
+// maxPublishBody caps a /publish request body. A signed FNRecord is a small
+// JSON document; without a cap the handler would buffer whatever it is sent.
+const maxPublishBody = 1 << 20
+
+// localAPIGuard protects the unauthenticated local control surface from being
+// driven by a web page the user merely visited. Two distinct attacks:
+//
+//   - DNS rebinding: a page on attacker.example resolves that name to
+//     127.0.0.1 and talks to the API with "Host: attacker.example". Requiring
+//     the Host header to name localhost or a bare IP literal (the only spellings
+//     the documented setups use) removes the rebinding target.
+//   - Cross-site request forgery: a form/fetch POST to http://localhost:8420/
+//     is a "simple request", so the browser sends it without a preflight and
+//     the side effect lands even though the reply is unreadable. Browsers do
+//     attach an Origin header, so mutating requests carrying a foreign Origin
+//     are rejected. Non-browser clients (curl, the CLI, LibreWeb) send no
+//     Origin and are unaffected.
+func localAPIGuard(next http.Handler, allowedHosts []string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !hostAllowed(r.Host, allowedHosts) {
+			http.Error(w, "Host not allowed for the local API (set FREEDOM_HTTP_ALLOWED_HOSTS to permit it)", http.StatusForbidden)
+			return
+		}
+		if r.Method != http.MethodGet && r.Method != http.MethodHead && !originAllowed(r) {
+			http.Error(w, "Cross-origin request rejected", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// hostAllowed reports whether a request's Host header may address this API.
+// "localhost", any IP literal, and the operator's explicit allow-list pass.
+func hostAllowed(rawHost string, allowed []string) bool {
+	host := strings.ToLower(rawHost)
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	host = strings.Trim(host, "[]") // IPv6 literal
+	if host == "" || host == "localhost" || net.ParseIP(host) != nil {
+		return true
+	}
+	for _, a := range allowed {
+		if host == a {
+			return true
+		}
+	}
+	return false
+}
+
+// originAllowed reports whether a mutating request's Origin may act on this
+// API. A missing Origin (every non-browser client) passes; a present one must
+// name the same host the request was addressed to.
+func originAllowed(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" || origin == "null" {
+		return true
+	}
+	u, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	return strings.EqualFold(u.Host, r.Host)
+}
+
 // PublishHandler stores a pre-signed FNRecord in the DHT. The client is expected
 // to have signed the record with the owner's private key (e.g. via the CLI).
 func PublishHandler(freedomDht FreedomDHT) http.HandlerFunc {
@@ -106,9 +186,13 @@ func PublishHandler(freedomDht FreedomDHT) http.HandlerFunc {
 			return
 		}
 
-		body, err := io.ReadAll(r.Body)
+		body, err := io.ReadAll(io.LimitReader(r.Body, maxPublishBody+1))
 		if err != nil {
 			http.Error(w, "Failed to read request body", http.StatusBadRequest)
+			return
+		}
+		if len(body) > maxPublishBody {
+			http.Error(w, "Record too large", http.StatusRequestEntityTooLarge)
 			return
 		}
 		rec, err := UnmarshalFNRecord(body)

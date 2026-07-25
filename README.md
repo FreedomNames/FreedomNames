@@ -179,6 +179,8 @@ All configuration is via environment variables (nothing is hardcoded):
 | `FREEDOM_HTTP_ADDR` | `127.0.0.1:8420` (bootstrap: `127.0.0.1:8430`) | HTTP API listen address (loopback by default) |
 | `FREEDOM_DNS_ADDR` | `:8053` | DNS server listen address |
 | `FREEDOM_UPSTREAM_DNS` | `1.1.1.1:53` | Upstream resolver for non-`.fn` queries |
+| `FREEDOM_DNS_RECURSION` | `local` | Who may have non-`.fn` queries forwarded upstream. `local` serves this machine and the local network; `any` makes the node a public open resolver (see below) |
+| `FREEDOM_HTTP_ALLOWED_HOSTS` | (none) | Extra `Host` header values the HTTP API accepts, beyond `localhost` and IP literals |
 | `FREEDOM_BOOTSTRAP` | (none) | Comma-separated bootstrap peer multiaddrs |
 | `FREEDOM_CONTENT_DIR` | `~/.freedom/content` | On-disk directory for the content-addressed blobstore |
 | `FREEDOM_BCH_NETWORK` | `mainnet` | BCH network for bare names: `mainnet`, `chipnet`, `testnet4`, or `testnet3` |
@@ -204,6 +206,19 @@ standard `:53`. Options:
   `FREEDOM_DNS_ADDR=:53`.
 - Or keep `:8053` and forward `:53 → :8053` with a local resolver
   (dnsmasq/systemd-resolved), or point a stub resolver at `127.0.0.1:8053`.
+
+`.fn` names are answered for anyone who can reach the listen address — that is
+public, authoritative data. Everything *else* is only forwarded upstream for
+clients on this machine or the local network, so a node on a public IP is not an
+open resolver that strangers can bounce traffic off. Set
+`FREEDOM_DNS_RECURSION=any` only if you intend to run a public forwarder.
+
+The HTTP API is unauthenticated and bound to loopback. It additionally rejects
+requests whose `Host` header is a domain name (which is how a DNS-rebinding
+attack reaches a local service) and mutating requests carrying a foreign
+`Origin` (cross-site request forgery from a page you merely visited). Command
+line clients send neither header and are unaffected; if you reach the API
+through a hostname, list it in `FREEDOM_HTTP_ALLOWED_HOSTS`.
 
 ## Managing names with the CLI
 

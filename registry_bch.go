@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 )
@@ -58,6 +59,21 @@ const (
 // through many hops cannot make one lookup do unbounded work.
 const maxCustodyHops = 64
 
+// maxHistoryScan caps how many transactions one lookup will fetch from a single
+// address history. Anyone can pay dust to a name's marker script (or to the
+// address currently holding a name NFT) as many times as they like, and every
+// entry costs a round-trip to the electrum server. Without a cap, a name could
+// be made arbitrarily expensive to resolve — and resolution is reachable from
+// any unauthenticated .fn query. Marker history is scanned oldest-first, which
+// is the half that decides the winning claim.
+const maxHistoryScan = 512
+
+// maxOwnerCacheEntries bounds the owner cache. Entries are keyed by requested
+// label, and lookups for names that do not exist are cached too, so an
+// unbounded map is a memory-exhaustion target for anyone who can send this node
+// a stream of random <random>.fn queries.
+const maxOwnerCacheEntries = 4096
+
 // NewBCHRegistry builds a registry over the given electrum client.
 func NewBCHRegistry(client *electrumClient, minConf int64) *bchRegistry {
 	if minConf < 1 {
@@ -97,17 +113,43 @@ func (r *bchRegistry) ResolveOwner(name string) ([]byte, error) {
 		// Negative-cache a definitive not-found to blunt random-name floods.
 		// Transient failures (timeouts, server errors) are not cached.
 		if errors.Is(err, ErrRegistryNotFound) {
-			r.mu.Lock()
-			r.cache[label] = ownerCacheEntry{notFound: true, expiresAt: time.Now().Add(notFoundCacheTTL)}
-			r.mu.Unlock()
+			r.cacheStore(label, ownerCacheEntry{notFound: true, expiresAt: time.Now().Add(notFoundCacheTTL)})
 		}
 		return nil, err
 	}
 
-	r.mu.Lock()
-	r.cache[label] = ownerCacheEntry{pubKey: pubKey, expiresAt: time.Now().Add(ownerCacheTTL)}
-	r.mu.Unlock()
+	r.cacheStore(label, ownerCacheEntry{pubKey: pubKey, expiresAt: time.Now().Add(ownerCacheTTL)})
 	return pubKey, nil
+}
+
+// cacheStore records an entry, keeping the cache bounded: expired entries are
+// dropped first, and if that is not enough the soonest-expiring entry is
+// evicted to make room.
+func (r *bchRegistry) cacheStore(label string, entry ownerCacheEntry) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if len(r.cache) >= maxOwnerCacheEntries {
+		now := time.Now()
+		for k, e := range r.cache {
+			if now.After(e.expiresAt) {
+				delete(r.cache, k)
+			}
+		}
+	}
+	for len(r.cache) >= maxOwnerCacheEntries {
+		oldest, found := "", false
+		for k, e := range r.cache {
+			if !found || e.expiresAt.Before(r.cache[oldest].expiresAt) {
+				oldest, found = k, true
+			}
+		}
+		if !found {
+			break
+		}
+		delete(r.cache, oldest)
+	}
+	r.cache[label] = entry
 }
 
 // categoryFor returns the NFT category for a normalized label (the category of
@@ -133,7 +175,7 @@ func (r *bchRegistry) winningClaim(ctx context.Context, label string) (*parsedTx
 	var claimTx *parsedTx
 	var claimTxID []byte
 	var claimHeight int64 = -1
-	for _, h := range history {
+	for _, h := range capHistory(history, label) {
 		if !confirmed(h.Height, tip, r.minConf) {
 			continue
 		}
@@ -188,7 +230,7 @@ func (r *bchRegistry) resolve(ctx context.Context, label string) ([]byte, error)
 	var claimTxID []byte
 	var claimHeight int64 = -1
 
-	for _, h := range history {
+	for _, h := range capHistory(history, label) {
 		if !confirmed(h.Height, tip, r.minConf) {
 			continue
 		}
@@ -323,7 +365,7 @@ func (r *bchRegistry) findSpender(ctx context.Context, script, txid []byte, vout
 	if err != nil {
 		return nil, nil, false, err
 	}
-	for _, h := range history {
+	for _, h := range capHistory(history, "custody hop") {
 		raw, err := r.client.GetRawTransaction(ctx, h.TxHash)
 		if err != nil {
 			return nil, nil, false, err
@@ -367,6 +409,18 @@ func parseFNMetadata(tx *parsedTx, label string) (tag string, pubKey []byte, ok 
 }
 
 // --- small helpers ---
+
+// capHistory limits an address history to maxHistoryScan entries, keeping the
+// oldest (electrum returns confirmed history in ascending height order, and the
+// earliest confirmed claim is the one that wins). what names the scan in the
+// log so a truncated lookup is visible rather than silently partial.
+func capHistory(history []electrumHistoryItem, what string) []electrumHistoryItem {
+	if len(history) <= maxHistoryScan {
+		return history
+	}
+	log.Printf("registry: %s has %d history entries, scanning the oldest %d", what, len(history), maxHistoryScan)
+	return history[:maxHistoryScan]
+}
 
 func confirmed(height, tip, minConf int64) bool {
 	if height <= 0 {

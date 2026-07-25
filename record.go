@@ -133,10 +133,35 @@ func (r *FNRecord) Verify() error {
 	return r.validateRecords()
 }
 
-// validateRecords sanity-checks each RR's type and value.
+// Size limits on a record set. Records are replicated to every peer in the
+// DHT's neighbourhood and re-published for as long as they live, so an
+// unbounded record is a way to make the whole network carry someone's payload.
+// The DNS wire format imposes its own ceilings, and a value that cannot be
+// packed would make the DNS path answer SERVFAIL instead of the record.
+const (
+	// maxRRsPerRecord bounds one name's record set.
+	maxRRsPerRecord = 32
+	// maxLabelLen is the DNS limit on a full domain name, which the label plus
+	// the pubkey-id suffix has to fit inside.
+	maxLabelLen = 190
+	// maxTXTLen is the DNS character-string limit: a longer TXT value cannot be
+	// represented on the wire at all.
+	maxTXTLen = 255
+	// maxDNSNameLen bounds a CNAME target.
+	maxDNSNameLen = 253
+)
+
+// validateRecords sanity-checks each RR's type and value, and bounds the size
+// of the set as a whole.
 func (r *FNRecord) validateRecords() error {
 	if len(r.Records) == 0 {
 		return errors.New("record has no resource records")
+	}
+	if len(r.Records) > maxRRsPerRecord {
+		return fmt.Errorf("record has %d resource records, max %d", len(r.Records), maxRRsPerRecord)
+	}
+	if len(r.Label) > maxLabelLen {
+		return fmt.Errorf("label is %d bytes, max %d", len(r.Label), maxLabelLen)
 	}
 	for _, rr := range r.Records {
 		switch rr.Type {
@@ -154,12 +179,19 @@ func (r *FNRecord) validateRecords() error {
 			if rr.Value == "" {
 				return errors.New("CNAME record has empty target")
 			}
+			if len(rr.Value) > maxDNSNameLen {
+				return fmt.Errorf("CNAME target is %d bytes, max %d", len(rr.Value), maxDNSNameLen)
+			}
 		case RecordTypeCONTENT:
 			if !isContentHash(rr.Value) {
 				return fmt.Errorf("CONTENT record value %q is not a valid content hash", rr.Value)
 			}
 		case RecordTypeTXT:
-			// Any UTF-8 string is acceptable.
+			// Any UTF-8 string, up to the DNS character-string limit: a longer
+			// value cannot be packed into an answer.
+			if len(rr.Value) > maxTXTLen {
+				return fmt.Errorf("TXT value is %d bytes, max %d", len(rr.Value), maxTXTLen)
+			}
 		default:
 			return fmt.Errorf("unsupported record type: %q", rr.Type)
 		}

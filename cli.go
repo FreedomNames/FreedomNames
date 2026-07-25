@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -11,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -98,7 +100,38 @@ func keysDir() (string, error) {
 	return dir, nil
 }
 
+// checkLabel rejects labels that are not usable as a name, before they are
+// pasted into a filesystem path. Without this, a label like "../../.ssh/authorized_keys"
+// makes keygen/set write outside ~/.freedom/keys — and one containing a path
+// separator would silently produce a key the node can never find again.
+func checkLabel(label string) error {
+	if label == "" {
+		return errors.New("label cannot be empty")
+	}
+	if len(label) > maxLabelLen {
+		return fmt.Errorf("label is %d bytes, max %d", len(label), maxLabelLen)
+	}
+	if label == "." || label == ".." || strings.HasPrefix(label, "-") {
+		return fmt.Errorf("invalid label %q", label)
+	}
+	for _, c := range label {
+		// Dots are allowed: a label may be a subdomain ("blog.mysite").
+		if c == '.' || c == '-' || c == '_' ||
+			c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' {
+			continue
+		}
+		return fmt.Errorf("invalid character %q in label %q (use a-z 0-9 . - _)", c, label)
+	}
+	if strings.Contains(label, "..") {
+		return fmt.Errorf("invalid label %q", label)
+	}
+	return nil
+}
+
 func keyPath(label string) (string, error) {
+	if err := checkLabel(label); err != nil {
+		return "", err
+	}
 	dir, err := keysDir()
 	if err != nil {
 		return "", err
@@ -107,6 +140,9 @@ func keyPath(label string) (string, error) {
 }
 
 func stagePath(label string) (string, error) {
+	if err := checkLabel(label); err != nil {
+		return "", err
+	}
 	dir, err := keysDir()
 	if err != nil {
 		return "", err

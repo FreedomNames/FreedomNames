@@ -24,7 +24,10 @@ func (freedomName *FreedomNameNode) eventLoop() {
 		new(event.EvtPeerConnectednessChanged),
 	})
 	if err != nil {
-		log.Printf("failed to subscribe to peer connectedness events: %s", err)
+		// sub is nil here: continuing would panic on the deferred Close and on
+		// the first receive from sub.Out().
+		log.Printf("failed to subscribe to libp2p events, event logging disabled: %s", err)
+		return
 	}
 	defer sub.Close()
 
@@ -33,7 +36,12 @@ func (freedomName *FreedomNameNode) eventLoop() {
 	for {
 		select {
 		case evt := <-sub.Out():
-			go func(evt interface{}) {
+			// Handled inline, not in a goroutine per event: these handlers only
+			// log, and the event stream is driven by remote peers connecting
+			// and disconnecting — spawning an unbounded number of goroutines
+			// from remote input is a denial-of-service lever, and the ordering
+			// of the log lines was lost for nothing.
+			func(evt interface{}) {
 				switch e := evt.(type) {
 				case event.EvtLocalProtocolsUpdated:
 					log.Printf("Event: 'Local protocols updated' - added: %+v, removed: %+v", e.Added, e.Removed)

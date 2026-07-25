@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"strings"
 	"syscall"
@@ -51,11 +52,14 @@ func applyNodeFlags(cfg *Config, args []string) {
 			cfg.HTTPAddr = val
 			i++
 		case "--api-bind":
-			_, port, ok := strings.Cut(cfg.HTTPAddr, ":")
-			if !ok {
+			// SplitHostPort, not a plain Cut: an IPv6 listen address
+			// ("[::1]:8420") has colons in the host too, and cutting at the
+			// first one would yield a nonsense port.
+			_, port, err := net.SplitHostPort(cfg.HTTPAddr)
+			if err != nil {
 				port = "8420"
 			}
-			cfg.HTTPAddr = val + ":" + port
+			cfg.HTTPAddr = net.JoinHostPort(val, port)
 			i++
 		case "--content-dir":
 			cfg.ContentDir = val
@@ -169,7 +173,10 @@ func main() {
 	if cfg.BootstrapMode {
 		log.Println("Bootstrap node: DNS server not started")
 	} else {
-		dnsServer := NewDNSServer(cfg.DNSAddr, cfg.UpstreamDNS, resolver)
+		dnsServer := NewDNSServer(cfg.DNSAddr, cfg.UpstreamDNS, resolver, cfg.DNSRecursionAny)
+		if cfg.DNSRecursionAny {
+			log.Printf("WARNING: FREEDOM_DNS_RECURSION=any - this node forwards queries for ANY client (open resolver)")
+		}
 		if err := dnsServer.Start(); err != nil {
 			log.Printf("WARNING: DNS server disabled (DHT and HTTP API still running): %v", err)
 			switch {
@@ -185,5 +192,5 @@ func main() {
 	}
 
 	// StartHTTPServer blocks until interrupted.
-	StartHTTPServer(freedomDht, resolver, cache, content, cfg.HTTPAddr, cfg.BootstrapMode)
+	StartHTTPServer(freedomDht, resolver, cache, content, cfg.HTTPAddr, cfg.BootstrapMode, cfg.HTTPAllowedHosts)
 }

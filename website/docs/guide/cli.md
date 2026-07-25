@@ -178,8 +178,9 @@ self-certifying `<label>.<pubKeyID>.fn` name.
 | `~/.freedom/keys/<label>.key` | the owner private key for a name |
 | `~/.freedom/keys/<label>.records.json` | staged records awaiting publish |
 | `~/.freedom/bch.key` | the BCH wallet key (funds bare-name claims) |
+| `~/.freedom/private.key` | the node's own libp2p identity |
 
-The node's own libp2p identity (`private.key`) is **separate**, so your names are
+The node's identity is **separate** from your name keys, so your names are
 portable between nodes.
 
 ## Next
