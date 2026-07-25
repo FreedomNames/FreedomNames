@@ -161,7 +161,12 @@ func (s *DNSServer) handleFN(ctx context.Context, w dns.ResponseWriter, r *dns.M
 	r.RecursionAvailable = true
 
 	if err != nil {
-		log.Printf("DNS: resolve %s: %v", name, err)
+		// %q, not %s: a query name is raw bytes off the wire. The DNS library
+		// escapes embedded dots and nothing else, so a label may carry newlines
+		// or terminal escapes, and answering .fn for anyone who asks is the
+		// design — an unauthenticated packet must not be able to write forged
+		// lines into this node's log.
+		log.Printf("DNS: resolve %q: %v", name, err)
 		if errors.Is(err, context.DeadlineExceeded) {
 			r.Rcode = dns.RcodeServerFailure // transient: lookup timed out
 		} else {
@@ -218,7 +223,7 @@ func (s *DNSServer) logOverloaded(name string) {
 	if now-last < int64(overloadLogInterval) || !s.lastDropLog.CompareAndSwap(last, now) {
 		return
 	}
-	log.Printf("DNS: shedding lookups (%d refused so far, %d already in flight), most recently %s",
+	log.Printf("DNS: shedding lookups (%d refused so far, %d already in flight), most recently %q",
 		dropped, maxInflightFN, name)
 }
 

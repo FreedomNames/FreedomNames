@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -34,6 +37,10 @@ func TestHostAllowed(t *testing.T) {
 		{"attacker.example:8420", nil, false},
 		{"node.internal:8420", []string{"node.internal"}, true},
 		{"attacker.example:8420", []string{"node.internal"}, false},
+		// An operator naturally writes the allow-list entry the way they type
+		// the URL. Both sides get normalized, so it still matches.
+		{"node.internal:8420", []string{"node.internal:8420"}, true},
+		{"node.internal:8420", []string{" NODE.INTERNAL "}, true},
 	}
 	for _, c := range cases {
 		if got := hostAllowed(c.host, c.allowed); got != c.want {
@@ -54,20 +61,28 @@ func TestLocalAPIGuardRejectsRebindingAndCrossOrigin(t *testing.T) {
 		method     string
 		host       string
 		origin     string
+		fetchSite  string
 		wantStatus int
 	}{
-		{"plain GET", http.MethodGet, "localhost:8420", "", http.StatusOK},
-		{"plain POST (curl/CLI, no Origin)", http.MethodPost, "localhost:8420", "", http.StatusOK},
-		{"same-origin POST", http.MethodPost, "localhost:8420", "http://localhost:8420", http.StatusOK},
-		{"rebound host", http.MethodGet, "attacker.example:8420", "", http.StatusForbidden},
-		{"cross-origin POST", http.MethodPost, "localhost:8420", "https://attacker.example", http.StatusForbidden},
-		{"cross-origin DELETE", http.MethodDelete, "localhost:8420", "https://attacker.example", http.StatusForbidden},
-		// A cross-origin GET leaks nothing (the reply is unreadable without
-		// CORS headers, which we never send) so it is not blocked.
-		{"cross-origin GET", http.MethodGet, "localhost:8420", "https://attacker.example", http.StatusOK},
+		{"plain GET", http.MethodGet, "localhost:8420", "", "", http.StatusOK},
+		{"plain POST (curl/CLI, no Origin)", http.MethodPost, "localhost:8420", "", "", http.StatusOK},
+		{"same-origin POST", http.MethodPost, "localhost:8420", "http://localhost:8420", "same-origin", http.StatusOK},
+		{"rebound host", http.MethodGet, "attacker.example:8420", "", "", http.StatusForbidden},
+		{"cross-origin POST", http.MethodPost, "localhost:8420", "https://attacker.example", "", http.StatusForbidden},
+		{"cross-origin DELETE", http.MethodDelete, "localhost:8420", "https://attacker.example", "", http.StatusForbidden},
+		{"cross-origin GET", http.MethodGet, "localhost:8420", "https://attacker.example", "", http.StatusForbidden},
 		// A sandboxed iframe sends Origin: null, so an attacker's page can
 		// choose that value: it must not be treated as "no Origin".
-		{"null origin POST", http.MethodPost, "localhost:8420", "null", http.StatusForbidden},
+		{"null origin POST", http.MethodPost, "localhost:8420", "null", "", http.StatusForbidden},
+		// The case an Origin check cannot see at all: a no-cors GET (<img src>,
+		// fetch mode:"no-cors") sends no Origin, and GET is not a safe method
+		// here — /content fetches from the network and announces this node as a
+		// provider of whatever it fetched.
+		{"drive-by no-cors GET", http.MethodGet, "localhost:8420", "", "cross-site", http.StatusForbidden},
+		{"cross-site POST", http.MethodPost, "localhost:8420", "", "cross-site", http.StatusForbidden},
+		// Typed URL / bookmark, and a page on this same site: both legitimate.
+		{"user-typed URL", http.MethodGet, "localhost:8420", "", "none", http.StatusOK},
+		{"same-site page", http.MethodGet, "localhost:8420", "", "same-site", http.StatusOK},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -76,6 +91,9 @@ func TestLocalAPIGuardRejectsRebindingAndCrossOrigin(t *testing.T) {
 			req.Host = c.host
 			if c.origin != "" {
 				req.Header.Set("Origin", c.origin)
+			}
+			if c.fetchSite != "" {
+				req.Header.Set("Sec-Fetch-Site", c.fetchSite)
 			}
 			rec := httptest.NewRecorder()
 			guarded.ServeHTTP(rec, req)
@@ -111,6 +129,34 @@ func TestForwardingAllowedOnlyForLocalClients(t *testing.T) {
 		if got := forwardingAllowed(c.addr); got != c.want {
 			t.Errorf("forwardingAllowed(%v) = %v, want %v", c.addr, got, c.want)
 		}
+	}
+}
+
+// --- log integrity ---
+
+// TestDNSLogsEscapeHostileQueryNames covers log forgery from an unauthenticated
+// packet. A query name is raw bytes off the wire — the DNS library escapes
+// embedded dots and nothing else — and the .fn zone answers whoever asks, by
+// design. Logging one with %s would let anyone write whatever they liked into
+// the operator's log, including terminal escapes.
+func TestDNSLogsEscapeHostileQueryNames(t *testing.T) {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	defer log.SetOutput(os.Stderr)
+
+	hostile := "evil\n2026/01/01 00:00:00 DNS server listening on 0.0.0.0:53\x1b[2Kgotcha.fn."
+	s := &DNSServer{inflight: make(chan struct{}, 1)}
+	s.logOverloaded(hostile)
+
+	out := buf.String()
+	if n := strings.Count(out, "\n"); n != 1 {
+		t.Fatalf("log emitted %d newlines, want 1 (a forged line was injected):\n%s", n, out)
+	}
+	if strings.ContainsRune(out, '\x1b') {
+		t.Fatalf("log carried a raw terminal escape:\n%q", out)
+	}
+	if !strings.Contains(out, "evil") {
+		t.Fatalf("log dropped the name entirely, which defeats the point:\n%s", out)
 	}
 }
 
@@ -319,6 +365,70 @@ func TestReserveBlocksConcurrentBudgetOvershoot(t *testing.T) {
 	ix.Release(size)
 	if got := ix.HostedBytes(); got != 0 {
 		t.Fatalf("hosted bytes = %d after an extra release, want 0", got)
+	}
+}
+
+// TestAbandonedOfferDestroysNothing covers a remote content-wipe. A push offer
+// is a few dozen bytes any peer can send, and nothing obliges that peer to
+// follow it with a transfer. If merely making room for the offer evicted, a
+// stranger could delete a node's replicas for free — offer, let the stream die,
+// repeat — which is precisely the availability the content layer exists to
+// provide. Eviction has to wait until the bytes are real.
+func TestAbandonedOfferDestroysNothing(t *testing.T) {
+	dir := t.TempDir()
+	store, err := NewBlobStore(dir)
+	if err != nil {
+		t.Fatalf("store: %v", err)
+	}
+	ix, err := LoadContentIndex(dir, store)
+	if err != nil {
+		t.Fatalf("index: %v", err)
+	}
+
+	const (
+		budget = 1000
+		held   = 800 // a replica this node already stores for the network
+		offer  = 600 // only fits if the held set is evicted
+	)
+	ix.AddHosted("victim", held, nil, "peer-a")
+
+	// Look at the index from far enough in the future that the held set is past
+	// evictionProtection and so genuinely is an eviction candidate.
+	future := time.Now().Add(2 * evictionProtection)
+
+	if !ix.Reserve(offer, budget, budget, 0, future) {
+		t.Fatal("the offer fits once the held set is evicted, so it should be admitted")
+	}
+	if !ix.Has("victim") {
+		t.Fatal("an offer that never delivered a byte deleted content this node already held")
+	}
+	if got := ix.HostedBytes(); got != held+offer {
+		t.Fatalf("hosted bytes = %d, want %d (held + the outstanding promise)", got, held+offer)
+	}
+
+	// The transfer dies. Everything must be exactly as it was.
+	ix.Release(offer)
+	if !ix.Has("victim") || ix.HostedBytes() != held {
+		t.Fatalf("after an abandoned offer: victim held = %v, hosted = %d, want true/%d",
+			ix.Has("victim"), ix.HostedBytes(), held)
+	}
+
+	// A transfer that actually completes is what earns the right to evict.
+	if !ix.Reserve(offer, budget, budget, 0, future) {
+		t.Fatal("second offer should be admitted")
+	}
+	if !ix.CommitHosted("delivered", offer, nil, "peer-b", budget, budget, 0, future) {
+		t.Fatal("a fully received set should commit")
+	}
+	if ix.Has("victim") {
+		t.Fatal("commit should have evicted the least-recently-used set to make room")
+	}
+	if !ix.Has("delivered") {
+		t.Fatal("the received set was not recorded")
+	}
+	// The reservation must be consumed by the commit, not counted a second time.
+	if got := ix.HostedBytes(); got != offer {
+		t.Fatalf("hosted bytes = %d after commit, want %d", got, offer)
 	}
 }
 

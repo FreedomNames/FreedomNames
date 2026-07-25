@@ -41,11 +41,20 @@ by a web page you merely visited:
   is how a DNS-rebinding attack reaches a service on `localhost`. `localhost`
   and IP literals (`127.0.0.1`, `[::1]`, a LAN address) are accepted; if you
   reach the API through a real hostname, list it in
-  `FREEDOM_HTTP_ALLOWED_HOSTS`.
-- Requests that change something (`POST`, `DELETE`) carrying an `Origin` header
-  from another site are refused with `403` — cross-site request forgery. A
-  browser always sends `Origin` on those; `curl`, the CLI and an embedding app
-  send none and are unaffected.
+  `FREEDOM_HTTP_ALLOWED_HOSTS` (a port on the entry is fine — it is ignored when
+  matching).
+- Requests a browser reports as coming from another site
+  (`Sec-Fetch-Site: cross-site`) are refused with `403`, whatever the method.
+  This one matters for reads too: `GET /content` fetches from the network on a
+  miss and keeps what it fetched, announcing this node as a provider — so
+  without it, a page you visited could pick what your node hosts and advertises
+  just by embedding an `<img>`. Such a request carries no `Origin` at all, which
+  is why the `Origin` check below cannot cover it.
+- Requests carrying an `Origin` header from another site are refused with `403`
+  — cross-site request forgery.
+
+`curl`, the CLI and an embedding app send none of these headers and are
+unaffected, as are a URL you typed yourself and a page served from this node.
 
 A spawning host can also override these with **flags**, which take precedence
 over the environment: `--http-addr HOST:PORT`, `--api-bind HOST`,

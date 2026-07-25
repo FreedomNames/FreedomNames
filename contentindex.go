@@ -199,6 +199,10 @@ func (ix *ContentIndex) AddHosted(root string, size int64, chunks []string, from
 	}
 	ix.mu.Lock()
 	defer ix.mu.Unlock()
+	ix.addHostedLocked(root, size, chunks, from)
+}
+
+func (ix *ContentIndex) addHostedLocked(root string, size int64, chunks []string, from string) {
 	if _, exists := ix.sets[root]; exists {
 		ix.touchLocked(root)
 		return
@@ -285,38 +289,74 @@ func (ix *ContentIndex) hostedBytesLocked() int64 {
 	return total
 }
 
-// Reserve admits a hosted set and holds its size against the budget until the
-// caller reports the outcome with Release. Every admitted transfer must be
-// paired with exactly one Release, or the budget leaks.
+// Reserve holds size bytes of the budget for a transfer that has not arrived
+// yet, and reports whether the set could be stored once it has. Every
+// successful Reserve must be paired with exactly one Release or CommitHosted,
+// or the budget leaks.
 //
-// The admission test and the reservation happen under a single lock hold. Doing
-// them as two steps would leave exactly the gap this exists to close: both
-// callers test against the same usage, then both reserve.
+// Reserve DELETES NOTHING. A push offer is a few dozen bytes from any peer that
+// cares to send one, and nothing obliges that peer to follow it with a transfer
+// — so if an offer alone were allowed to evict, a stranger could wipe this
+// node's hosted content for free, one abandoned offer at a time, without ever
+// uploading anything. It only asks whether the eviction policy *could* make
+// room; the deletion happens in CommitHosted, once the bytes are real.
+//
+// The test and the reservation happen under a single lock hold. Doing them as
+// two steps would leave exactly the gap this exists to close: both callers test
+// against the same usage, then both reserve.
 func (ix *ContentIndex) Reserve(size, budget, maxSize int64, ttl time.Duration, now time.Time) bool {
 	if ix == nil {
 		return true // store-only service (tests): no policy
 	}
 	ix.mu.Lock()
 	defer ix.mu.Unlock()
-	if !ix.admitLocked(size, budget, maxSize, ttl, now) {
+	if !ix.fitLocked(size, budget, maxSize, ttl, now, false) {
 		return false
 	}
 	ix.reserved += size
 	return true
 }
 
-// Release drops a reservation taken by Reserve, whether the transfer completed
-// (its bytes are now counted as a stored set) or failed.
+// Release drops a reservation taken by Reserve whose transfer never completed.
+// A completed one is consumed by CommitHosted instead.
 func (ix *ContentIndex) Release(size int64) {
 	if ix == nil {
 		return
 	}
 	ix.mu.Lock()
 	defer ix.mu.Unlock()
+	ix.releaseLocked(size)
+}
+
+func (ix *ContentIndex) releaseLocked(size int64) {
 	ix.reserved -= size
 	if ix.reserved < 0 {
 		ix.reserved = 0
 	}
+}
+
+// CommitHosted turns a reservation into a stored set: it makes room for real,
+// evicting if the budget requires it, and records the set. This is the only
+// path on which an inbound push may cost this node content it already holds,
+// and it is reached only after every blob has arrived and verified.
+//
+// It consumes the reservation whether or not it succeeds, so the caller must
+// not also Release. It returns false if the budget filled while the transfer
+// was in flight, in which case the set is not recorded.
+func (ix *ContentIndex) CommitHosted(root string, size int64, chunks []string, from string, budget, maxSize int64, ttl time.Duration, now time.Time) bool {
+	if ix == nil {
+		return true // store-only service (tests): no policy
+	}
+	ix.mu.Lock()
+	defer ix.mu.Unlock()
+	// Drop the promise before measuring, or these bytes are counted twice and
+	// the eviction pass frees twice what it needs to.
+	ix.releaseLocked(size)
+	if !ix.fitLocked(size, budget, maxSize, ttl, now, true) {
+		return false
+	}
+	ix.addHostedLocked(root, size, chunks, from)
+	return true
 }
 
 // Admit decides whether a hosted set of the given size may be stored. Nothing
@@ -333,12 +373,14 @@ func (ix *ContentIndex) Admit(size, budget, maxSize int64, ttl time.Duration, no
 	}
 	ix.mu.Lock()
 	defer ix.mu.Unlock()
-	return ix.admitLocked(size, budget, maxSize, ttl, now)
+	return ix.fitLocked(size, budget, maxSize, ttl, now, true)
 }
 
-// admitLocked is Admit's body. Caller holds mu, so an admission can be made
-// atomic with whatever the caller does about it (see Reserve).
-func (ix *ContentIndex) admitLocked(size, budget, maxSize int64, ttl time.Duration, now time.Time) bool {
+// fitLocked reports whether a hosted set of the given size fits, evicting to
+// make room when apply is set. With apply false it is a dry run: it walks the
+// same eviction order and answers the same question, but deletes nothing (see
+// Reserve for why that distinction is load-bearing). Caller holds mu.
+func (ix *ContentIndex) fitLocked(size, budget, maxSize int64, ttl time.Duration, now time.Time, apply bool) bool {
 	if size > maxSize || size > budget {
 		return false
 	}
@@ -352,12 +394,16 @@ func (ix *ContentIndex) admitLocked(size, budget, maxSize int64, ttl time.Durati
 		}
 	}()
 
-	for ix.hostedBytesLocked()+size > budget {
+	// Dry runs cannot delete, so they track what they would have freed instead.
+	var freed int64
+	var spared map[string]bool
+
+	for ix.hostedBytesLocked()-freed+size > budget {
 		victim := ""
 		victimExpired := false
 		var oldest int64
 		for root, m := range ix.sets {
-			if m.Owned {
+			if m.Owned || spared[root] {
 				continue
 			}
 			expired := ttl > 0 && now.Unix()-m.LastAccess > int64(ttl.Seconds())
@@ -374,8 +420,16 @@ func (ix *ContentIndex) admitLocked(size, budget, maxSize int64, ttl time.Durati
 		if victim == "" {
 			return false
 		}
-		ix.evictLocked(victim)
-		evicted = true
+		if apply {
+			ix.evictLocked(victim)
+			evicted = true
+			continue
+		}
+		freed += ix.sets[victim].Size
+		if spared == nil {
+			spared = make(map[string]bool)
+		}
+		spared[victim] = true
 	}
 	return true
 }

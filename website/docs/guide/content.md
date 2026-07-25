@@ -92,7 +92,17 @@ not even TTL-expired sets. This is deliberate: every replica a node keeps is
 content the network can still serve, so a node never *proactively* destroys
 availability. There is no cleanup timer, only eviction priority at the moment
 space is genuinely needed. When a new set needs room, eviction picks TTL-expired
-sets first (least recently accessed first) and falls back to plain LRU. Any access or re-push from a healing peer refreshes a set's clock, so
+sets first (least recently accessed first) and falls back to plain LRU.
+
+"The moment space is genuinely needed" means the moment the incoming bytes have
+all arrived and verified — not the moment a peer *offers* them. An offer only
+reserves budget against a dry run of the eviction policy; it deletes nothing. A
+push offer costs its sender a few dozen bytes and nothing obliges them to follow
+it with a transfer, so an offer that could evict would let any peer delete your
+replicas for free. If the budget fills while a transfer is in flight, the
+completed set is declined rather than admitted.
+
+Any access or re-push from a healing peer refreshes a set's clock, so
 content with a living swarm effectively never expires. Note that publishing an
 *updated* page is a new content set with a new hash: the old version remains
 owned (and so pinned) locally until you delete its blobs by hand.

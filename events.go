@@ -66,7 +66,10 @@ func (freedomName *FreedomNameNode) eventLoop() {
 				case event.EvtNATDeviceTypeChanged:
 					log.Printf("Event: 'NAT device type changed' - DeviceType %v, transport: %v", e.NatDeviceType.String(), e.TransportProtocol.String())
 				case event.EvtPeerProtocolsUpdated:
-					log.Printf("Event: 'Peer protocols updated' - added: %+v, removed: %+v, peer: %+v", e.Added, e.Removed, e.Peer)
+					// %q: protocol IDs are strings a remote peer chose and sent
+					// us during identify, so they are untrusted input on their
+					// way into the log.
+					log.Printf("Event: 'Peer protocols updated' - added: %q, removed: %q, peer: %v", e.Added, e.Removed, e.Peer)
 				case event.EvtPeerIdentificationCompleted:
 					log.Printf("Event: 'Peer identification completed' - %v", e.Peer)
 				case event.EvtPeerIdentificationFailed:
@@ -83,7 +86,7 @@ func (freedomName *FreedomNameNode) eventLoop() {
 					}
 					// Get the peer addresses
 					peerAddresses := freedomName.kadDHT.Host().Network().Peerstore().Addrs(peerID)
-					log.Printf("Event: 'Peer connectedness change' - Peer %s (peerInfo: %+v) is now %s, protocols: %v, addresses: %v", peerID.String(), peerInfo, e.Connectedness, peerProtocols, peerAddresses)
+					log.Printf("Event: 'Peer connectedness change' - Peer %s is now %s, protocols: %q, addresses: %v", peerID.String(), e.Connectedness, peerProtocols, peerAddresses)
 
 					// Q: Do we really need to manage the peersstore ourselves?
 					if e.Connectedness == network.NotConnected {

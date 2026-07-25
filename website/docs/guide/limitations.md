@@ -121,10 +121,13 @@ public bootstrap exists, off-LAN discovery is manual.
 
 - **The HTTP API is unauthenticated.** It binds to `127.0.0.1` by default for
   this reason. Do not expose it on a untrusted network; anyone who can reach it
-  can publish and fetch through your node. It rejects domain-name `Host` headers
-  and cross-origin mutating requests, which stops a *web page* from driving it,
-  but that is not authentication: anything that can open a socket to it still
-  has full control.
+  can publish and fetch through your node. It rejects domain-name `Host`
+  headers, requests a browser marks as cross-site, and cross-origin requests,
+  which stops a *web page* from driving it — but that is not authentication:
+  anything that can open a socket to it still has full control. The cross-site
+  check relies on `Sec-Fetch-Site`, which browsers older than roughly 2023 do
+  not send; on those, an embedded `<img>` pointed at `/content` can still make
+  your node fetch, keep and announce content of the page's choosing.
 - **DNS forwarding is limited to local clients.** `.fn` is answered for anyone;
   everything else is only forwarded for loopback and private/link-local
   addresses, so a public node is not an open resolver. The classification is by
