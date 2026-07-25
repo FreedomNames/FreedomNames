@@ -56,10 +56,15 @@ public bootstrap exists, off-LAN discovery is manual.
   name can resolve to a stale owner rather than an error.
 - **Address history is scanned only so far.** Anyone can pay dust to a name's
   discovery marker, and every entry costs a round trip to an Electrum server, so
-  a lookup reads at most 512 history entries per address (oldest first, which is
-  the half that decides the winning claim). A name deliberately spammed past
-  that could in principle hide a later rebind from the scan; the truncation is
-  logged when it happens.
+  a lookup reads at most 512 history entries per address. Which end it reads
+  depends on what it is looking for: the earliest entries decide the winning
+  claim, while a custody transfer is by nature at the recent end. A name
+  deliberately spammed past the cap does not resolve to a stale or wrong owner —
+  a scan that runs out of budget without an answer fails as inconclusive, is
+  logged, and is *not* negative-cached, so the name resolves again once the
+  history is back within reach. The name is still unresolvable while the flood
+  is in scope, which makes this a denial-of-service avenue against a specific
+  name rather than a hijacking one.
 
 ## Content layer scope
 

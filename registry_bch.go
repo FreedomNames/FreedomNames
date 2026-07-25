@@ -64,8 +64,10 @@ const maxCustodyHops = 64
 // address currently holding a name NFT) as many times as they like, and every
 // entry costs a round-trip to the electrum server. Without a cap, a name could
 // be made arbitrarily expensive to resolve — and resolution is reachable from
-// any unauthenticated .fn query. Marker history is scanned oldest-first, which
-// is the half that decides the winning claim.
+// any unauthenticated .fn query. Which end of the history gets scanned depends
+// on what the caller is looking for — see oldestHistory and newestHistory — and
+// a scan that hits the cap without finding its answer reports
+// errHistoryTruncated rather than a definitive "no".
 const maxHistoryScan = 512
 
 // maxOwnerCacheEntries bounds the owner cache. Entries are keyed by requested
@@ -172,10 +174,11 @@ func (r *bchRegistry) winningClaim(ctx context.Context, label string) (*parsedTx
 		return nil, nil, err
 	}
 
+	scan, truncated := oldestHistory(history, label)
 	var claimTx *parsedTx
 	var claimTxID []byte
 	var claimHeight int64 = -1
-	for _, h := range capHistory(history, label) {
+	for _, h := range scan {
 		if !confirmed(h.Height, tip, r.minConf) {
 			continue
 		}
@@ -197,6 +200,9 @@ func (r *bchRegistry) winningClaim(ctx context.Context, label string) (*parsedTx
 		}
 	}
 	if claimTx == nil {
+		if truncated {
+			return nil, nil, fmt.Errorf("claim for %q: %w", label, errHistoryTruncated)
+		}
 		return nil, nil, ErrRegistryNotFound
 	}
 	category := genesisCategory(claimTx)
@@ -230,7 +236,12 @@ func (r *bchRegistry) resolve(ctx context.Context, label string) ([]byte, error)
 	var claimTxID []byte
 	var claimHeight int64 = -1
 
-	for _, h := range capHistory(history, label) {
+	// A truncated scan can miss an FN02 rebind, which is by nature at the recent
+	// end. A binding that IS found stays trustworthy — it is only authoritative
+	// once it matches the live NFT commitment below — but a miss cannot be
+	// reported as "unclaimed".
+	scan, truncated := oldestHistory(history, label)
+	for _, h := range scan {
 		if !confirmed(h.Height, tip, r.minConf) {
 			continue
 		}
@@ -260,6 +271,9 @@ func (r *bchRegistry) resolve(ctx context.Context, label string) ([]byte, error)
 	}
 
 	if claimTx == nil {
+		if truncated {
+			return nil, fmt.Errorf("claim for %q: %w", label, errHistoryTruncated)
+		}
 		return nil, ErrRegistryNotFound
 	}
 
@@ -282,6 +296,13 @@ func (r *bchRegistry) resolve(ctx context.Context, label string) ([]byte, error)
 	// yet re-bound via `freedom adopt`), the name has no resolvable owner.
 	if pub, ok := bindings[hex.EncodeToString(commitment)]; ok {
 		return pub, nil
+	}
+	if truncated {
+		// The owning binding may simply be in the part we never read. Reporting
+		// "unclaimed" here would negative-cache a name that is fine, which is a
+		// per-name denial of service anyone can trigger: the marker address is
+		// derived from the label alone, so anyone can pad its history with dust.
+		return nil, fmt.Errorf("owner binding for %q: %w", label, errHistoryTruncated)
 	}
 	return nil, ErrRegistryNotFound
 }
@@ -365,7 +386,8 @@ func (r *bchRegistry) findSpender(ctx context.Context, script, txid []byte, vout
 	if err != nil {
 		return nil, nil, false, err
 	}
-	for _, h := range capHistory(history, "custody hop") {
+	scan, truncated := newestHistory(history, "custody hop")
+	for _, h := range scan {
 		raw, err := r.client.GetRawTransaction(ctx, h.TxHash)
 		if err != nil {
 			return nil, nil, false, err
@@ -379,6 +401,13 @@ func (r *bchRegistry) findSpender(ctx context.Context, script, txid []byte, vout
 				return tx, raw, true, nil
 			}
 		}
+	}
+	if truncated {
+		// found=false means "this outpoint is unspent", which stops the custody
+		// walk and freezes the answer at the current holder. Saying that from a
+		// partial scan would keep resolving a transferred name to its previous
+		// owner, so fail the lookup instead.
+		return nil, nil, false, fmt.Errorf("custody hop: %w", errHistoryTruncated)
 	}
 	return nil, nil, false, nil
 }
@@ -410,16 +439,41 @@ func parseFNMetadata(tx *parsedTx, label string) (tag string, pubKey []byte, ok 
 
 // --- small helpers ---
 
-// capHistory limits an address history to maxHistoryScan entries, keeping the
-// oldest (electrum returns confirmed history in ascending height order, and the
-// earliest confirmed claim is the one that wins). what names the scan in the
-// log so a truncated lookup is visible rather than silently partial.
-func capHistory(history []electrumHistoryItem, what string) []electrumHistoryItem {
+// errHistoryTruncated reports that a lookup hit maxHistoryScan and so could not
+// reach a definitive answer. It deliberately does NOT wrap ErrRegistryNotFound:
+// a truncated scan says "I did not finish looking", not "the name is unclaimed",
+// and only the latter may be negative-cached (see ResolveOwner).
+var errHistoryTruncated = errors.New("address history too large to scan conclusively")
+
+// oldestHistory keeps the earliest maxHistoryScan entries. Electrum returns
+// confirmed history in ascending height order, and the earliest confirmed claim
+// is the one that wins, so the oldest end is the half that decides a claim.
+// The bool reports whether anything was dropped: a caller that finds nothing
+// must not report a definitive answer from a partial scan.
+func oldestHistory(history []electrumHistoryItem, what string) ([]electrumHistoryItem, bool) {
 	if len(history) <= maxHistoryScan {
-		return history
+		return history, false
 	}
 	log.Printf("registry: %s has %d history entries, scanning the oldest %d", what, len(history), maxHistoryScan)
-	return history[:maxHistoryScan]
+	return history[:maxHistoryScan], true
+}
+
+// newestHistory keeps the most recent maxHistoryScan entries, newest first. A
+// transaction that spends an output is always mined at or after the one that
+// created it, so a custody hop has to search from the recent end — taking the
+// oldest entries here would scan precisely the half that cannot contain the
+// spend.
+func newestHistory(history []electrumHistoryItem, what string) ([]electrumHistoryItem, bool) {
+	truncated := len(history) > maxHistoryScan
+	if truncated {
+		log.Printf("registry: %s has %d history entries, scanning the newest %d", what, len(history), maxHistoryScan)
+		history = history[len(history)-maxHistoryScan:]
+	}
+	out := make([]electrumHistoryItem, len(history))
+	for i, h := range history {
+		out[len(history)-1-i] = h
+	}
+	return out, truncated
 }
 
 func confirmed(height, tip, minConf int64) bool {
