@@ -40,8 +40,8 @@ for platform in "${PLATFORMS[@]}"; do
     echo "INFO: Building $GOOS/$GOARCH ..."
     CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" \
         go build -trimpath \
-        -ldflags "-s -w -X main.buildVersion=${VERSION}" \
-        -o "$OUT_DIR/$bin_name" .
+        -ldflags "-s -w -X gitlab.melroy.org/freedom-names/freedom-names/internal/version.Version=${VERSION}" \
+        -o "$OUT_DIR/$bin_name" ./cmd/freedom-names
 
     base="freedom-names-$APP_VERSION-$GOOS-$GOARCH"
     if [ "$GOOS" = "windows" ]; then

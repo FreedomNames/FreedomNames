@@ -42,7 +42,7 @@ export WORKDIR=$(mktemp -d /tmp/fn-verify.XXXXXX)
 export BIN="$WORKDIR/freedom-names"
 
 step "Build the binary"
-( cd "$ROOT" && go build -o "$BIN" . ) || fail "go build failed"
+( cd "$ROOT" && go build -o "$BIN" ./cmd/freedom-names ) || fail "go build failed"
 pass "built $BIN ($("$BIN" freedom name x >/dev/null 2>&1; echo ok))"
 
 # Each leg brings its own fresh nodes up and tears them down, so ports are free

@@ -319,6 +319,44 @@ header sniffed from the first bytes (e.g. `image/png`, `text/plain`), since the
 content-addressed store keeps no MIME metadata. Unrecognized bytes fall back to
 `application/octet-stream`.
 
+## Project structure
+
+```
+cmd/freedom-names/   the binary's entry point — wiring only
+internal/            all implementation code, private to this module
+  version/           build-stamped version string
+  config/            FREEDOM_* environment configuration
+  record/            signed name records: types, signing, validation
+  content/           content-addressed blob store, hosting index, rate limits
+  registry/          bare-name rules and the name-registry interface
+  bch/               Bitcoin Cash: transactions, wallet, Electrum, registry
+  node/              libp2p host, Kademlia DHT, content transfer + replication
+  resolver/          name -> records resolution and caching
+  dnsserver/         the .fn DNS server
+  httpapi/           the local HTTP API
+  cli/               the `freedom-names freedom` subcommands
+  bind/              listener bind-error classification
+  testsupport/       fixtures shared by more than one package's tests
+scripts/             build, format, test and network-verification scripts
+assets/              logo and repository images
+website/             the VitePress documentation site
+```
+
+Everything lives under `internal/`, so the compiler enforces that none of it is
+an importable public API. Dependencies flow one way from the entry point through
+explicit package boundaries. `content` sits near the bottom; `record` reuses its
+content-hash validation, and `config` reuses its content-size limit.
+
+Two interfaces are deliberately declared by their *consumer* rather than their
+implementer — `httpapi.FreedomDHT` and `resolver.RecordStore`. Go satisfies
+interfaces structurally, so `node` implements both without those interfaces
+depending on its concrete type. `resolver` therefore avoids importing `node`;
+`httpapi` imports it separately for the content service.
+
+Tests live beside the code they cover, generally in the same package so they can
+exercise unexported implementation details; there is no separate test tree.
+Dependencies are managed by `go.mod`; there is no vendor directory.
+
 ## Development
 
 Developers working from a source checkout can run the tests (including a live
@@ -326,6 +364,12 @@ over-the-wire DNS server test):
 
 ```sh
 go test -race ./...
+```
+
+Build a development binary (stamps the version from the nearest git tag):
+
+```sh
+./scripts/build.sh
 ```
 
 Install [air](https://github.com/air-verse/air) for auto-recompile on changes:

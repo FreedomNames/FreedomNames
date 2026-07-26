@@ -43,7 +43,7 @@ kept under a `/tmp/fn-verify.XXXX` workdir printed at the end.
 Each script is standalone; set `BIN` to a built binary:
 
 ```sh
-go build -o /tmp/freedom-names .
+go build -o /tmp/freedom-names ./cmd/freedom-names
 BIN=/tmp/freedom-names scripts/verify-network/01-selfcert-replication.sh
 BIN=/tmp/freedom-names scripts/verify-network/02-content-fetch.sh
 BIN=/tmp/freedom-names scripts/verify-network/03-barename-claim.sh [label]
