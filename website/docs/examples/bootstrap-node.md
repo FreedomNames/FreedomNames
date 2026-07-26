@@ -98,12 +98,34 @@ keeping it stable is an operational task, not something the node handles for you
   filesystem every restart generates a fresh identity.
 - Confirm it survived a restart: the peer ID from `/info` must be unchanged.
 
-Run it under a service manager so it starts from a fixed directory as a fixed
-user. A minimal systemd unit:
+### Run it as a systemd service
+
+Run it under a service manager so it always starts from a fixed directory as a
+fixed user, and comes back after a reboot.
+
+**1. Create a dedicated user and install the binary.** The unit below runs as
+`freedom`, so the identity key ends up at `/home/freedom/.freedom/private.key`:
+
+```sh
+sudo useradd --system --create-home --home-dir /home/freedom \
+     --shell /usr/sbin/nologin freedom
+sudo install -m 755 freedom-names /usr/local/bin/freedom-names
+```
+
+On non-Debian systems `nologin` may live at `/sbin/nologin` instead.
+
+**2. Write the unit file** to `/etc/systemd/system/freedom-names-bootstrap.service`.
+Unit files for units you add by hand belong in `/etc/systemd/system/`;
+`/lib/systemd/system/` is for packages and gets overwritten on upgrade:
+
+```sh
+sudo nano /etc/systemd/system/freedom-names-bootstrap.service
+```
 
 ```ini
 [Unit]
 Description=Freedom Names bootstrap node
+Wants=network-online.target
 After=network-online.target
 
 [Service]
@@ -111,13 +133,60 @@ User=freedom
 WorkingDirectory=/home/freedom
 ExecStart=/usr/local/bin/freedom-names bootstrap
 Restart=always
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-`WorkingDirectory` is the part that matters: it pins which `private.key` the node
-can pick up.
+`WorkingDirectory` is the part that matters most: it pins which `private.key` the
+node can pick up. `Wants=` is needed alongside `After=`, since `After=` on its own
+only orders against `network-online.target` without pulling it in.
+
+**3. Reload systemd, then enable and start it.** `daemon-reload` makes systemd
+notice the new file; `enable --now` both starts it immediately and sets it to
+start on boot:
+
+```sh
+sudo systemctl daemon-reload
+sudo systemctl enable --now freedom-names-bootstrap
+```
+
+**4. Check it came up:**
+
+```sh
+systemctl status freedom-names-bootstrap
+sudo journalctl -u freedom-names-bootstrap -f
+```
+
+The log prints the peer ID and listen addresses at startup. Confirm the API
+answers too:
+
+```sh
+curl http://localhost:8430/info
+```
+
+**5. Back up the identity key.** It is generated on first start, so it does not
+exist until now:
+
+```sh
+sudo cp /home/freedom/.freedom/private.key ~/freedom-bootstrap-key.backup
+```
+
+Store that copy somewhere off the machine. It is the node's identity: without it
+a rebuild gets a new peer ID and every node pointed at the old one fails to
+connect.
+
+Useful afterwards:
+
+```sh
+sudo systemctl restart freedom-names-bootstrap   # after upgrading the binary
+sudo systemctl disable --now freedom-names-bootstrap
+```
+
+After a restart or reboot, re-check `/info`: the peer ID must be identical. If it
+changed, the node is not reading the key you think it is, and the usual cause is a
+different `WorkingDirectory` or a missing home directory.
 
 ## Getting listed as a default
 
