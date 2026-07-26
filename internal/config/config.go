@@ -21,6 +21,12 @@ type Config struct {
 	Bootstrap   []string // bootstrap peer multiaddrs
 	ContentDir  string   // content-addressed blobstore directory
 
+	// BootstrapFromEnv reports whether Bootstrap came from FREEDOM_BOOTSTRAP
+	// rather than the built-in list. A hand-supplied list is worth echoing at
+	// startup, since a typo in it silently yields no peers; the built-in list
+	// only needs a one-line summary.
+	BootstrapFromEnv bool
+
 	// DNSRecursionAny lets ANY client use this node to forward non-.fn queries
 	// upstream. Off by default: forwarding for the whole internet is an open
 	// resolver, i.e. a reflection/amplification tool. See forwardingAllowed.
@@ -138,6 +144,7 @@ func LoadConfigForRole(bootstrapMode bool) *Config {
 	}
 	if v := os.Getenv("FREEDOM_BOOTSTRAP"); v != "" {
 		cfg.Bootstrap = splitAndTrim(v)
+		cfg.BootstrapFromEnv = true
 	}
 	// Recursion for remote clients is opt-in and spelled out explicitly, so it
 	// can never be enabled by a typo in an unrelated variable.

@@ -365,14 +365,32 @@ func logBootstrapPeers(cfg *config.Config, infos []peer.AddrInfo) {
 		log.Println("No bootstrap peers configured: discovery is limited to mDNS on the local network")
 	case len(infos) == 0:
 		log.Printf("None of the %d configured bootstrap peer(s) could be used: discovery is limited to mDNS on the local network", len(cfg.Bootstrap))
+	case !cfg.BootstrapFromEnv:
+		// The built-in list needs no verifying and grows over time, so keep it to
+		// one line. Peers that actually connect are logged individually by the
+		// event listener anyway.
+		log.Printf("Dialing %d built-in bootstrap peer(s) across %d addresses", distinctPeers(infos), len(infos))
 	default:
-		log.Printf("Dialing %d bootstrap peer(s) to join the network:", len(infos))
+		// A hand-supplied FREEDOM_BOOTSTRAP is the one worth echoing back, since
+		// it is the part a typo can silently break.
+		log.Printf("Dialing %d bootstrap peer(s) from FREEDOM_BOOTSTRAP:", distinctPeers(infos))
 		for _, info := range infos {
 			for _, addr := range info.Addrs {
 				log.Printf("  %s/p2p/%s", addr, info.ID)
 			}
 		}
 	}
+}
+
+// distinctPeers counts unique hosts, not addresses: one peer contributes a
+// separate AddrInfo per transport (TCP, QUIC), which would otherwise double the
+// apparent peer count.
+func distinctPeers(infos []peer.AddrInfo) int {
+	seen := make(map[peer.ID]struct{}, len(infos))
+	for _, info := range infos {
+		seen[info.ID] = struct{}{}
+	}
+	return len(seen)
 }
 
 func BootstrapPeerInfos(addrs []string) []peer.AddrInfo {
