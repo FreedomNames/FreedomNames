@@ -13,7 +13,7 @@ node is entirely driven by its environment.
 | `FREEDOM_CONTENT_DIR` | `~/.freedom/content` | Content-addressed blobstore directory |
 | `FREEDOM_BOOTSTRAP` | *(built-in list)* | Comma-separated bootstrap peer multiaddrs. Overrides the built-in defaults |
 | `FREEDOM_BCH_NETWORK` | `mainnet` | BCH network for bare names: `mainnet`, `chipnet`, `testnet4`, or `testnet3` |
-| `FREEDOM_BCH_ELECTRUM` | *(built-in list per network)* | Comma-separated Electrum/Fulcrum servers, tried in order with failover (`ssl://host:port`). Overrides the built-in bootstrap list |
+| `FREEDOM_BCH_ELECTRUM` | *(built-in list per network)* | Comma-separated Electrum/Fulcrum servers, tried in order with failover (`ssl://host:port`). Overrides the built-in Electrum list |
 | `FREEDOM_BCH_MINCONF` | `1` | Confirmations before a name claim counts |
 | `FREEDOM_CONTENT_REPLICAS` | `3` | Copies pushed to other nodes per publish (target holders = this + 1) |
 | `FREEDOM_CONTENT_HOST_BUDGET` | `20G` (20 GiB) | Max bytes of hosted (other people's) content |

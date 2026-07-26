@@ -51,11 +51,11 @@ terminal; the CLI and your system resolver talk to it.
 
 ::: warning Network connectivity
 Freedom Names discovers other instances on your local network through mDNS, and
-dials a built-in default bootstrap peer to reach nodes beyond it. That public
-network is still very small, so expect few peers. Publishing and resolving DHT
-records requires at least one other peer; check `/peers` to confirm you have one.
-To run discovery you control, set `FREEDOM_BOOTSTRAP` to your own bootstrap node
-as described below.
+dials the built-in default bootstrap peers to reach nodes beyond it. That public
+network is still small, so expect few peers. Publishing and resolving DHT records
+requires at least one other peer; check `/peers` to confirm you have one. To run
+discovery you control, set `FREEDOM_BOOTSTRAP` to your own bootstrap node as
+described below.
 :::
 
 ## Run a bootstrap node

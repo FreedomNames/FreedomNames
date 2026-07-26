@@ -42,12 +42,11 @@ local instance.
 
 ## What's next
 
-- Nearby nodes discover each other over mDNS, but publishing and resolving
-  through the DHT needs at least one other peer. On a single machine, run a
-  second node as a bootstrap in another terminal (see [**Run a bootstrap
-  node**](/guide/running-a-node#run-a-bootstrap-node)), or point at an existing
-  peer with `FREEDOM_BOOTSTRAP` (see [**Run Freedom
-  Names**](/guide/running-a-node)).
+- Your node joins the network on its own: it dials the built-in public bootstrap
+  peers, and finds nearby instances over mDNS. Confirm with `curl -s
+  localhost:8420/peers`, which should list at least one peer within a few
+  seconds. To use peers you control instead, set `FREEDOM_BOOTSTRAP` (see [**Run
+  a bootstrap node**](/examples/bootstrap-node)).
 - Ready to create a name? Continue with [**Your first
   name**](/guide/your-first-name).
 - Make `.fn` resolve system-wide: [**Resolving from your
