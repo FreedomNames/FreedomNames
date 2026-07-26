@@ -56,10 +56,24 @@ type Config struct {
 	ContentMaxPushSize  int64         // largest pushed content set this node accepts
 }
 
-// Default bootstrap peers. Replace/extend with real public /dnsaddr entries as
-// the network grows. Overridable via FREEDOM_BOOTSTRAP (comma-separated).
+// Default bootstrap peers: public server-mode nodes a fresh install dials to
+// join the DHT. Extend as the network grows. Overridable via FREEDOM_BOOTSTRAP
+// (comma-separated).
+//
+// Entries are deliberately raw /ip4 multiaddrs rather than /dnsaddr: Freedom
+// Names replaces DNS, so bootstrapping through DNS would make joining the
+// network depend on the system it exists to replace. The cost is that a peer
+// that moves needs a release to update, so each host here must have a static
+// address and a persistent identity (~/.freedom/private.key).
+//
+// Only TCP and QUIC are listed. A bootstrap node also speaks WebTransport
+// (:4021) and WebRTC-direct (:4022), but those multiaddrs embed a /certhash of
+// a self-signed certificate that go-libp2p regenerates on restart, so they
+// cannot be hardcoded; browser peers learn them at runtime via identify.
 var defaultBootstrapPeers = []string{
-	// "/dnsaddr/bootstrap.freedom-names.example/p2p/12D3Koo...",
+	// Operated by a community member; verified reachable on TCP + QUIC.
+	"/ip4/135.148.236.246/tcp/4020/p2p/12D3KooWFRgUQUMvP4rimeZ1vS2DzmP48vvxcfEk5XqWmURMKU13",
+	"/ip4/135.148.236.246/udp/4020/quic-v1/p2p/12D3KooWFRgUQUMvP4rimeZ1vS2DzmP48vvxcfEk5XqWmURMKU13",
 }
 
 // defaultHTTPAddr is the HTTP API address a node uses when FREEDOM_HTTP_ADDR is
