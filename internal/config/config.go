@@ -70,10 +70,15 @@ type Config struct {
 // (:4021) and WebRTC-direct (:4022), but those multiaddrs embed a /certhash of
 // a self-signed certificate that go-libp2p regenerates on restart, so they
 // cannot be hardcoded; browser peers learn them at runtime via identify.
+// Unreachable entries are not fatal: a peer that fails to dial is skipped, so
+// the remaining ones still get the node into the DHT. Order carries no weight.
 var defaultBootstrapPeers = []string{
-	// Operated by a community member; verified reachable on TCP + QUIC.
+	// Community-operated node on a static hosted address.
 	"/ip4/135.148.236.246/tcp/4020/p2p/12D3KooWFRgUQUMvP4rimeZ1vS2DzmP48vvxcfEk5XqWmURMKU13",
 	"/ip4/135.148.236.246/udp/4020/quic-v1/p2p/12D3KooWFRgUQUMvP4rimeZ1vS2DzmP48vvxcfEk5XqWmURMKU13",
+	// Maintainer-operated node.
+	"/ip4/77.61.56.117/tcp/4020/p2p/12D3KooWJTZUqCzYBT7jrG8ZaxwRU99WSZkKPxTSREYy7EDRsFex",
+	"/ip4/77.61.56.117/udp/4020/quic-v1/p2p/12D3KooWJTZUqCzYBT7jrG8ZaxwRU99WSZkKPxTSREYy7EDRsFex",
 }
 
 // defaultHTTPAddr is the HTTP API address a node uses when FREEDOM_HTTP_ADDR is

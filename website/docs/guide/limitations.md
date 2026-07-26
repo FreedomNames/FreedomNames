@@ -20,17 +20,14 @@ The code for all three is complete and tested against mocks / in-process hosts.
 See [testing on a real network](/guide/testing-a-network) to validate them
 yourself. Treat production use as beta until you have.
 
-## A very small bootstrap network
+## A young network
 
-Two nodes on the same LAN find each other via mDNS. Nodes on different networks
-need a shared bootstrap peer, and one public default ships in the binary, but
-only one. Until more exist, off-LAN discovery depends on a single host: if it is
-down, a fresh install with no `FREEDOM_BOOTSTRAP` cannot reach the network at
-all. There is also no meaningful network size yet, so expect a sparse DHT.
+Nodes on the same LAN find each other via mDNS; beyond that they rely on the
+public bootstrap peers built into the binary. That list is still short and the DHT
+is sparse, so expect few peers for now.
 
-Run your own bootstrap node and point nodes at it with `FREEDOM_BOOTSTRAP` if you
-need discovery you control. See
-[Run a bootstrap node](/examples/bootstrap-node).
+To run discovery you control, stand up your own bootstrap node and set
+`FREEDOM_BOOTSTRAP`. See [Run a bootstrap node](/examples/bootstrap-node).
 
 ## Bare-name (Bitcoin Cash) caveats
 
