@@ -343,18 +343,19 @@ website/             the VitePress documentation site
 ```
 
 Everything lives under `internal/`, so the compiler enforces that none of it is
-an importable public API. Dependencies flow one way, from the entry point down:
-`record`, `content` and `config` sit at the bottom and import nothing else from
-this module.
+an importable public API. Dependencies flow one way from the entry point through
+explicit package boundaries. `content` sits near the bottom; `record` reuses its
+content-hash validation, and `config` reuses its content-size limit.
 
 Two interfaces are deliberately declared by their *consumer* rather than their
 implementer — `httpapi.FreedomDHT` and `resolver.RecordStore`. Go satisfies
-interfaces structurally, so `node` implements both without `httpapi` or
-`resolver` having to import `node` (and pull in the whole libp2p tree).
+interfaces structurally, so `node` implements both without those interfaces
+depending on its concrete type. `resolver` therefore avoids importing `node`;
+`httpapi` imports it separately for the content service.
 
-Tests live beside the code they cover, in the same package, as Go requires —
-there is no separate test tree. Dependencies are managed by `go.mod`; there is
-no vendor directory.
+Tests live beside the code they cover, generally in the same package so they can
+exercise unexported implementation details; there is no separate test tree.
+Dependencies are managed by `go.mod`; there is no vendor directory.
 
 ## Development
 

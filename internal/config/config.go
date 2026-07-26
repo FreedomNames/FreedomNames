@@ -12,7 +12,8 @@ import (
 )
 
 // Config holds runtime configuration. Values come from environment variables so
-// nothing operational is hardcoded; sensible defaults keep `go run .` working.
+// nothing operational is hardcoded; sensible defaults keep
+// `go run ./cmd/freedom-names` working.
 type Config struct {
 	HTTPAddr    string   // address for the HTTP API (default "127.0.0.1:8420")
 	DNSAddr     string   // address for the DNS server (default ":8053")
