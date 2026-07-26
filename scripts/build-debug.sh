@@ -11,6 +11,6 @@ VERSION="${VERSION#v}"
 
 echo "INFO: Building freedom-names ${VERSION} (debug) ..."
 go build -race -gcflags "all=-N -l" \
-    -ldflags "-X main.buildVersion=${VERSION}-debug" \
-    -o freedom-names .
+    -ldflags "-X gitlab.melroy.org/freedom-names/freedom-names/internal/version.Version=${VERSION}-debug" \
+    -o freedom-names ./cmd/freedom-names
 echo "INFO: Done: ./freedom-names"

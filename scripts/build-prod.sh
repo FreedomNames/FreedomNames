@@ -17,6 +17,6 @@ VERSION="${VERSION#v}"
 
 echo "INFO: Building freedom-names ${VERSION} (production) ..."
 CGO_ENABLED=0 go build -trimpath \
-    -ldflags "-s -w -X main.buildVersion=${VERSION}" \
-    -o freedom-names .
+    -ldflags "-s -w -X gitlab.melroy.org/freedom-names/freedom-names/internal/version.Version=${VERSION}" \
+    -o freedom-names ./cmd/freedom-names
 echo "INFO: Done: ./freedom-names"

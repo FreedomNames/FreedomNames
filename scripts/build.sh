@@ -11,5 +11,5 @@ VERSION="$(git describe --tags --always --dirty)"
 VERSION="${VERSION#v}"
 
 echo "INFO: Building freedom-names ${VERSION} ..."
-go build -ldflags "-X main.buildVersion=${VERSION}" -o freedom-names .
+go build -ldflags "-X gitlab.melroy.org/freedom-names/freedom-names/internal/version.Version=${VERSION}" -o freedom-names ./cmd/freedom-names
 echo "INFO: Done: ./freedom-names"
