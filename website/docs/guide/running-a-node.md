@@ -50,12 +50,12 @@ You now have a working local Freedom Names instance. Leave it running in a
 terminal; the CLI and your system resolver talk to it.
 
 ::: warning Network connectivity
-Freedom Names discovers other instances on your local network through mDNS. It
-does not yet ship with a public bootstrap peer, so starting it without
-`FREEDOM_BOOTSTRAP` does not connect it to peers outside your local network. You
-can still start and inspect the local instance, but publishing and resolving
-DHT records requires at least one other peer. To connect multiple networks, run
-or configure a bootstrap node as described below.
+Freedom Names discovers other instances on your local network through mDNS, and
+dials the built-in default bootstrap peers to reach nodes beyond it. That public
+network is still small, so expect few peers. Publishing and resolving DHT records
+requires at least one other peer; check `/peers` to confirm you have one. To run
+discovery you control, set `FREEDOM_BOOTSTRAP` to your own bootstrap node as
+described below.
 :::
 
 ## Run a bootstrap node

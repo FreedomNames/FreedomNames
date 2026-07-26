@@ -148,6 +148,7 @@ func NewNode(ctx context.Context, cfg *config.Config) *FreedomNameNode {
 
 	// Bootstrap peers come from configuration (FREEDOM_BOOTSTRAP), not hardcoded.
 	bootstrapInfos := BootstrapPeerInfos(cfg.Bootstrap)
+	logBootstrapPeers(cfg, bootstrapInfos)
 
 	// DHT options
 	dhtOpts := []dht.Option{
@@ -346,6 +347,51 @@ func (freedomName *FreedomNameNode) GetNetworkSize() (int32, error) {
 // -----------------------------------------------------------
 // Private functions
 // -----------------------------------------------------------
+
+// logBootstrapPeers reports what the node will actually dial to join the DHT.
+// Without this, a mistyped or dropped FREEDOM_BOOTSTRAP is indistinguishable
+// from an unreachable peer: both just sit at zero connected peers. Entries that
+// fail to parse are already logged by BootstrapPeerInfos, so the count here is
+// what survived.
+func logBootstrapPeers(cfg *config.Config, infos []peer.AddrInfo) {
+	if cfg.BootstrapMode {
+		// A bootstrap node is the rendezvous point; it never dials the list, so
+		// reporting a count it will not use would be misleading.
+		log.Println("Bootstrap mode: serving as a rendezvous peer, not dialing the bootstrap list")
+		return
+	}
+	switch {
+	case len(cfg.Bootstrap) == 0:
+		log.Println("No bootstrap peers configured: discovery is limited to mDNS on the local network")
+	case len(infos) == 0:
+		log.Printf("None of the %d configured bootstrap peer(s) could be used: discovery is limited to mDNS on the local network", len(cfg.Bootstrap))
+	case !cfg.BootstrapFromEnv:
+		// The built-in list needs no verifying and grows over time, so keep it to
+		// one line. Peers that actually connect are logged individually by the
+		// event listener anyway.
+		log.Printf("Dialing %d built-in bootstrap peer(s) across %d addresses", distinctPeers(infos), len(infos))
+	default:
+		// A hand-supplied FREEDOM_BOOTSTRAP is the one worth echoing back, since
+		// it is the part a typo can silently break.
+		log.Printf("Dialing %d bootstrap peer(s) from FREEDOM_BOOTSTRAP:", distinctPeers(infos))
+		for _, info := range infos {
+			for _, addr := range info.Addrs {
+				log.Printf("  %s/p2p/%s", addr, info.ID)
+			}
+		}
+	}
+}
+
+// distinctPeers counts unique hosts, not addresses: one peer contributes a
+// separate AddrInfo per transport (TCP, QUIC), which would otherwise double the
+// apparent peer count.
+func distinctPeers(infos []peer.AddrInfo) int {
+	seen := make(map[peer.ID]struct{}, len(infos))
+	for _, info := range infos {
+		seen[info.ID] = struct{}{}
+	}
+	return len(seen)
+}
 
 func BootstrapPeerInfos(addrs []string) []peer.AddrInfo {
 	var infos []peer.AddrInfo

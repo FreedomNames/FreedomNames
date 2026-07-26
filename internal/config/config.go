@@ -21,6 +21,12 @@ type Config struct {
 	Bootstrap   []string // bootstrap peer multiaddrs
 	ContentDir  string   // content-addressed blobstore directory
 
+	// BootstrapFromEnv reports whether Bootstrap came from FREEDOM_BOOTSTRAP
+	// rather than the built-in list. A hand-supplied list is worth echoing at
+	// startup, since a typo in it silently yields no peers; the built-in list
+	// only needs a one-line summary.
+	BootstrapFromEnv bool
+
 	// DNSRecursionAny lets ANY client use this node to forward non-.fn queries
 	// upstream. Off by default: forwarding for the whole internet is an open
 	// resolver, i.e. a reflection/amplification tool. See forwardingAllowed.
@@ -56,10 +62,29 @@ type Config struct {
 	ContentMaxPushSize  int64         // largest pushed content set this node accepts
 }
 
-// Default bootstrap peers. Replace/extend with real public /dnsaddr entries as
-// the network grows. Overridable via FREEDOM_BOOTSTRAP (comma-separated).
+// Default bootstrap peers: public server-mode nodes a fresh install dials to
+// join the DHT. Extend as the network grows. Overridable via FREEDOM_BOOTSTRAP
+// (comma-separated).
+//
+// Entries are deliberately raw /ip4 multiaddrs rather than /dnsaddr: Freedom
+// Names replaces DNS, so bootstrapping through DNS would make joining the
+// network depend on the system it exists to replace. The cost is that a peer
+// that moves needs a release to update, so each host here must have a static
+// address and a persistent identity (~/.freedom/private.key).
+//
+// Only TCP and QUIC are listed. A bootstrap node also speaks WebTransport
+// (:4021) and WebRTC-direct (:4022), but those multiaddrs embed a /certhash of
+// a self-signed certificate that go-libp2p regenerates on restart, so they
+// cannot be hardcoded; browser peers learn them at runtime via identify.
+// Unreachable entries are not fatal: a peer that fails to dial is skipped, so
+// the remaining ones still get the node into the DHT. Order carries no weight.
 var defaultBootstrapPeers = []string{
-	// "/dnsaddr/bootstrap.freedom-names.example/p2p/12D3Koo...",
+	// Community-operated node on a static hosted address.
+	"/ip4/135.148.236.246/tcp/4020/p2p/12D3KooWFRgUQUMvP4rimeZ1vS2DzmP48vvxcfEk5XqWmURMKU13",
+	"/ip4/135.148.236.246/udp/4020/quic-v1/p2p/12D3KooWFRgUQUMvP4rimeZ1vS2DzmP48vvxcfEk5XqWmURMKU13",
+	// Maintainer-operated node.
+	"/ip4/77.61.56.117/tcp/4020/p2p/12D3KooWJTZUqCzYBT7jrG8ZaxwRU99WSZkKPxTSREYy7EDRsFex",
+	"/ip4/77.61.56.117/udp/4020/quic-v1/p2p/12D3KooWJTZUqCzYBT7jrG8ZaxwRU99WSZkKPxTSREYy7EDRsFex",
 }
 
 // defaultHTTPAddr is the HTTP API address a node uses when FREEDOM_HTTP_ADDR is
@@ -119,6 +144,7 @@ func LoadConfigForRole(bootstrapMode bool) *Config {
 	}
 	if v := os.Getenv("FREEDOM_BOOTSTRAP"); v != "" {
 		cfg.Bootstrap = splitAndTrim(v)
+		cfg.BootstrapFromEnv = true
 	}
 	// Recursion for remote clients is opt-in and spelled out explicitly, so it
 	// can never be enabled by a typo in an unrelated variable.

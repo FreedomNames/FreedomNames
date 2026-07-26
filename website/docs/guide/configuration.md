@@ -11,9 +11,9 @@ node is entirely driven by its environment.
 | `FREEDOM_DNS_RECURSION` | `local` | Who may have non-`.fn` queries forwarded upstream. `local` = this machine and the local network; `any` = a public open resolver |
 | `FREEDOM_HTTP_ALLOWED_HOSTS` | *(none)* | Extra `Host` header values the HTTP API accepts, beyond `localhost` and IP literals |
 | `FREEDOM_CONTENT_DIR` | `~/.freedom/content` | Content-addressed blobstore directory |
-| `FREEDOM_BOOTSTRAP` | *(none)* | Comma-separated bootstrap peer multiaddrs |
+| `FREEDOM_BOOTSTRAP` | *(built-in list)* | Comma-separated bootstrap peer multiaddrs. Overrides the built-in defaults |
 | `FREEDOM_BCH_NETWORK` | `mainnet` | BCH network for bare names: `mainnet`, `chipnet`, `testnet4`, or `testnet3` |
-| `FREEDOM_BCH_ELECTRUM` | *(built-in list per network)* | Comma-separated Electrum/Fulcrum servers, tried in order with failover (`ssl://host:port`). Overrides the built-in bootstrap list |
+| `FREEDOM_BCH_ELECTRUM` | *(built-in list per network)* | Comma-separated Electrum/Fulcrum servers, tried in order with failover (`ssl://host:port`). Overrides the built-in Electrum list |
 | `FREEDOM_BCH_MINCONF` | `1` | Confirmations before a name claim counts |
 | `FREEDOM_CONTENT_REPLICAS` | `3` | Copies pushed to other nodes per publish (target holders = this + 1) |
 | `FREEDOM_CONTENT_HOST_BUDGET` | `20G` (20 GiB) | Max bytes of hosted (other people's) content |
@@ -115,7 +115,7 @@ FREEDOM_UPSTREAM_DNS=9.9.9.9:53 ./freedom-names
 **Join a network via bootstrap peers**:
 
 ```sh
-FREEDOM_BOOTSTRAP="/ip4/203.0.113.10/tcp/4020/p2p/<peerID>,/ip4/…/…" ./freedom-names
+FREEDOM_BOOTSTRAP="/ip4/<PUBLIC_IP>/tcp/4020/p2p/<peerID>,/ip4/…/…" ./freedom-names
 ```
 
 ## System-wide resolution and the `:53` port

@@ -167,8 +167,9 @@ on `127.0.0.1:8430` instead of `8420`, and starts no DNS server. The different
 API port lets it run alongside a normal node on the same machine; both are still
 overridable via `FREEDOM_HTTP_ADDR`.
 
-Nearby nodes discover each other with mDNS. There is no default public
-bootstrap peer yet; set `FREEDOM_BOOTSTRAP` to connect across networks.
+Nearby nodes discover each other with mDNS. Beyond the local network, a node
+dials the built-in default bootstrap peers; set `FREEDOM_BOOTSTRAP` to use your
+own instead.
 
 ### Configuration
 
@@ -181,10 +182,10 @@ All configuration is via environment variables (nothing is hardcoded):
 | `FREEDOM_UPSTREAM_DNS` | `1.1.1.1:53` | Upstream resolver for non-`.fn` queries |
 | `FREEDOM_DNS_RECURSION` | `local` | Who may have non-`.fn` queries forwarded upstream. `local` serves this machine and the local network; `any` makes the node a public open resolver (see below) |
 | `FREEDOM_HTTP_ALLOWED_HOSTS` | (none) | Extra `Host` header values the HTTP API accepts, beyond `localhost` and IP literals |
-| `FREEDOM_BOOTSTRAP` | (none) | Comma-separated bootstrap peer multiaddrs |
+| `FREEDOM_BOOTSTRAP` | (built-in list) | Comma-separated bootstrap peer multiaddrs. Overrides the built-in defaults |
 | `FREEDOM_CONTENT_DIR` | `~/.freedom/content` | On-disk directory for the content-addressed blobstore |
 | `FREEDOM_BCH_NETWORK` | `mainnet` | BCH network for bare names: `mainnet`, `chipnet`, `testnet4`, or `testnet3` |
-| `FREEDOM_BCH_ELECTRUM` | (built-in list per network) | Comma-separated Electrum/Fulcrum servers, tried in order with failover (`ssl://` or `tcp://`). Overrides the built-in bootstrap list |
+| `FREEDOM_BCH_ELECTRUM` | (built-in list per network) | Comma-separated Electrum/Fulcrum servers, tried in order with failover (`ssl://` or `tcp://`). Overrides the built-in Electrum list |
 | `FREEDOM_BCH_MINCONF` | `1` | Confirmations required before a bare-name claim counts |
 | `FREEDOM_CONTENT_REPLICAS` | `3` | Copies pushed to other nodes per publish |
 | `FREEDOM_CONTENT_HOST_BUDGET` | `20G` | Maximum hosted content from other publishers |
@@ -278,7 +279,7 @@ self-certifying name; the node reads the owner straight from the BCH chain.
 
 **Privacy note:** any public Electrum server sees which bare names you resolve.
 For privacy (or guaranteed availability) run your own Fulcrum and point the node
-at it, which also overrides the built-in bootstrap list:
+at it, which also overrides the built-in Electrum list:
 
 ```sh
 FREEDOM_BCH_ELECTRUM=ssl://your-fulcrum.example:50002 ./freedom-names
