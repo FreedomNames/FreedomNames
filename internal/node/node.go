@@ -148,6 +148,7 @@ func NewNode(ctx context.Context, cfg *config.Config) *FreedomNameNode {
 
 	// Bootstrap peers come from configuration (FREEDOM_BOOTSTRAP), not hardcoded.
 	bootstrapInfos := BootstrapPeerInfos(cfg.Bootstrap)
+	logBootstrapPeers(cfg, bootstrapInfos)
 
 	// DHT options
 	dhtOpts := []dht.Option{
@@ -346,6 +347,33 @@ func (freedomName *FreedomNameNode) GetNetworkSize() (int32, error) {
 // -----------------------------------------------------------
 // Private functions
 // -----------------------------------------------------------
+
+// logBootstrapPeers reports what the node will actually dial to join the DHT.
+// Without this, a mistyped or dropped FREEDOM_BOOTSTRAP is indistinguishable
+// from an unreachable peer: both just sit at zero connected peers. Entries that
+// fail to parse are already logged by BootstrapPeerInfos, so the count here is
+// what survived.
+func logBootstrapPeers(cfg *config.Config, infos []peer.AddrInfo) {
+	if cfg.BootstrapMode {
+		// A bootstrap node is the rendezvous point; it never dials the list, so
+		// reporting a count it will not use would be misleading.
+		log.Println("Bootstrap mode: serving as a rendezvous peer, not dialing the bootstrap list")
+		return
+	}
+	switch {
+	case len(cfg.Bootstrap) == 0:
+		log.Println("No bootstrap peers configured: discovery is limited to mDNS on the local network")
+	case len(infos) == 0:
+		log.Printf("None of the %d configured bootstrap peer(s) could be used: discovery is limited to mDNS on the local network", len(cfg.Bootstrap))
+	default:
+		log.Printf("Dialing %d bootstrap peer(s) to join the network:", len(infos))
+		for _, info := range infos {
+			for _, addr := range info.Addrs {
+				log.Printf("  %s/p2p/%s", addr, info.ID)
+			}
+		}
+	}
+}
 
 func BootstrapPeerInfos(addrs []string) []peer.AddrInfo {
 	var infos []peer.AddrInfo
