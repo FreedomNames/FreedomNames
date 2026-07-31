@@ -173,7 +173,7 @@ func NewNode(ctx context.Context, cfg *config.Config) *FreedomNameNode {
 	}
 
 	// Create a new Kademlia DHT instance using the host
-	dht, err := dht.New(ctx, p2pHost, dhtOpts...)
+	dht, err := dht.New(p2pHost, dhtOpts...)
 	if err != nil {
 		panic(err)
 	}
