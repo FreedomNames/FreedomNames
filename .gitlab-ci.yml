@@ -1,5 +1,15 @@
+# Pushing a new commit to a branch cancels the previous pipeline for that same
+# branch, so a rapid series of pushes does not queue up superseded runs.
+# `interruptible` only cancels jobs that opted in, and the default is `false`,
+# hence the `default: interruptible: true` below. Deploy jobs opt back out: a
+# publish that is already running should finish rather than be killed halfway.
+workflow:
+  auto_cancel:
+    on_new_commit: interruptible
+
 default:
   image: golang:1.26
+  interruptible: true
 
   cache:
     key:
@@ -77,6 +87,7 @@ go-build:
 docs-deploy:
   stage: deploy
   image: node:24
+  interruptible: false
   cache:
     key: vitepress
     paths:
@@ -129,6 +140,7 @@ go-release:
 release:
   stage: deploy
   image: serversideup/github-cli:latest
+  interruptible: false
   needs:
     - job: go-release
       artifacts: true
