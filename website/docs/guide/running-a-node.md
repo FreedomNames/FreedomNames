@@ -15,11 +15,11 @@ arm64. Download the package matching your platform from either:
   **Assets**.
 
 For example, on 64-bit Linux, download
-`freedom-names-0.9.1-linux-amd64.tar.gz` and extract it. Replace `0.9.1` with
+`freedom-names-0.9.2-linux-amd64.tar.gz` and extract it. Replace `0.9.2` with
 the version shown on the release page when a newer release is available:
 
 ```sh
-tar -xzf freedom-names-0.9.1-linux-amd64.tar.gz
+tar -xzf freedom-names-0.9.2-linux-amd64.tar.gz
 ```
 
 Choose `linux-arm64` for 64-bit ARM Linux, `darwin-amd64` for an Intel Mac,
