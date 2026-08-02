@@ -186,7 +186,7 @@ func TestRollbackSparesSharedBlobs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("receiver put: %v", err)
 	}
-	receiver.cs.index.AddHosted(root, int64(len(shared)), nil, "someone")
+	receiver.cs.index.AddHosted(root, int64(len(shared)), nil, "someone", nil)
 
 	// The sender offers the same bytes but lies about the size, so the push is
 	// rejected and rolled back.

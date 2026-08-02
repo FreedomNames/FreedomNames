@@ -46,6 +46,13 @@ type ContentIndex struct {
 	blobs map[string]map[string]bool // blob hash -> set roots referencing it
 	dirty bool                       // lastAccess-only changes awaiting a flush
 
+	// pending counts in-flight claims per blob hash: writers that are part way
+	// through assembling a set and are relying on that blob, before any index
+	// entry points at it. Without it, "no set references this blob" reads as
+	// "nothing wants this blob", which is false for the entire duration of
+	// every transfer. See BlobClaims.
+	pending map[string]int
+
 	// reserved is the bytes promised to admitted-but-not-yet-stored sets. An
 	// inbound push is admitted before its bytes arrive, so without counting the
 	// promise, N concurrent pushes each measure the same pre-transfer usage and
@@ -65,10 +72,11 @@ type indexFile struct {
 // so stores from before the index existed keep working.
 func LoadContentIndex(dir string, store *BlobStore) (*ContentIndex, error) {
 	ix := &ContentIndex{
-		path:  filepath.Join(dir, indexFileName),
-		store: store,
-		sets:  make(map[string]*contentMeta),
-		blobs: make(map[string]map[string]bool),
+		path:    filepath.Join(dir, indexFileName),
+		store:   store,
+		sets:    make(map[string]*contentMeta),
+		blobs:   make(map[string]map[string]bool),
+		pending: make(map[string]int),
 	}
 	if data, err := os.ReadFile(ix.path); err == nil {
 		var f indexFile
@@ -170,8 +178,12 @@ func (ix *ContentIndex) reference(root string, m *contentMeta) {
 	}
 }
 
-// MarkOwned records (or upgrades) a set as this node's own published content.
-func (ix *ContentIndex) MarkOwned(root string, size int64, chunks []string) {
+// MarkOwned records (or upgrades) a set as this node's own published content,
+// releasing the writer's claims on its blobs as it does so. Passing the claims
+// in rather than releasing them afterwards keeps the two atomic: the set is
+// never observable as recorded-but-unclaimed, nor as claimed-but-unrecorded.
+// claims may be nil when the caller held none.
+func (ix *ContentIndex) MarkOwned(root string, size int64, chunks []string, claims *BlobClaims) {
 	if ix == nil {
 		return
 	}
@@ -188,18 +200,22 @@ func (ix *ContentIndex) MarkOwned(root string, size int64, chunks []string) {
 	m.Chunks = chunks
 	m.LastAccess = now
 	ix.reference(root, m)
+	// References now cover these blobs, so the claims go without deleting.
+	ix.releaseClaimsLocked(claims, false)
 	ix.save()
 }
 
 // AddHosted records a set stored on behalf of the network (a push or a cached
-// fetch). It does not check the budget — call Admit first.
-func (ix *ContentIndex) AddHosted(root string, size int64, chunks []string, from string) {
+// fetch), releasing the writer's claims on its blobs in the same critical
+// section. It does not check the budget — call Admit first. claims may be nil.
+func (ix *ContentIndex) AddHosted(root string, size int64, chunks []string, from string, claims *BlobClaims) {
 	if ix == nil {
 		return
 	}
 	ix.mu.Lock()
 	defer ix.mu.Unlock()
 	ix.addHostedLocked(root, size, chunks, from)
+	ix.releaseClaimsLocked(claims, false)
 }
 
 func (ix *ContentIndex) addHostedLocked(root string, size int64, chunks []string, from string) {
@@ -225,21 +241,93 @@ func (ix *ContentIndex) Has(root string) bool {
 	return ok
 }
 
-// Referenced reports whether any tracked set claims this blob, either as its
-// root or as one of its chunks.
+// BlobClaims is one writer's in-flight hold on the blobs it is assembling into
+// a set. It exists because "no set references this blob" is not the same
+// question as "nothing wants this blob": between the moment a transfer writes a
+// blob and the moment its set is indexed, the index knows nothing about it, and
+// content addressing means a second transfer may be depending on those exact
+// bytes at the same time.
 //
-// It exists so a caller can tell a blob the store holds *for* the network from
-// one that is merely lying there. Rolling back a transfer that never completed
-// must not touch the former: a chunk hash is shared by every set that happens
-// to contain those exact bytes, so an aborted push of set B can easily carry a
-// blob that set A depends on.
-func (ix *ContentIndex) Referenced(hash string) bool {
-	if ix == nil {
-		return false
+// Consulting the index without this is a race no amount of locking fixes.
+// Suppose transfer A writes chunk X, then transfer B starts a different set
+// that also contains X. If A then aborts, the index still has no entry naming
+// X, so A concludes nothing wants it and deletes it. B goes on to index a set
+// whose bytes are no longer on disk. Widening the lock only decides which side
+// of the gap the deletion lands on; it does not close it.
+//
+// So a writer claims each blob before it writes or relies on it, and a blob is
+// removed only once no claim and no index reference remains. The claim is
+// released as part of the same critical section that records the set, so a
+// commit is never visible with its claims already gone.
+//
+// The zero value is unusable; call ContentIndex.BeginWrite.
+type BlobClaims struct {
+	ix     *ContentIndex
+	hashes []string
+}
+
+// BeginWrite opens a claim set for one transfer. A nil index (the store-only
+// service used in tests) yields a handle whose methods do nothing, so callers
+// need no special case.
+func (ix *ContentIndex) BeginWrite() *BlobClaims {
+	return &BlobClaims{ix: ix}
+}
+
+// Claim registers an in-flight claim on a blob. Call it BEFORE writing the blob
+// or before depending on one already in the store, so no window exists in which
+// the blob is present but unspoken for.
+//
+// Claiming the same hash twice is fine: claims are counted, and each is
+// released once.
+func (c *BlobClaims) Claim(hash string) {
+	if c == nil || c.ix == nil {
+		return
 	}
-	ix.mu.Lock()
-	defer ix.mu.Unlock()
-	return len(ix.blobs[hash]) > 0
+	c.ix.mu.Lock()
+	defer c.ix.mu.Unlock()
+	c.ix.pending[hash]++
+	c.hashes = append(c.hashes, hash)
+}
+
+// Discard releases every claim and removes the blobs that nothing else wants:
+// no other writer holding a claim, no indexed set referencing them. Use it when
+// a transfer fails or is abandoned.
+//
+// Discarding after the set has been recorded is a no-op, so a deferred Discard
+// is a safe way to guarantee an abandoned transfer cleans up after itself.
+func (c *BlobClaims) Discard() {
+	if c == nil || c.ix == nil {
+		return
+	}
+	c.ix.mu.Lock()
+	defer c.ix.mu.Unlock()
+	c.ix.releaseClaimsLocked(c, true)
+}
+
+// releaseClaimsLocked drops a writer's claims, deleting any blob left wanted by
+// nobody when discard is set. Caller holds mu.
+//
+// The handle is emptied, which is what makes a later Discard a no-op and keeps
+// the counts honest if one is called twice.
+func (ix *ContentIndex) releaseClaimsLocked(c *BlobClaims, discard bool) {
+	if c == nil || c.ix == nil {
+		return
+	}
+	for _, h := range c.hashes {
+		remaining := ix.pending[h] - 1
+		if remaining > 0 {
+			ix.pending[h] = remaining
+		} else {
+			delete(ix.pending, h)
+		}
+		// Deleting only when both counts are zero is the whole invariant: a
+		// blob survives while any writer is still assembling a set around it,
+		// and while any recorded set names it.
+		if discard && remaining <= 0 && len(ix.blobs[h]) == 0 {
+			ix.store.Delete(h)
+		}
+	}
+	c.hashes = nil
 }
 
 // Touch refreshes a set's last access time (TTL + LRU signal).
@@ -360,7 +448,13 @@ func (ix *ContentIndex) releaseLocked(size int64) {
 // It consumes the reservation whether or not it succeeds, so the caller must
 // not also Release. It returns false if the budget filled while the transfer
 // was in flight, in which case the set is not recorded.
-func (ix *ContentIndex) CommitHosted(root string, size int64, chunks []string, from string, budget, maxSize int64, ttl time.Duration, now time.Time) bool {
+//
+// On success the writer's claims are released here, under the same lock that
+// records the set, so the blobs pass straight from being claimed to being
+// referenced with no instant in between where a concurrent Discard could see
+// them as wanted by nobody. On failure the claims are left alone: the caller
+// still holds them and is expected to Discard, which is what removes the bytes.
+func (ix *ContentIndex) CommitHosted(root string, size int64, chunks []string, from string, budget, maxSize int64, ttl time.Duration, now time.Time, claims *BlobClaims) bool {
 	if ix == nil {
 		return true // store-only service (tests): no policy
 	}
@@ -373,6 +467,7 @@ func (ix *ContentIndex) CommitHosted(root string, size int64, chunks []string, f
 		return false
 	}
 	ix.addHostedLocked(root, size, chunks, from)
+	ix.releaseClaimsLocked(claims, false)
 	return true
 }
 
@@ -452,7 +547,14 @@ func (ix *ContentIndex) fitLocked(size, budget, maxSize int64, ttl time.Duration
 }
 
 // evictLocked removes a set: index entry plus every blob no other set still
-// references. Caller holds mu and is responsible for persisting the change.
+// references and no writer is still claiming. Caller holds mu and is
+// responsible for persisting the change.
+//
+// The claim check matters as much here as it does on the rollback path: a
+// transfer part way through assembling a set that happens to share bytes with
+// the victim would otherwise have those bytes evicted out from under it. When a
+// claim does hold the blob back, the index entry still goes; whichever writer
+// still holds it decides its fate when it finishes.
 func (ix *ContentIndex) evictLocked(root string) {
 	m := ix.sets[root]
 	if m == nil {
@@ -464,7 +566,9 @@ func (ix *ContentIndex) evictLocked(root string) {
 		delete(refs, root)
 		if len(refs) == 0 {
 			delete(ix.blobs, h)
-			ix.store.Delete(h)
+			if ix.pending[h] == 0 {
+				ix.store.Delete(h)
+			}
 		}
 	}
 	release(root)

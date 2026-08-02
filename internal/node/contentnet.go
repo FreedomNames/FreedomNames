@@ -126,17 +126,28 @@ func (cs *ContentService) Put(ctx context.Context, data []byte) (string, error) 
 func (cs *ContentService) PutStream(ctx context.Context, r io.Reader) (string, int64, error) {
 	// Read one byte past content.ChunkSize to learn whether this is single- or
 	// multi-chunk content before committing to either layout.
+	// Local content is assembled blob by blob just like an inbound push, and is
+	// just as invisible to the index until the set is recorded. It takes the
+	// same claims, so a concurrent rollback or eviction cannot delete a chunk
+	// out from under a publish in progress.
+	claims := cs.index.BeginWrite()
+	defer claims.Discard()
+
 	head := make([]byte, content.ChunkSize+1)
 	hn, err := readFill(r, head)
 	if err != nil {
 		return "", 0, err
 	}
 	if hn <= content.ChunkSize {
-		hash, err := cs.store.Put(head[:hn])
+		hash, err := content.ContentHash(head[:hn])
 		if err != nil {
 			return "", 0, err
 		}
-		cs.index.MarkOwned(hash, int64(hn), nil)
+		claims.Claim(hash)
+		if _, err := cs.store.Put(head[:hn]); err != nil {
+			return "", 0, err
+		}
+		cs.index.MarkOwned(hash, int64(hn), nil, claims)
 		cs.announce(ctx, hash)
 		cs.replicateOwned(hash)
 		return hash, int64(hn), nil
@@ -147,8 +158,12 @@ func (cs *ContentService) PutStream(ctx context.Context, r io.Reader) (string, i
 		if m.TotalSize+int64(len(b)) > content.MaxContentSize {
 			return content.ErrContentTooLarge
 		}
-		h, err := cs.store.Put(b)
+		h, err := content.ContentHash(b)
 		if err != nil {
+			return err
+		}
+		claims.Claim(h)
+		if _, err := cs.store.Put(b); err != nil {
 			return err
 		}
 		m.Chunks = append(m.Chunks, h)
@@ -182,11 +197,15 @@ func (cs *ContentService) PutStream(ctx context.Context, r io.Reader) (string, i
 	if err != nil {
 		return "", 0, err
 	}
-	hash, err := cs.store.Put(data)
+	hash, err := content.ContentHash(data)
 	if err != nil {
 		return "", 0, err
 	}
-	cs.index.MarkOwned(hash, int64(len(data))+m.TotalSize, m.Chunks)
+	claims.Claim(hash)
+	if _, err := cs.store.Put(data); err != nil {
+		return "", 0, err
+	}
+	cs.index.MarkOwned(hash, int64(len(data))+m.TotalSize, m.Chunks, claims)
 	cs.announce(ctx, hash)
 	// Providing every chunk means one DHT walk each; do it in the background
 	// so a large Put returns promptly. provideLoop re-announces on schedule.
@@ -265,14 +284,23 @@ func (cs *ContentService) FetchStream(ctx context.Context, hash string) (io.Read
 		return nil, 0, err
 	}
 	remote := src != ""
+	// Caching a fetched blob is the third way bytes enter the store, and it
+	// takes the same claims: between the write and the AddHosted that records
+	// the set, the blob is on disk with nothing in the index pointing at it.
+	claims := cs.index.BeginWrite()
+	defer claims.Discard()
 	if m, ok := content.DecodeManifest(top); ok {
 		cache := false
 		if remote {
 			total := int64(len(top)) + m.TotalSize
 			if cs.admitHosted(total) {
 				cache = true
+				claims.Claim(hash)
 				cs.cacheBlob(hash, top)
-				cs.index.AddHosted(hash, total, m.Chunks, src.String())
+				// The chunk hashes are recorded here, before the chunks
+				// themselves are fetched, so each one is referenced from the
+				// moment it lands and needs no claim of its own.
+				cs.index.AddHosted(hash, total, m.Chunks, src.String(), claims)
 			}
 		} else {
 			cs.index.TouchBlob(hash)
@@ -282,8 +310,9 @@ func (cs *ContentService) FetchStream(ctx context.Context, hash string) (io.Read
 	}
 	if remote {
 		if cs.admitHosted(int64(len(top))) {
+			claims.Claim(hash)
 			cs.cacheBlob(hash, top)
-			cs.index.AddHosted(hash, int64(len(top)), nil, src.String())
+			cs.index.AddHosted(hash, int64(len(top)), nil, src.String(), claims)
 		}
 	} else {
 		cs.index.TouchBlob(hash)
