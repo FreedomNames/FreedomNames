@@ -139,6 +139,13 @@ tar -xzf freedom-names-0.9.2-linux-amd64.tar.gz
 ./freedom-names
 ```
 
+Each release also ships a `SHA256SUMS` file covering every archive, so a
+download can be checked against it before you run it:
+
+```sh
+sha256sum -c SHA256SUMS --ignore-missing
+```
+
 Choose `linux-arm64` for 64-bit ARM Linux, `darwin-amd64` for an Intel Mac,
 `darwin-arm64` for Apple Silicon, or the matching Windows `.zip`. On Windows,
 run `.\freedom-names.exe` in PowerShell.

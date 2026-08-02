@@ -210,12 +210,30 @@ func (cs *ContentService) handlePushStream(stream network.Stream) {
 	}
 	stream.SetDeadline(time.Now().Add(pushDeadline(int64(size))))
 
-	r := content.LimitReader(stream, cs.downLimit)
+	// The offered size is what the hosting policy admitted, so it is also the
+	// ceiling on what may be read: a sender that streams more than it offered
+	// would otherwise get the difference written to disk for free, since the
+	// mismatch is only caught after the last blob. The allowance on top covers
+	// the per-blob framing (hash string plus two varints), which is not part of
+	// the offered payload size.
+	framing := int64(nblobs) * (maxHashRequestLen + 2*binary.MaxVarintLen64)
+	r := io.LimitReader(content.LimitReader(stream, cs.downLimit), int64(size)+framing)
 	var (
 		manifest *content.ChunkManifest
 		received uint64
 	)
+	// A push that never completes is an abandoned transfer, not a replica:
+	// nothing was admitted, nothing was indexed, and no peer has been told we
+	// hold it, so its bytes are rolled back rather than left to sit uncounted
+	// until some future restart adopts them. Claiming each blob first is what
+	// makes that rollback safe to run alongside other writers and the eviction
+	// pass; see content.BlobClaims. The deferred Discard covers the paths that
+	// return without going through fail (a dropped connection, a panic), and is
+	// a no-op once the set has been recorded.
+	claims := cs.index.BeginWrite()
+	defer claims.Discard()
 	fail := func(why string, args ...any) {
+		claims.Discard()
 		log.Printf("content: reject push %s from %s: %s", root, stream.Conn().RemotePeer(), fmt.Sprintf(why, args...))
 		stream.Write([]byte{0})
 	}
@@ -225,7 +243,10 @@ func (cs *ContentService) handlePushStream(stream network.Stream) {
 			fail("read blob header: %v", err)
 			return
 		}
-		data, err := readBlob(r)
+		// Cap this blob at what is left of the offered size, so an oversized
+		// one is refused on its length header rather than after the bytes have
+		// been read and buffered.
+		data, err := readBlobMax(r, size-received)
 		if err != nil {
 			fail("read blob %s: %v", hash, err)
 			return
@@ -261,6 +282,11 @@ func (cs *ContentService) handlePushStream(stream network.Stream) {
 				return
 			}
 		}
+		// Claim before the write, so the blob is never on disk unspoken for.
+		// Blobs already present are claimed too: this set depends on them just
+		// as much, and the claim is what stops another writer's rollback or an
+		// eviction from taking them away mid-transfer.
+		claims.Claim(hash)
 		if _, err := cs.store.Put(data); err != nil {
 			fail("store blob: %v", err)
 			return
@@ -279,7 +305,7 @@ func (cs *ContentService) handlePushStream(stream network.Stream) {
 	// The bytes are here and verified: this is where making room may finally
 	// delete something. commitHosted consumes the reservation either way.
 	reserved = false
-	if !cs.commitHosted(root, int64(size), chunks, stream.Conn().RemotePeer().String()) {
+	if !cs.commitHosted(root, int64(size), chunks, stream.Conn().RemotePeer().String(), claims) {
 		fail("hosting budget filled while the transfer was in flight")
 		return
 	}
@@ -317,13 +343,14 @@ func (cs *ContentService) reserveHosted(size int64) bool {
 // completed.
 func (cs *ContentService) releaseHosted(size int64) { cs.index.Release(size) }
 
-// commitHosted records a fully received set, evicting if the budget needs it.
-// It consumes the reservation whether or not it succeeds.
-func (cs *ContentService) commitHosted(root string, size int64, chunks []string, from string) bool {
+// commitHosted records a fully received set, evicting if the budget needs it,
+// and hands over the transfer's blob claims so recording the set and releasing
+// them happen together. It consumes the reservation whether or not it succeeds.
+func (cs *ContentService) commitHosted(root string, size int64, chunks []string, from string, claims *content.BlobClaims) bool {
 	if cs.index == nil {
 		return true // store-only service (tests): no policy
 	}
-	return cs.index.CommitHosted(root, size, chunks, from, cs.hostBudget, cs.maxPushSize, cs.hostTTL, time.Now())
+	return cs.index.CommitHosted(root, size, chunks, from, cs.hostBudget, cs.maxPushSize, cs.hostTTL, time.Now(), claims)
 }
 
 func readStatusByte(r io.Reader) (byte, error) {

@@ -21,11 +21,13 @@ url_for() {
     echo "${CI_PROJECT_URL}/-/jobs/artifacts/${APP_VERSION}/raw/$1?job=${ARTIFACT_JOB}"
 }
 
-# Add one release asset link. $1 = display name, $2 = artifact path.
+# Add one release asset link. $1 = display name, $2 = artifact path,
+# $3 = link_type (defaults to "package"; the checksum list is "other", since it
+# is not a package to download and run).
 add_link() {
     curl --request POST \
         --header "JOB-TOKEN: $CI_JOB_TOKEN" \
-        --data link_type="package" \
+        --data link_type="${3:-package}" \
         --data name="$1" \
         --data url="$(url_for "$2")" \
         "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/releases/$APP_VERSION/assets/links"
@@ -42,6 +44,7 @@ if [[ "$output" == "[]" ]]; then
 
     # !! In the reverse order of how we want the links to be displayed !!
     # Meaning the first added, will be the displayed last.
+    add_link "FreedomNames - SHA256 checksums"                      "build_release/SHA256SUMS" "other"
     add_link "FreedomNames - macOS arm64 (Apple Silicon) (.tar.gz)" "build_release/freedom-names-$APP_VERSION-darwin-arm64.tar.gz"
     add_link "FreedomNames - macOS amd64 (Intel) (.tar.gz)"         "build_release/freedom-names-$APP_VERSION-darwin-amd64.tar.gz"
     add_link "FreedomNames - Windows arm64 (.zip)"                  "build_release/freedom-names-$APP_VERSION-windows-arm64.zip"

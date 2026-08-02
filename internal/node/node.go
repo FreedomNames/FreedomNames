@@ -99,6 +99,11 @@ func NewNode(ctx context.Context, cfg *config.Config) *FreedomNameNode {
 
 	bwctr := metrics.NewBandwidthCounter()
 
+	// Bootstrap peers come from configuration (FREEDOM_BOOTSTRAP), not
+	// hardcoded. Resolved before the host is built because a normal node uses
+	// them twice: as DHT bootstrap peers, and as its relay candidates below.
+	bootstrapInfos := BootstrapPeerInfos(cfg.Bootstrap)
+
 	// Common options
 	opts := []libp2p.Option{
 		// routing,
@@ -123,7 +128,35 @@ func NewNode(ctx context.Context, cfg *config.Config) *FreedomNameNode {
 			libp2p.ForceReachabilityPublic(), // Ignore auto detection NAT, assuming you are opening your ports in your router/firewall.
 			libp2p.EnableRelayService(),      // Enable relay service
 			libp2p.EnableHolePunching(),      // Enable hole punching
+			// Answer reachability probes for other peers. A node behind NAT
+			// only starts reserving relay slots once AutoNAT has told it that
+			// it is unreachable, and that verdict comes from public peers
+			// dialling it back — which is exactly what a bootstrap node is
+			// positioned to do.
+			libp2p.EnableNATService(),
 		}...)
+	} else {
+		// A normal node is usually a home machine behind NAT. libp2p can work
+		// around that, but only with both halves switched on, and neither is a
+		// default:
+		//
+		//   - AutoRelay reserves a slot on a relay and advertises the resulting
+		//     /p2p-circuit address, so other peers have something to dial at
+		//     all. Bootstrap nodes run EnableRelayService above, which makes
+		//     them the natural candidates; naming them statically also skips
+		//     waiting on relay discovery through the DHT.
+		//   - Hole punching (DCUtR) then upgrades that relayed connection to a
+		//     direct one, which is what carries content transfers.
+		//
+		// Without these, two NATed peers can only meet when UPnP happened to
+		// open a port. That matters beyond connectivity in general: fetching
+		// content means dialling whichever peer the provider records name
+		// (see ContentService.fetchBlob), so an undialable holder is an
+		// unreachable copy.
+		if len(bootstrapInfos) > 0 {
+			opts = append(opts, libp2p.EnableAutoRelayWithStaticRelays(bootstrapInfos))
+		}
+		opts = append(opts, libp2p.EnableHolePunching())
 	}
 
 	p2pHost, err := libp2p.New(opts...)
@@ -146,8 +179,6 @@ func NewNode(ctx context.Context, cfg *config.Config) *FreedomNameNode {
 		log.Println("mDNS service started")
 	}
 
-	// Bootstrap peers come from configuration (FREEDOM_BOOTSTRAP), not hardcoded.
-	bootstrapInfos := BootstrapPeerInfos(cfg.Bootstrap)
 	logBootstrapPeers(cfg, bootstrapInfos)
 
 	// DHT options
@@ -369,11 +400,11 @@ func logBootstrapPeers(cfg *config.Config, infos []peer.AddrInfo) {
 		// The built-in list needs no verifying and grows over time, so keep it to
 		// one line. Peers that actually connect are logged individually by the
 		// event listener anyway.
-		log.Printf("Dialing %d built-in bootstrap peer(s) across %d addresses", distinctPeers(infos), len(infos))
+		log.Printf("Dialing %d built-in bootstrap peer(s) across %d addresses", len(infos), countAddrs(infos))
 	default:
 		// A hand-supplied FREEDOM_BOOTSTRAP is the one worth echoing back, since
 		// it is the part a typo can silently break.
-		log.Printf("Dialing %d bootstrap peer(s) from FREEDOM_BOOTSTRAP:", distinctPeers(infos))
+		log.Printf("Dialing %d bootstrap peer(s) from FREEDOM_BOOTSTRAP:", len(infos))
 		for _, info := range infos {
 			for _, addr := range info.Addrs {
 				log.Printf("  %s/p2p/%s", addr, info.ID)
@@ -382,19 +413,28 @@ func logBootstrapPeers(cfg *config.Config, infos []peer.AddrInfo) {
 	}
 }
 
-// distinctPeers counts unique hosts, not addresses: one peer contributes a
-// separate AddrInfo per transport (TCP, QUIC), which would otherwise double the
-// apparent peer count.
-func distinctPeers(infos []peer.AddrInfo) int {
-	seen := make(map[peer.ID]struct{}, len(infos))
+// countAddrs totals the addresses across peers. BootstrapPeerInfos returns one
+// entry per peer, so the number of entries is the peer count and this is what
+// says how many ways there are to reach them.
+func countAddrs(infos []peer.AddrInfo) int {
+	total := 0
 	for _, info := range infos {
-		seen[info.ID] = struct{}{}
+		total += len(info.Addrs)
 	}
-	return len(seen)
+	return total
 }
 
+// BootstrapPeerInfos parses bootstrap multiaddrs into one AddrInfo per peer,
+// with every transport that peer was listed under folded into its Addrs.
+//
+// The merge matters: a peer is normally listed twice (TCP and QUIC), and both
+// AutoRelay and the DHT take a list of peers, not of addresses. Handing them
+// the same peer twice would have them count one relay candidate as two.
+// Entries that fail to parse are logged and skipped, so a typo in one costs
+// only that address.
 func BootstrapPeerInfos(addrs []string) []peer.AddrInfo {
 	var infos []peer.AddrInfo
+	index := make(map[peer.ID]int, len(addrs))
 	for _, s := range addrs {
 		maddr, err := multiaddr.NewMultiaddr(s)
 		if err != nil {
@@ -406,6 +446,11 @@ func BootstrapPeerInfos(addrs []string) []peer.AddrInfo {
 			log.Printf("error converting multiaddr %s to AddrInfo: %v", s, err)
 			continue
 		}
+		if at, ok := index[info.ID]; ok {
+			infos[at].Addrs = append(infos[at].Addrs, info.Addrs...)
+			continue
+		}
+		index[info.ID] = len(infos)
 		infos = append(infos, *info)
 	}
 	return infos

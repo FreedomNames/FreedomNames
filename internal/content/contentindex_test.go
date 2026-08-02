@@ -22,9 +22,9 @@ func newTestIndex(t *testing.T) (*ContentIndex, *BlobStore, string) {
 func TestIndexPersistenceRoundTrip(t *testing.T) {
 	ix, store, dir := newTestIndex(t)
 	h, _ := store.Put([]byte("owned page"))
-	ix.MarkOwned(h, 10, nil)
+	ix.MarkOwned(h, 10, nil, nil)
 	h2, _ := store.Put([]byte("hosted page"))
-	ix.AddHosted(h2, 11, nil, "12D3KooTestPeer")
+	ix.AddHosted(h2, 11, nil, "12D3KooTestPeer", nil)
 
 	reloaded, err := LoadContentIndex(dir, store)
 	if err != nil {
@@ -103,10 +103,10 @@ func TestIndexAdmitBudgetAndLRU(t *testing.T) {
 		return h
 	}
 	owned := put("owned content")
-	ix.MarkOwned(owned, 400, nil)
+	ix.MarkOwned(owned, 400, nil, nil)
 	a, b := put("hosted a"), put("hosted b")
-	ix.AddHosted(a, 300, nil, "")
-	ix.AddHosted(b, 300, nil, "")
+	ix.AddHosted(a, 300, nil, "", nil)
+	ix.AddHosted(b, 300, nil, "", nil)
 	// Backdate stored/access times so LRU + protection logic is exercised.
 	ix.mu.Lock()
 	ix.sets[a].StoredAt, ix.sets[a].LastAccess = old.Unix(), old.Unix()
@@ -159,8 +159,8 @@ func TestIndexExpiredKeptUntilSpaceNeeded(t *testing.T) {
 
 	stale, _ := store.Put([]byte("stale hosted content"))
 	fresh, _ := store.Put([]byte("fresh hosted content"))
-	ix.AddHosted(stale, 400, nil, "")
-	ix.AddHosted(fresh, 400, nil, "")
+	ix.AddHosted(stale, 400, nil, "", nil)
+	ix.AddHosted(fresh, 400, nil, "", nil)
 	ix.mu.Lock()
 	old := now.Add(-48 * time.Hour).Unix()
 	ix.sets[stale].StoredAt, ix.sets[stale].LastAccess = old, old
@@ -198,8 +198,8 @@ func TestIndexSharedChunkSurvivesEviction(t *testing.T) {
 	rootA, _ := store.Put([]byte("root a"))
 	rootB, _ := store.Put([]byte("root b"))
 	old := time.Now().Add(-3 * time.Hour).Unix()
-	ix.AddHosted(rootA, 200, []string{shared}, "")
-	ix.AddHosted(rootB, 200, []string{shared}, "")
+	ix.AddHosted(rootA, 200, []string{shared}, "", nil)
+	ix.AddHosted(rootB, 200, []string{shared}, "", nil)
 	ix.mu.Lock()
 	ix.sets[rootA].StoredAt, ix.sets[rootA].LastAccess = old, old
 	ix.mu.Unlock()
@@ -223,7 +223,7 @@ func TestIndexTouchBlobRefreshesSet(t *testing.T) {
 	ix, store, _ := newTestIndex(t)
 	chunk, _ := store.Put([]byte("chunk"))
 	root, _ := store.Put([]byte("root"))
-	ix.AddHosted(root, 100, []string{chunk}, "")
+	ix.AddHosted(root, 100, []string{chunk}, "", nil)
 	ix.mu.Lock()
 	ix.sets[root].LastAccess = 12345
 	ix.mu.Unlock()

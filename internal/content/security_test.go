@@ -71,7 +71,7 @@ func TestAbandonedOfferDestroysNothing(t *testing.T) {
 		held   = 800 // a replica this node already stores for the network
 		offer  = 600 // only fits if the held set is evicted
 	)
-	ix.AddHosted("victim", held, nil, "peer-a")
+	ix.AddHosted("victim", held, nil, "peer-a", nil)
 
 	// Look at the index from far enough in the future that the held set is past
 	// evictionProtection and so genuinely is an eviction candidate.
@@ -98,7 +98,7 @@ func TestAbandonedOfferDestroysNothing(t *testing.T) {
 	if !ix.Reserve(offer, budget, budget, 0, future) {
 		t.Fatal("second offer should be admitted")
 	}
-	if !ix.CommitHosted("delivered", offer, nil, "peer-b", budget, budget, 0, future) {
+	if !ix.CommitHosted("delivered", offer, nil, "peer-b", budget, budget, 0, future, nil) {
 		t.Fatal("a fully received set should commit")
 	}
 	if ix.Has("victim") {

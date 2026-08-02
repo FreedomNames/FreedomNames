@@ -24,6 +24,9 @@ tar -xzf freedom-names-0.9.2-linux-amd64.tar.gz
 ./freedom-names
 ```
 
+Releases ship a `SHA256SUMS` file too, so you can check the download first with
+`sha256sum -c SHA256SUMS --ignore-missing`.
+
 On Windows, run `.\freedom-names.exe` instead. No installation or elevated
 privileges are needed; the DNS server uses the unprivileged port `:8053`.
 
