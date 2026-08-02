@@ -26,6 +26,14 @@ Nodes on the same LAN find each other via mDNS; beyond that they rely on the
 public bootstrap peers built into the binary. That list is still short and the DHT
 is sparse, so expect few peers for now.
 
+Most nodes sit behind a home router, so a node that cannot accept incoming
+connections reserves a slot on a bootstrap peer's relay and advertises the
+resulting address; peers reach it there and then hole-punch to a direct
+connection. That is best effort rather than a guarantee: hole punching fails
+against some NATs (symmetric ones in particular), and a node that never gets
+through keeps talking over the relay, which is slower and depends on the relay
+staying up. Forwarding a port, or letting UPnP do it, avoids the whole dance.
+
 To run discovery you control, stand up your own bootstrap node and set
 `FREEDOM_BOOTSTRAP`. See [Run a bootstrap node](/examples/bootstrap-node).
 
@@ -96,7 +104,10 @@ To run discovery you control, stand up your own bootstrap node and set
   budget; there is no per-peer quota yet (the pusher's peer ID is recorded for
   a future share cap), so a determined peer could fill another node's hosting
   budget with junk. Junk is displaced only under budget pressure, where
-  TTL-expired and least-recently-used sets are evicted first.
+  TTL-expired and least-recently-used sets are evicted first. The budget itself
+  is a hard ceiling, though: a push may not deliver more than the size it
+  offered, and one that fails or is cut off has its bytes rolled back rather
+  than left on disk.
 
 ## Record and naming caveats
 
