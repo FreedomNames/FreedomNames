@@ -15,11 +15,11 @@ arm64. Download the package matching your platform from either:
   **Assets**.
 
 For example, on 64-bit Linux, download
-`freedom-names-0.9.2-linux-amd64.tar.gz` and extract it. Replace `0.9.2` with
+`freedom-names-0.9.3-linux-amd64.tar.gz` and extract it. Replace `0.9.3` with
 the version shown on the release page when a newer release is available:
 
 ```sh
-tar -xzf freedom-names-0.9.2-linux-amd64.tar.gz
+tar -xzf freedom-names-0.9.3-linux-amd64.tar.gz
 ```
 
 Every release also publishes a `SHA256SUMS` file covering all the archives. The
@@ -31,7 +31,7 @@ sha256sum -c SHA256SUMS --ignore-missing
 ```
 
 On macOS use `shasum -a 256 -c SHA256SUMS --ignore-missing`; on Windows,
-`Get-FileHash freedom-names-0.9.2-windows-amd64.zip` and compare the printed
+`Get-FileHash freedom-names-0.9.3-windows-amd64.zip` and compare the printed
 hash with the line for that file.
 
 Choose `linux-arm64` for 64-bit ARM Linux, `darwin-amd64` for an Intel Mac,
@@ -69,6 +69,12 @@ requires at least one other peer; check `/peers` to confirm you have one. To run
 discovery you control, set `FREEDOM_BOOTSTRAP` to your own bootstrap node as
 described below.
 :::
+
+You do not have to open a port. A node behind a home router asks a bootstrap
+peer to relay for it and then tries to upgrade that to a direct connection, so
+it can be reached without any router configuration. Opening a port (or letting
+UPnP do it) still gives the best results, and some NATs defeat the upgrade; see
+[known limitations](/guide/limitations#a-young-network).
 
 ## Run a bootstrap node
 

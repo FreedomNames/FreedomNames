@@ -102,6 +102,13 @@ it with a transfer, so an offer that could evict would let any peer delete your
 replicas for free. If the budget fills while a transfer is in flight, the
 completed set is declined rather than admitted.
 
+The offer is also a ceiling, not just an estimate: a transfer may not deliver
+more than the size it announced, and one that is declined, fails verification or
+is cut off part way has its blobs removed again. Nothing a peer sends can occupy
+disk your hosting budget has not accounted for. Blobs another set is using, or
+that a transfer still in progress depends on, are never caught up in that
+cleanup.
+
 Any access or re-push from a healing peer refreshes a set's clock, so
 content with a living swarm effectively never expires. Note that publishing an
 *updated* page is a new content set with a new hash: the old version remains

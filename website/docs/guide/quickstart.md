@@ -17,10 +17,10 @@ Builds are available for Linux, macOS, and Windows on both amd64 and arm64.
 
 ## 2. Extract and run
 
-On 64-bit Linux (replace `0.9.2` with the version you downloaded):
+On 64-bit Linux (replace `0.9.3` with the version you downloaded):
 
 ```sh
-tar -xzf freedom-names-0.9.2-linux-amd64.tar.gz
+tar -xzf freedom-names-0.9.3-linux-amd64.tar.gz
 ./freedom-names
 ```
 
