@@ -210,12 +210,39 @@ func (cs *ContentService) handlePushStream(stream network.Stream) {
 	}
 	stream.SetDeadline(time.Now().Add(pushDeadline(int64(size))))
 
-	r := content.LimitReader(stream, cs.downLimit)
+	// The offered size is what the hosting policy admitted, so it is also the
+	// ceiling on what may be read: a sender that streams more than it offered
+	// would otherwise get the difference written to disk for free, since the
+	// mismatch is only caught after the last blob. The allowance on top covers
+	// the per-blob framing (hash string plus two varints), which is not part of
+	// the offered payload size.
+	framing := int64(nblobs) * (maxHashRequestLen + 2*binary.MaxVarintLen64)
+	r := io.LimitReader(content.LimitReader(stream, cs.downLimit), int64(size)+framing)
 	var (
 		manifest *content.ChunkManifest
 		received uint64
+		// Blobs this session brought into the store that were not already
+		// there. A push that never completes is an abandoned transfer, not a
+		// replica: nothing was admitted, nothing was indexed, and no peer has
+		// been told we hold it, so its bytes are rolled back rather than left
+		// to sit uncounted until some future restart adopts them.
+		written []string
 	)
+	rollback := func() {
+		for _, h := range written {
+			// Never remove a blob some other set depends on: content addressing
+			// means an aborted set can share chunks with one we legitimately
+			// host.
+			if cs.index.Referenced(h) {
+				continue
+			}
+			if err := cs.store.Delete(h); err != nil {
+				log.Printf("content: rollback %s: %v", h, err)
+			}
+		}
+	}
 	fail := func(why string, args ...any) {
+		rollback()
 		log.Printf("content: reject push %s from %s: %s", root, stream.Conn().RemotePeer(), fmt.Sprintf(why, args...))
 		stream.Write([]byte{0})
 	}
@@ -225,7 +252,10 @@ func (cs *ContentService) handlePushStream(stream network.Stream) {
 			fail("read blob header: %v", err)
 			return
 		}
-		data, err := readBlob(r)
+		// Cap this blob at what is left of the offered size, so an oversized
+		// one is refused on its length header rather than after the bytes have
+		// been read and buffered.
+		data, err := readBlobMax(r, size-received)
 		if err != nil {
 			fail("read blob %s: %v", hash, err)
 			return
@@ -261,9 +291,13 @@ func (cs *ContentService) handlePushStream(stream network.Stream) {
 				return
 			}
 		}
+		existed := cs.store.Has(hash)
 		if _, err := cs.store.Put(data); err != nil {
 			fail("store blob: %v", err)
 			return
+		}
+		if !existed {
+			written = append(written, hash)
 		}
 		received += uint64(len(data))
 	}

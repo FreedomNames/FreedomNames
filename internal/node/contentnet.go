@@ -542,6 +542,18 @@ func writeBlobHeader(w io.Writer, size uint64) error {
 }
 
 func readBlob(r io.Reader) ([]byte, error) {
+	return readBlobMax(r, content.MaxBlobSize)
+}
+
+// readBlobMax is readBlob with a caller-supplied ceiling, never above the
+// protocol's own MaxBlobSize. The declared length is checked before the buffer
+// is allocated, so a peer cannot make us allocate or read more than the caller
+// is willing to accept — the push receiver uses this to keep a set's blobs
+// within the size its sender offered (see handlePushStream).
+func readBlobMax(r io.Reader, max uint64) ([]byte, error) {
+	if max > content.MaxBlobSize {
+		max = content.MaxBlobSize
+	}
 	size, err := binary.ReadUvarint(newByteReaderFrom(r))
 	if err != nil {
 		return nil, err
@@ -549,7 +561,7 @@ func readBlob(r io.Reader) ([]byte, error) {
 	if size == 0 {
 		return nil, content.ErrBlobNotFound
 	}
-	if size > content.MaxBlobSize {
+	if size > max {
 		return nil, content.ErrBlobTooLarge
 	}
 	buf := make([]byte, size)

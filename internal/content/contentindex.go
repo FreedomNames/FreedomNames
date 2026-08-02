@@ -225,6 +225,23 @@ func (ix *ContentIndex) Has(root string) bool {
 	return ok
 }
 
+// Referenced reports whether any tracked set claims this blob, either as its
+// root or as one of its chunks.
+//
+// It exists so a caller can tell a blob the store holds *for* the network from
+// one that is merely lying there. Rolling back a transfer that never completed
+// must not touch the former: a chunk hash is shared by every set that happens
+// to contain those exact bytes, so an aborted push of set B can easily carry a
+// blob that set A depends on.
+func (ix *ContentIndex) Referenced(hash string) bool {
+	if ix == nil {
+		return false
+	}
+	ix.mu.Lock()
+	defer ix.mu.Unlock()
+	return len(ix.blobs[hash]) > 0
+}
+
 // Touch refreshes a set's last access time (TTL + LRU signal).
 func (ix *ContentIndex) Touch(root string) {
 	if ix == nil {
