@@ -5,6 +5,9 @@ resolving records, moving content, and inspecting the node. The CLI talks to thi
 same API. The API binds to loopback by default; it is an unauthenticated local
 control surface, so expose it beyond `127.0.0.1` only deliberately.
 
+Owner-key operations use a second, loopback-only authoring origin (default
+`127.0.0.1:8421`), advertised by `/health` when available.
+
 Because it is unauthenticated, three classes of request are refused with `403`
 before they reach any route, so a web page you merely visited cannot drive the
 node behind your back:
@@ -40,6 +43,93 @@ address bar, or a page served from this same node.
 | [`/info`](#get-info) | GET | Version, mode, peer ID, addresses, network size |
 | [`/health`](#get-health) | GET | Liveness + version + role handshake |
 | [`/clear_cache`](#delete-clear_cache) | DELETE | Purge the local resolution cache |
+| [`/authoring/names`](#get-authoringnames) | GET/POST | List owned names or create an owner key (loopback only) |
+| [`/authoring/names/<label>/publish`](#post-authoringnameslabelpublish) | POST | Build, sign and publish records (loopback only) |
+
+## Local authoring API
+
+The `/authoring/*` routes are a privileged management surface: they can use the
+owner keys under `~/.freedom/keys/`. They therefore use a separate HTTP origin,
+`127.0.0.1:8421` by default, from the ordinary API on port `8420`. This matters
+because `/content` can serve user-controlled bytes: content opened on port
+`8420` must never become same-origin with owner-key operations.
+
+A request is accepted only when both the connection and its `Host` address are
+loopback (`localhost`, `127.0.0.1`, or `::1`), and requests carrying proxy
+forwarding headers or same-site/cross-site Fetch Metadata are rejected. The
+listener refuses a non-loopback
+`FREEDOM_AUTHORING_ADDR`, even if `FREEDOM_HTTP_ADDR` deliberately exposes the
+ordinary API to a LAN.
+
+Private key material is never returned. There is deliberately no arbitrary
+"sign these bytes" endpoint: clients submit validated Freedom resource records,
+and the node owns sequence selection, canonical record construction, signing,
+and publication as one operation.
+
+### GET `/authoring/names`
+
+Lists the names whose owner keys exist locally, sorted by label:
+
+```json
+{
+  "names": [
+    {"label": "blog", "name": "blog.<pubKeyID>.fn"}
+  ]
+}
+```
+
+A damaged key remains visible by its label with an empty `name`, so it cannot
+silently disappear and look available for replacement.
+
+### POST `/authoring/names`
+
+Creates a new Ed25519 owner key without overwriting an existing key:
+
+```sh
+curl -X POST http://localhost:8421/authoring/names \
+  -H 'Content-Type: application/json' \
+  -d '{"label":"blog"}'
+```
+
+Response `201 Created`:
+
+```json
+{"label":"blog","name":"blog.<pubKeyID>.fn"}
+```
+
+The key is stored as `~/.freedom/keys/blog.key` with mode `0600`. Errors are
+structured as `{"error":"..."}`: `400` invalid JSON/label, `409` an owner key
+already exists, `403` the request is not strictly local.
+
+### POST `/authoring/names/<label>/publish`
+
+Builds, signs and publishes a complete replacement record set:
+
+```sh
+curl -X POST http://localhost:8421/authoring/names/blog/publish \
+  -H 'Content-Type: application/json' \
+  -d '{"records":[{"type":"CONTENT","value":"<content-hash>","ttl":300}]}'
+```
+
+Response `200 OK`:
+
+```json
+{
+  "published": "blog.<pubKeyID>.fn",
+  "seq": 1720713600,
+  "expires": 1721318400
+}
+```
+
+`seq` and `expires` are Unix seconds. Publications are serialized per label;
+the chosen sequence is strictly higher than the current record even when two
+local clients publish during the same second. The request replaces the name's
+whole record set—it does not merge with records already on the network.
+
+Errors are structured JSON: `400` malformed or invalid records, `404` no local
+owner key, `409` no newer sequence can be represented, `503` the DHT is not
+ready, `502` the current network record could not be checked, and `403` the
+request is not strictly local.
 
 ## POST `/publish`
 
@@ -252,7 +342,14 @@ curl http://localhost:8420/health
 ```
 
 ```json
-{ "status": "ok", "version": "<version>", "ready": true, "role": "node" }
+{
+  "status": "ok",
+  "version": "<version>",
+  "ready": true,
+  "role": "node",
+  "capabilities": ["authoring"],
+  "authoringAPI": "http://127.0.0.1:8421"
+}
 ```
 
 The endpoint answers any HTTP method, always with `200`; `ready` flips to `true`
@@ -275,6 +372,13 @@ still `false`**. That guarantee is deliberate: `/info` returns `500` until the
 DHT is initialized, so a host that probed `/info` could read a still-starting
 node as "nothing listening here" and start a second one. `/health` always
 answers.
+
+`capabilities` is the supported feature-discovery mechanism for embedding
+applications. Check for `authoring` before presenting owner-name operations;
+this lets an application safely adopt an older running node while retaining
+content-hash-only publishing. Use the accompanying `authoringAPI` URL rather
+than assuming a port. Bootstrap nodes and nodes whose authoring listener could
+not start omit the capability and URL.
 
 ## Next
 

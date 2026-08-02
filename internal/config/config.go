@@ -15,11 +15,12 @@ import (
 // nothing operational is hardcoded; sensible defaults keep
 // `go run ./cmd/freedom-names` working.
 type Config struct {
-	HTTPAddr    string   // address for the HTTP API (default "127.0.0.1:8420")
-	DNSAddr     string   // address for the DNS server (default ":8053")
-	UpstreamDNS string   // upstream resolver for non-.fn queries (default "1.1.1.1:53")
-	Bootstrap   []string // bootstrap peer multiaddrs
-	ContentDir  string   // content-addressed blobstore directory
+	HTTPAddr      string   // address for the HTTP API (default "127.0.0.1:8420")
+	AuthoringAddr string   // loopback-only owner-key API (default "127.0.0.1:8421")
+	DNSAddr       string   // address for the DNS server (default ":8053")
+	UpstreamDNS   string   // upstream resolver for non-.fn queries (default "1.1.1.1:53")
+	Bootstrap     []string // bootstrap peer multiaddrs
+	ContentDir    string   // content-addressed blobstore directory
 
 	// BootstrapFromEnv reports whether Bootstrap came from FREEDOM_BOOTSTRAP
 	// rather than the built-in list. A hand-supplied list is worth echoing at
@@ -120,6 +121,10 @@ func LoadConfigForRole(bootstrapMode bool) *Config {
 		// exposed on all interfaces. Override with FREEDOM_HTTP_ADDR=:8420 to
 		// share it on a LAN deliberately.
 		HTTPAddr: envOr("FREEDOM_HTTP_ADDR", defaultHTTPAddr(bootstrapMode)),
+		// Owner-key operations use a different origin from /content, which can
+		// serve user-controlled bytes. The HTTP server rejects any non-loopback
+		// value even when the ordinary API is deliberately exposed.
+		AuthoringAddr: envOr("FREEDOM_AUTHORING_ADDR", "127.0.0.1:8421"),
 		// Default to the high port :8053 so nodes run without root. (We avoid
 		// :5353, which collides with mDNS/avahi on most desktops.) Set
 		// FREEDOM_DNS_ADDR=:53 (with setcap or a :53->:8053 forwarder) for

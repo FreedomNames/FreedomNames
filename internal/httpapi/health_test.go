@@ -39,10 +39,10 @@ func (s stubDHT) GetNetworkSize() (int32, error)            { return 0, nil }
 func (s stubDHT) GetProtocols() []protocol.ID               { return nil }
 
 // getHealth calls the handler and decodes its JSON body.
-func getHealth(t *testing.T, dht FreedomDHT, role string) map[string]any {
+func getHealth(t *testing.T, dht FreedomDHT, role, authoringURL string) map[string]any {
 	t.Helper()
 	rec := httptest.NewRecorder()
-	HealthHandler(dht, role).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/health", nil))
+	HealthHandler(dht, role, authoringURL).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/health", nil))
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
@@ -69,11 +69,26 @@ func TestHealthReportsRole(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			body := getHealth(t, stubDHT{initialized: true}, roleFor(tc.bootstrapMode))
+			authoringURL := "http://127.0.0.1:8421"
+			if tc.bootstrapMode {
+				authoringURL = ""
+			}
+			body := getHealth(t, stubDHT{initialized: true}, roleFor(tc.bootstrapMode), authoringURL)
 			if got := body["role"]; got != tc.want {
 				t.Errorf("role = %v, want %q", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestHealthAdvertisesAuthoringCapability(t *testing.T) {
+	body := getHealth(t, stubDHT{initialized: true}, RoleNode, "http://127.0.0.1:8421")
+	capabilities, ok := body["capabilities"].([]any)
+	if !ok || len(capabilities) != 1 || capabilities[0] != "authoring" {
+		t.Fatalf("capabilities = %#v, want [authoring]", body["capabilities"])
+	}
+	if got := body["authoringAPI"]; got != "http://127.0.0.1:8421" {
+		t.Fatalf("authoringAPI = %#v", got)
 	}
 }
 
@@ -82,7 +97,7 @@ func TestHealthReportsRole(t *testing.T) {
 // up, so a host probing a still-starting bootstrap node must still learn what
 // it is -- otherwise it reads "nothing here" and double-spawns.
 func TestHealthRolePresentWhenNotReady(t *testing.T) {
-	body := getHealth(t, stubDHT{initialized: false}, RoleBootstrap)
+	body := getHealth(t, stubDHT{initialized: false}, RoleBootstrap, "")
 
 	if ready, ok := body["ready"].(bool); !ok || ready {
 		t.Fatalf("ready = %v, want false (precondition for this test)", body["ready"])

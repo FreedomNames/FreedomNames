@@ -6,6 +6,7 @@ node is entirely driven by its environment.
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `FREEDOM_HTTP_ADDR` | `127.0.0.1:8420` (bootstrap: `127.0.0.1:8430`) | HTTP API listen address (loopback by default) |
+| `FREEDOM_AUTHORING_ADDR` | `127.0.0.1:8421` | Owner-key API address; non-loopback values are refused |
 | `FREEDOM_DNS_ADDR` | `:8053` | DNS server listen address |
 | `FREEDOM_UPSTREAM_DNS` | `1.1.1.1:53` | Upstream resolver for non-`.fn` queries |
 | `FREEDOM_DNS_RECURSION` | `local` | Who may have non-`.fn` queries forwarded upstream. `local` = this machine and the local network; `any` = a public open resolver |
@@ -56,9 +57,16 @@ by a web page you merely visited:
 `curl`, the CLI and an embedding app send none of these headers and are
 unaffected, as are a URL you typed yourself and a page served from this node.
 
+Owner-key operations use the separate `FREEDOM_AUTHORING_ADDR` listener. It
+must resolve to loopback and rejects forwarded requests. Keeping it on a
+different origin from port `8420` prevents user-controlled bytes served by
+`/content` from becoming same-origin with signing operations. `/health`
+advertises the effective authoring URL when that listener is available.
+
 A spawning host can also override these with **flags**, which take precedence
-over the environment: `--http-addr HOST:PORT`, `--api-bind HOST`,
-`--content-dir DIR`, `--dns-addr HOST:PORT`. Note that `--api-bind` replaces
+over the environment: `--http-addr HOST:PORT`,
+`--authoring-addr HOST:PORT`, `--api-bind HOST`, `--content-dir DIR`, and
+`--dns-addr HOST:PORT`. Note that `--api-bind` replaces
 only the bind host and keeps the port of the current HTTP address (the
 `FREEDOM_HTTP_ADDR`/`--http-addr` value, `8420` if that has no port). See
 [embedding a node](/guide/embedding).

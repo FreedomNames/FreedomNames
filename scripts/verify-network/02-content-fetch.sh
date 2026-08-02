@@ -15,14 +15,14 @@ WORKDIR=${WORKDIR:-$(mktemp -d)}
 HOME_A="$WORKDIR/home-a"; HOME_B="$WORKDIR/home-b"
 mkdir -p "$HOME_A" "$HOME_B"
 
-API_A="http://127.0.0.1:8420"
-API_B="http://127.0.0.1:8421"
+API_A="http://127.0.0.1:18420"
+API_B="http://127.0.0.1:18421"
 
 trap cleanup_nodes EXIT
 
 step "Content: start bootstrap node A"
 ( cd "$WORKDIR" && env HOME="$HOME_A" \
-    FREEDOM_HTTP_ADDR=127.0.0.1:8420 FREEDOM_DNS_ADDR=127.0.0.1:8053 \
+    FREEDOM_HTTP_ADDR=127.0.0.1:18420 FREEDOM_DNS_ADDR=127.0.0.1:18053 \
     "$BIN" bootstrap >"$WORKDIR/node-a.log" 2>&1 ) &
 NODE_PIDS+=("$!"); info "node A (bootstrap) pid $!"
 wait_http "$API_A/health" 30 || fail "node A did not come up"
@@ -33,7 +33,8 @@ pass "node A healthy: $MADDR"
 step "Content: start client node B, peered to A"
 start_node "$WORKDIR/node-b.log" \
   HOME="$HOME_B" FREEDOM_BOOTSTRAP="$MADDR" \
-  FREEDOM_HTTP_ADDR=127.0.0.1:8421 FREEDOM_DNS_ADDR=127.0.0.1:8054
+  FREEDOM_HTTP_ADDR=127.0.0.1:18421 FREEDOM_AUTHORING_ADDR=127.0.0.1:18422 \
+  FREEDOM_DNS_ADDR=127.0.0.1:18054
 wait_http "$API_B/health" 30 || fail "node B did not come up"
 wait_peers "$API_B" 60 || fail "node B never peered with A"
 pass "nodes peered"

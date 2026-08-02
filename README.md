@@ -132,10 +132,10 @@ Download the prebuilt archive for your operating system and architecture from
 Releases](https://github.com/FreedomNames/FreedomNames/releases) (**Assets**).
 
 For example, the 64-bit Linux package extracts to one executable. Replace
-`0.9.3` with the version you downloaded:
+`0.9.4` with the version you downloaded:
 
 ```sh
-tar -xzf freedom-names-0.9.3-linux-amd64.tar.gz
+tar -xzf freedom-names-0.9.4-linux-amd64.tar.gz
 ./freedom-names
 ```
 
@@ -185,6 +185,7 @@ All configuration is via environment variables (nothing is hardcoded):
 | Variable | Default | Purpose |
 |---|---|---|
 | `FREEDOM_HTTP_ADDR` | `127.0.0.1:8420` (bootstrap: `127.0.0.1:8430`) | HTTP API listen address (loopback by default) |
+| `FREEDOM_AUTHORING_ADDR` | `127.0.0.1:8421` | Owner-key API; non-loopback values are refused |
 | `FREEDOM_DNS_ADDR` | `:8053` | DNS server listen address |
 | `FREEDOM_UPSTREAM_DNS` | `1.1.1.1:53` | Upstream resolver for non-`.fn` queries |
 | `FREEDOM_DNS_RECURSION` | `local` | Who may have non-`.fn` queries forwarded upstream. `local` serves this machine and the local network; `any` makes the node a public open resolver (see below) |
@@ -321,6 +322,8 @@ clients on this machine and the local network; remote clients get `REFUSED`
 | `/info` | GET | Version, mode, peer ID, addresses, network size |
 | `/health` | GET | Liveness + version handshake |
 | `/clear_cache` | DELETE | Purge the local resolution cache |
+| `:8421/authoring/names` | GET/POST | List or create locally owned names (separate loopback origin) |
+| `:8421/authoring/names/<label>/publish` | POST | Build, sign and publish records (separate loopback origin) |
 
 Content responses (`/content` GET and `/resolve-content`) carry a `Content-Type`
 header sniffed from the first bytes (e.g. `image/png`, `text/plain`), since the
@@ -342,6 +345,7 @@ internal/            all implementation code, private to this module
   resolver/          name -> records resolution and caching
   dnsserver/         the .fn DNS server
   httpapi/           the local HTTP API
+  authoring/         owner-key management and signed-record construction
   cli/               the `freedom-names freedom` subcommands
   bind/              listener bind-error classification
   testsupport/       fixtures shared by more than one package's tests

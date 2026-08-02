@@ -39,3 +39,12 @@ func TestHTTPAddrPrecedence(t *testing.T) {
 		}
 	})
 }
+
+func TestAuthoringAddrFlagWinsOverEnv(t *testing.T) {
+	t.Setenv("FREEDOM_AUTHORING_ADDR", "127.0.0.1:9998")
+	cfg := config.LoadConfig()
+	applyNodeFlags(cfg, []string{"--authoring-addr", "127.0.0.1:7778"})
+	if cfg.AuthoringAddr != "127.0.0.1:7778" {
+		t.Errorf("AuthoringAddr = %q, want flag value", cfg.AuthoringAddr)
+	}
+}

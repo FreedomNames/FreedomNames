@@ -90,6 +90,7 @@ func TestDefaultBCHElectrumServers(t *testing.T) {
 func TestHTTPAddrDefaultByRole(t *testing.T) {
 	// Ensure the env does not leak in from the developer's shell.
 	t.Setenv("FREEDOM_HTTP_ADDR", "")
+	t.Setenv("FREEDOM_AUTHORING_ADDR", "")
 
 	cases := []struct {
 		name          string
@@ -108,6 +109,9 @@ func TestHTTPAddrDefaultByRole(t *testing.T) {
 			}
 			if cfg.BootstrapMode != tc.bootstrapMode {
 				t.Errorf("BootstrapMode = %v, want %v", cfg.BootstrapMode, tc.bootstrapMode)
+			}
+			if cfg.AuthoringAddr != "127.0.0.1:8421" {
+				t.Errorf("AuthoringAddr = %q, want 127.0.0.1:8421", cfg.AuthoringAddr)
 			}
 		})
 	}

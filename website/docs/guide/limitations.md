@@ -113,8 +113,9 @@ To run discovery you control, stand up your own bootstrap node and set
 
 - **Records expire in 7 days.** A published record is valid for 7 days and must
   be re-published (re-signed) before then. The node re-provides it to the DHT
-  while running, but it cannot re-sign (it does not hold your key), so an
-  offline owner's name lapses after a week. Re-run `freedom publish` (or
+  while running, but the background republisher does not re-sign or load your
+  owner key, so an offline owner's name lapses after a week. Re-run
+  `freedom publish` (or
   `freedom put`) to renew.
 - **Long self-certifying names.** A self-certifying name carries a ~52-character
   key id (`label.<pubKeyID>.fn`). Bare names avoid this but need a

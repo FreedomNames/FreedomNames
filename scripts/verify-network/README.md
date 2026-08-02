@@ -35,7 +35,8 @@ kept under a `/tmp/fn-verify.XXXX` workdir printed at the end.
 - `jq` optional (a grep fallback is used if it is missing).
 - For leg 3: a funded BCH address. Chipnet (the default) is free — see the
   faucet links the script prints. Mainnet spends real (tiny) BCH.
-- Ports used on loopback: HTTP `8420`/`8421`, DNS `8053`/`8054`, libp2p `4020`
+- Ports used on loopback: HTTP `18420`/`18421`, authoring `18422`, DNS
+  `18053`/`18054`, libp2p `4020`
   (bootstrap). Free them or edit the scripts if they clash.
 
 ## Running a single leg
