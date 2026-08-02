@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # By: Melroy van den Berg
-# Description: Cross-compile freedom-names for the release matrix and package
-#  each binary as a tarball (.tar.gz for linux/darwin, .zip for windows).
+# Description: Cross-compile freedom-names for the release matrix, package each
+#  binary as a tarball (.tar.gz for linux/darwin, .zip for windows), and write a
+#  SHA256SUMS file covering all of them.
 # Depends on one environment variable: $APP_VERSION (e.g. "v0.3.0")
 #
 # Output: build_release/freedom-names-$APP_VERSION-<os>-<arch>.{tar.gz,zip}
+#         build_release/SHA256SUMS
 
 set -euo pipefail
 
@@ -52,5 +54,18 @@ for platform in "${PLATFORMS[@]}"; do
     rm -f "$OUT_DIR/$bin_name"
 done
 
+# Checksums over the exact archives being published, so a download from either
+# host can be verified with `sha256sum -c SHA256SUMS`. The release is mirrored
+# to GitHub, which means users fetch these bytes from a second place we do not
+# control; a checksum list published alongside them is what makes the two
+# comparable. Generated here rather than in CI so a local release build produces
+# the same set of artifacts.
+#
+# Run from inside OUT_DIR so the file names in SHA256SUMS are bare, which is
+# what `sha256sum -c` expects next to the downloaded archives.
+(cd "$OUT_DIR" && sha256sum freedom-names-* > SHA256SUMS)
+
 echo "INFO: Release artifacts:"
 ls -1 "$OUT_DIR"
+echo "INFO: SHA256SUMS:"
+cat "$OUT_DIR/SHA256SUMS"

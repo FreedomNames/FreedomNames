@@ -22,6 +22,18 @@ the version shown on the release page when a newer release is available:
 tar -xzf freedom-names-0.9.2-linux-amd64.tar.gz
 ```
 
+Every release also publishes a `SHA256SUMS` file covering all the archives. The
+same builds are served from two hosts, so checking the archive you downloaded
+against it is worth the one command:
+
+```sh
+sha256sum -c SHA256SUMS --ignore-missing
+```
+
+On macOS use `shasum -a 256 -c SHA256SUMS --ignore-missing`; on Windows,
+`Get-FileHash freedom-names-0.9.2-windows-amd64.zip` and compare the printed
+hash with the line for that file.
+
 Choose `linux-arm64` for 64-bit ARM Linux, `darwin-amd64` for an Intel Mac,
 `darwin-arm64` for Apple Silicon, or the corresponding Windows `.zip` package.
 Windows users can extract the zip with **Extract All** in File Explorer.
