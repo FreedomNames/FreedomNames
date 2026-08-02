@@ -3,8 +3,6 @@ package cli
 import (
 	"path/filepath"
 	"testing"
-
-	"gitlab.melroy.org/freedom-names/freedom-names/internal/record"
 )
 
 // withTempHome points ~/.freedom at a temp dir for the duration of a test.
@@ -56,25 +54,6 @@ func TestCliSetKeepsDistinctRecords(t *testing.T) {
 	}
 	if len(records) != 3 {
 		t.Fatalf("expected 3 distinct records, got %d: %+v", len(records), records)
-	}
-}
-
-func TestNextSeq(t *testing.T) {
-	// First publish: no current record, use wall-clock.
-	if got := nextSeq(1000, nil); got != 1000 {
-		t.Fatalf("nil current: want 1000, got %d", got)
-	}
-	// Normal update: current record older than the clock, use wall-clock.
-	if got := nextSeq(1000, &record.FNRecord{Seq: 500}); got != 1000 {
-		t.Fatalf("older current: want 1000, got %d", got)
-	}
-	// Same-second double publish: must go strictly above the current record.
-	if got := nextSeq(1000, &record.FNRecord{Seq: 1000}); got != 1001 {
-		t.Fatalf("same-second: want 1001, got %d", got)
-	}
-	// Clock stepped backwards: must still go above the current record.
-	if got := nextSeq(900, &record.FNRecord{Seq: 1000}); got != 1001 {
-		t.Fatalf("clock back: want 1001, got %d", got)
 	}
 }
 

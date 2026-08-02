@@ -28,6 +28,7 @@ import (
 // which take precedence over environment variables:
 //
 //	--http-addr HOST:PORT   full HTTP API listen address
+//	--authoring-addr HOST:PORT  loopback-only authoring API listen address
 //	--api-bind  HOST        just the bind host of the HTTP API (port unchanged)
 //	--content-dir DIR       content-addressed blobstore directory
 //	--dns-addr HOST:PORT    DNS server listen address
@@ -43,6 +44,9 @@ func applyNodeFlags(cfg *config.Config, args []string) {
 		switch args[i] {
 		case "--http-addr":
 			cfg.HTTPAddr = val
+			i++
+		case "--authoring-addr":
+			cfg.AuthoringAddr = val
 			i++
 		case "--api-bind":
 			// SplitHostPort, not a plain Cut: an IPv6 listen address
@@ -76,6 +80,7 @@ Usage:
 
 Flags:
   --http-addr HOST:PORT   HTTP API listen address (default 127.0.0.1:8420)
+  --authoring-addr HOST:PORT  Owner-key API (loopback only, default 127.0.0.1:8421)
   --api-bind HOST         Bind host of the HTTP API (port unchanged)
   --content-dir DIR       Content blobstore directory (default ~/.freedom/content)
   --dns-addr HOST:PORT    DNS server listen address (default :8053)
@@ -174,5 +179,5 @@ func main() {
 	}
 
 	// StartHTTPServer blocks until interrupted.
-	httpapi.StartHTTPServer(freedomDht, res, cache, contentSvc, cfg.HTTPAddr, cfg.BootstrapMode, cfg.HTTPAllowedHosts)
+	httpapi.StartHTTPServer(freedomDht, res, cache, contentSvc, cfg.HTTPAddr, cfg.AuthoringAddr, cfg.BootstrapMode, cfg.HTTPAllowedHosts)
 }

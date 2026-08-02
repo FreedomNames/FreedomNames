@@ -170,14 +170,20 @@ func writeContentFetchError(w http.ResponseWriter, hash string, err error) {
 // still false. That guarantee is load-bearing: /info 500s until the DHT is
 // initialized, so a spawning host that probed /info could read a starting
 // bootstrap node as "nothing here" and double-spawn. /health always answers.
-func HealthHandler(freedomDht FreedomDHT, role string) http.HandlerFunc {
+func HealthHandler(freedomDht FreedomDHT, role, authoringURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
-			"status":  "ok",
-			"version": version.String(),
-			"ready":   freedomDht.IsInitialized(),
-			"role":    role,
-		})
+		response := map[string]any{
+			"status":       "ok",
+			"version":      version.String(),
+			"ready":        freedomDht.IsInitialized(),
+			"role":         role,
+			"capabilities": []string{},
+		}
+		if authoringURL != "" {
+			response["capabilities"] = []string{"authoring"}
+			response["authoringAPI"] = authoringURL
+		}
+		json.NewEncoder(w).Encode(response)
 	}
 }

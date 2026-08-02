@@ -2,20 +2,17 @@ package cli
 
 import (
 	"bytes"
-	"crypto/rand"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
-	"math"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
+	"gitlab.melroy.org/freedom-names/freedom-names/internal/authoring"
 	"gitlab.melroy.org/freedom-names/freedom-names/internal/record"
 )
 
@@ -90,11 +87,10 @@ func RunCLI(args []string) {
 
 // keysDir returns ~/.freedom/keys, creating it if needed.
 func keysDir() (string, error) {
-	home, err := os.UserHomeDir()
+	dir, err := authoring.DefaultKeysDir()
 	if err != nil {
 		return "", err
 	}
-	dir := filepath.Join(home, ".freedom", "keys")
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return "", err
 	}
@@ -106,27 +102,7 @@ func keysDir() (string, error) {
 // makes keygen/set write outside ~/.freedom/keys — and one containing a path
 // separator would silently produce a key the node can never find again.
 func checkLabel(label string) error {
-	if label == "" {
-		return errors.New("label cannot be empty")
-	}
-	if len(label) > record.MaxLabelLen {
-		return fmt.Errorf("label is %d bytes, max %d", len(label), record.MaxLabelLen)
-	}
-	if label == "." || label == ".." || strings.HasPrefix(label, "-") {
-		return fmt.Errorf("invalid label %q", label)
-	}
-	for _, c := range label {
-		// Dots are allowed: a label may be a subdomain ("blog.mysite").
-		if c == '.' || c == '-' || c == '_' ||
-			c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' {
-			continue
-		}
-		return fmt.Errorf("invalid character %q in label %q (use a-z 0-9 . - _)", c, label)
-	}
-	if strings.Contains(label, "..") {
-		return fmt.Errorf("invalid label %q", label)
-	}
-	return nil
+	return authoring.CheckLabel(label)
 }
 
 func keyPath(label string) (string, error) {
@@ -153,46 +129,27 @@ func stagePath(label string) (string, error) {
 
 // loadKey loads the owner private key for a label.
 func loadKey(label string) (crypto.PrivKey, error) {
-	path, err := keyPath(label)
+	service, err := authoring.NewDefault(nil)
 	if err != nil {
 		return nil, err
 	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("no key for %q (run: freedom keygen %s): %w", label, label, err)
-	}
-	return crypto.UnmarshalPrivateKey(data)
+	return service.LoadKey(label)
 }
 
 func cliKeygen(args []string) error {
 	if len(args) != 1 {
 		return fmt.Errorf("usage: freedom keygen <label>")
 	}
-	label := args[0]
-	path, err := keyPath(label)
+	service, err := authoring.NewDefault(nil)
 	if err != nil {
 		return err
 	}
-	if _, err := os.Stat(path); err == nil {
-		return fmt.Errorf("key for %q already exists at %s", label, path)
-	}
-
-	priv, _, err := crypto.GenerateKeyPairWithReader(crypto.Ed25519, -1, rand.Reader)
+	name, err := service.CreateName(args[0])
 	if err != nil {
 		return err
 	}
-	data, err := crypto.MarshalPrivateKey(priv)
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(path, data, 0600); err != nil {
-		return err
-	}
-
-	pub, _ := crypto.MarshalPublicKey(priv.GetPublic())
-	id, _ := record.PubKeyID(pub)
-	fmt.Printf("Generated key for %q\n", label)
-	fmt.Printf("Your name: %s.%s.%s\n", label, id, record.TLD)
+	fmt.Printf("Generated key for %q\n", name.Label)
+	fmt.Printf("Your name: %s\n", name.Name)
 	return nil
 }
 
@@ -266,16 +223,15 @@ func cliName(args []string) error {
 	if len(args) != 1 {
 		return fmt.Errorf("usage: freedom name <label>")
 	}
-	priv, err := loadKey(args[0])
+	service, err := authoring.NewDefault(nil)
 	if err != nil {
 		return err
 	}
-	pub, _ := crypto.MarshalPublicKey(priv.GetPublic())
-	id, err := record.PubKeyID(pub)
+	name, err := service.Name(args[0])
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%s.%s.%s\n", args[0], id, record.TLD)
+	fmt.Println(name.Name)
 	return nil
 }
 
@@ -300,21 +256,18 @@ func cliPublish(args []string) error {
 // strictly above the name's current record) and POSTs them to a node. Shared by
 // `freedom publish` and `freedom put`.
 func publishRecords(api, label string, records []record.RR) error {
-	priv, err := loadKey(label)
+	service, err := authoring.NewDefault(nil)
 	if err != nil {
 		return err
 	}
 
 	var current *record.FNRecord
-	pub, _ := crypto.MarshalPublicKey(priv.GetPublic())
-	if id, idErr := record.PubKeyID(pub); idErr == nil {
-		fullName := label + "." + id + "." + record.TLD
-		if rec, ok := fetchCurrentRecord(api, fullName); ok {
+	if name, nameErr := service.Name(label); nameErr == nil {
+		if rec, ok := fetchCurrentRecord(api, name.Name); ok {
 			current = rec
 		}
 	}
-	seq := nextSeq(uint64(time.Now().Unix()), current)
-	rec, err := record.BuildAndSignRecord(priv, label, records, seq)
+	rec, err := service.BuildRecord(label, records, current)
 	if err != nil {
 		return err
 	}
@@ -333,7 +286,7 @@ func publishRecords(api, label string, records []record.RR) error {
 		return fmt.Errorf("node rejected publish (%d): %s", resp.StatusCode, string(body))
 	}
 	name, _ := rec.FullName()
-	fmt.Printf("Published %s (seq %d, %d record(s))\n", name, seq, len(records))
+	fmt.Printf("Published %s (seq %d, %d record(s))\n", name, rec.Seq, len(records))
 	fmt.Printf("Record valid until %s. Re-run publish before then to renew.\n",
 		time.Unix(rec.EOL, 0).Format(time.RFC1123))
 	return nil
@@ -363,21 +316,6 @@ func cliLookup(args []string) error {
 	}
 	fmt.Println(string(body))
 	return nil
-}
-
-// nextSeq picks the sequence number for a publish: wall-clock time, but always
-// strictly above the name's current record when one exists. This keeps updates
-// winning in the DHT even for same-second double publishes or a clock stepped
-// backwards, either of which would otherwise wedge updates. Saturates at
-// MaxUint64 rather than wrapping to 0 on a (hostile) maximal current record.
-func nextSeq(wallClock uint64, current *record.FNRecord) uint64 {
-	if current != nil && current.Seq >= wallClock {
-		if current.Seq == math.MaxUint64 {
-			return math.MaxUint64
-		}
-		return current.Seq + 1
-	}
-	return wallClock
 }
 
 // fetchCurrentRecord fetches the current signed record for a full name from a

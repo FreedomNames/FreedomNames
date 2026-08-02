@@ -33,6 +33,7 @@ freedom-names \
 - **`--api-bind 127.0.0.1`** (the default) keeps the HTTP API on loopback. The API
   is an unauthenticated local control surface: it must not be exposed on a LAN.
 - **`--http-addr`** sets the full listen address if you need a specific port.
+- **`--authoring-addr`** sets the separate loopback owner-key API address.
 - **`--content-dir`** points the blobstore at app-managed storage.
 - **`--dns-addr`** sets the DNS server port (or run without DNS; it is optional).
 
@@ -45,7 +46,14 @@ curl http://127.0.0.1:8420/health
 ```
 
 ```json
-{ "status": "ok", "version": "<version>", "ready": true, "role": "node" }
+{
+  "status": "ok",
+  "version": "<version>",
+  "ready": true,
+  "role": "node",
+  "capabilities": ["authoring"],
+  "authoringAPI": "http://127.0.0.1:8421"
+}
 ```
 
 `version` lets the host confirm it launched the build it shipped; `ready` becomes
@@ -67,6 +75,12 @@ Probe `/health`, not `/info`: `/info` returns `500` until the DHT is initialized
 so a still-starting node would look like no node at all, and you would start a
 second one. `role` is always present on `/health`, even while `ready` is `false`.
 
+Use `capabilities`, rather than comparing versions, to discover optional
+integration surfaces. When `authoring` is present, send owner-key operations to
+the accompanying `authoringAPI` origin. When it is absent (for example on an
+older adopted node), keep content-hash publishing available and hide name
+management.
+
 ## Loading a page
 
 ```
@@ -87,12 +101,19 @@ When the user publishes a page from an in-app editor, the host uploads and
 points a name at it in one call chain:
 
 ```
-POST /content        (raw page bytes)      -> { "hash": "<hash>" }
-POST /publish        (a signed CONTENT record for the name)
+POST http://127.0.0.1:8420/content
+  raw page bytes -> { "hash": "<hash>" }
+
+POST <authoringAPI>/authoring/names/<label>/publish
+  { "records": [{ "type": "CONTENT", "value": "<hash>", "ttl": 300 }] }
+  -> { "published": "<full-name>", "seq": ..., "expires": ... }
 ```
 
-The `freedom put` CLI command does exactly this sequence and is a good reference
-for the flow.
+List existing names with `GET <authoringAPI>/authoring/names`, or create one
+with `POST <authoringAPI>/authoring/names`. The authoring service selects the
+next sequence number, constructs the canonical record, signs it with the local
+owner key, and publishes it as one operation. The `freedom put` CLI shares the
+same key and record-building implementation.
 
 ## Why this replaces IPFS
 

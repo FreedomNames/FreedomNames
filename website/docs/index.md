@@ -50,7 +50,8 @@ features:
     title: Batteries included
     details: >-
       One prebuilt binary runs a DHT peer, content service, DNS server, and HTTP
-      API. Its bundled CLI generates keys, stages records, and publishes them.
+      API. Its bundled CLI and local authoring API generate keys, build signed
+      records, and publish them.
   - icon: 🧭
     title: Bare names when you want them
     details: >-

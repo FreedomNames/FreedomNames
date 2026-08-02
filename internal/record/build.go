@@ -7,9 +7,9 @@ import (
 )
 
 // defaultRecordTTL is how long a signed FNRecord stays valid (its EOL horizon).
-// The node can only re-put the original signed bytes — it never holds the
-// owner's private key, so it cannot extend the EOL. The owner must re-publish
-// (re-sign) before this expires; the CLI surfaces the expiry date at publish.
+// The background republisher only retains the signed record, not its owner
+// key, so it cannot extend the EOL. The owner must re-publish (re-sign) before
+// this expires; the CLI and authoring API surface the expiry at publish time.
 const defaultRecordTTL = 7 * 24 * time.Hour
 
 // BuildAndSignRecord constructs an FNRecord for the given label and resource

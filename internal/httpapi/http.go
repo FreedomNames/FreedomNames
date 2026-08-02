@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/routing"
+	"gitlab.melroy.org/freedom-names/freedom-names/internal/authoring"
 	"gitlab.melroy.org/freedom-names/freedom-names/internal/bind"
 	"gitlab.melroy.org/freedom-names/freedom-names/internal/node"
 	"gitlab.melroy.org/freedom-names/freedom-names/internal/record"
@@ -53,8 +54,29 @@ func roleFor(bootstrapMode bool) string {
 	return RoleNode
 }
 
-func StartHTTPServer(freedomDht FreedomDHT, res *resolver.Resolver, cache resolver.Cache, svc *node.ContentService, addr string, bootstrapMode bool, allowedHosts []string) {
+func StartHTTPServer(freedomDht FreedomDHT, res *resolver.Resolver, cache resolver.Cache, svc *node.ContentService, addr, authoringAddr string, bootstrapMode bool, allowedHosts []string) {
 	role := roleFor(bootstrapMode)
+	var authoringServer *http.Server
+	var authoringListener net.Listener
+	var authoringURL string
+	if !bootstrapMode {
+		authoringService, err := authoring.NewDefault(freedomDht)
+		if err != nil {
+			log.Printf("WARNING: authoring API disabled: %v", err)
+		} else if authoringListener, err = listenAuthoring(authoringAddr); err != nil {
+			log.Printf("WARNING: authoring API disabled: %v", err)
+		} else {
+			authoringMux := http.NewServeMux()
+			authoringMux.Handle("/authoring/names", localAuthoringOnly(NamesHandler(authoringService)))
+			authoringMux.Handle("/authoring/names/", localAuthoringOnly(NamePublishHandler(authoringService)))
+			authoringServer = &http.Server{
+				Handler:           localAPIGuard(authoringMux, nil),
+				ReadHeaderTimeout: 15 * time.Second,
+				IdleTimeout:       120 * time.Second,
+			}
+			authoringURL = "http://" + authoringListener.Addr().String()
+		}
+	}
 
 	// Set up HTTP API endpoints
 	mux := http.NewServeMux()
@@ -64,7 +86,7 @@ func StartHTTPServer(freedomDht FreedomDHT, res *resolver.Resolver, cache resolv
 	mux.HandleFunc("/peers", AllPeersHandler(freedomDht))
 	mux.HandleFunc("/info", InfoHandler(freedomDht, role))
 	mux.HandleFunc("/clear_cache", ClearCacheHandler(cache))
-	mux.HandleFunc("/health", HealthHandler(freedomDht, role))
+	mux.HandleFunc("/health", HealthHandler(freedomDht, role, authoringURL))
 	// Content endpoints (LibreWeb's page-bytes layer).
 	mux.HandleFunc("/content", ContentHandler(svc))
 	mux.HandleFunc("/resolve-content", ResolveContentHandler(res, svc))
@@ -83,6 +105,14 @@ func StartHTTPServer(freedomDht FreedomDHT, res *resolver.Resolver, cache resolv
 
 	var wg sync.WaitGroup
 	wg.Add(1)
+	if authoringServer != nil {
+		go func() {
+			log.Printf("Authoring API server listening on %s", authoringListener.Addr())
+			if err := authoringServer.Serve(authoringListener); err != nil && err != http.ErrServerClosed {
+				log.Printf("WARNING: authoring API stopped: %v", err)
+			}
+		}()
+	}
 
 	go func() {
 		// Creating a channel to listen for signals, like SIGINT
@@ -94,6 +124,11 @@ func StartHTTPServer(freedomDht FreedomDHT, res *resolver.Resolver, cache resolv
 		err := server.Shutdown(context.Background())
 		if err != nil {
 			log.Printf("Error during shutdown: %v\n", err)
+		}
+		if authoringServer != nil {
+			if err := authoringServer.Shutdown(context.Background()); err != nil {
+				log.Printf("Error shutting down authoring API: %v\n", err)
+			}
 		}
 		// Notifying the main goroutine that we are done
 		wg.Done()
@@ -108,10 +143,26 @@ func StartHTTPServer(freedomDht FreedomDHT, res *resolver.Resolver, cache resolv
 		//log.Println("Server was gracefully shut down.")
 	} else if err != nil {
 		if bind.IsPrivilegedPort(err) || bind.IsAddrInUse(err) {
-			log.Fatalf("HTTP API could not bind %s: %v\n  Set FREEDOM_HTTP_ADDR to a free port, e.g. FREEDOM_HTTP_ADDR=:8421", addr, err)
+			log.Fatalf("HTTP API could not bind %s: %v\n  Set FREEDOM_HTTP_ADDR to a free port, e.g. FREEDOM_HTTP_ADDR=:8422", addr, err)
 		}
 		log.Fatalf("HTTP server error: %v", err)
 	}
+}
+
+func listenAuthoring(addr string) (net.Listener, error) {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid FREEDOM_AUTHORING_ADDR %q: %w", addr, err)
+	}
+	ip := net.ParseIP(host)
+	if host != "localhost" && (ip == nil || !ip.IsLoopback()) {
+		return nil, fmt.Errorf("FREEDOM_AUTHORING_ADDR %q is not loopback; owner-key operations cannot be exposed remotely", addr)
+	}
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, fmt.Errorf("authoring API could not bind %s: %w", addr, err)
+	}
+	return listener, nil
 }
 
 // maxPublishBody caps a /publish request body. A signed record.FNRecord is a small

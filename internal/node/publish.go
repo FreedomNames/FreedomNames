@@ -70,8 +70,8 @@ func (freedomName *FreedomNameNode) republishLoop() {
 
 // republishOwned re-puts each still-valid owned record into the DHT so it does
 // not fall out at the DHT's ~36h record expiry. It cannot extend a record's
-// signed EOL (the node has no owner keys): records whose EOL has passed are
-// pruned from the owned set with a warning telling the owner to re-publish.
+// signed EOL (the republisher does not retain owner keys): records whose EOL
+// has passed are pruned with a warning telling the owner to re-publish.
 func (freedomName *FreedomNameNode) republishOwned() {
 	now := time.Now().Unix()
 
