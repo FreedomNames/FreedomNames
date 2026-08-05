@@ -20,7 +20,7 @@ require (
 )
 
 require (
-	codeberg.org/miekg/dns v0.6.83
+	codeberg.org/miekg/dns v0.6.90
 	golang.org/x/telemetry v0.0.0-20260717140457-bdb89881bb75 // indirect
 )
 
