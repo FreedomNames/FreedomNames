@@ -20,6 +20,9 @@ default:
 
 variables:
   GOPATH: $CI_PROJECT_DIR/.go
+  # Canonical release downloads live in the versioned Generic Package Registry
+  # package, not in the expiring artifacts of the build job.
+  PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/freedom-names/${CI_COMMIT_TAG}"
 
 stages:
   - test
@@ -137,9 +140,9 @@ go-release:
       - build_release/freedom-names-*.zip
       - build_release/SHA256SUMS
 
-# Add asset links to the (UI-created) GitLab release and mirror the binaries
-# to the GitHub release. Tag pipelines only.
-release:
+# Upload packages to the Generic Package Registry, add them to the (UI-created)
+# GitLab release, and mirror them to the GitHub release. Tag pipelines only.
+upload_and_release:
   stage: deploy
   image: serversideup/github-cli:latest
   interruptible: false
@@ -150,6 +153,16 @@ release:
     - if: $CI_PROJECT_NAMESPACE == "freedom-names" && $CI_COMMIT_TAG
   script:
     - export APP_VERSION=${CI_COMMIT_TAG}
+    # Publish the exact files produced by go-release to the versioned Generic
+    # Package Registry. Release links below point here, never at CI artifacts.
+    - |
+      set -eu
+      for file in build_release/freedom-names-* build_release/SHA256SUMS; do
+        curl --fail-with-body --retry 3 --retry-all-errors \
+          --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+          --upload-file "${file}" \
+          "${PACKAGE_REGISTRY_URL}/$(basename "${file}")"
+      done
     - ./scripts/create-release-links.sh
 
     # GitHub Sync (fallback to only upload if creating a release fails).
