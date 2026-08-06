@@ -1,16 +1,42 @@
 # Quickstart
 
-Get a Freedom Names node running locally in a couple of minutes. For platform
-details, peer configuration, and troubleshooting, see [**Run Freedom
-Names**](/guide/running-a-node).
+Freedom Names has **two quick-start paths**. Choose the one that matches the
+job:
 
-::: tip Running infrastructure for others?
-For a public bootstrap server that starts on boot, use the one-command
-[bootstrap-server install](/examples/bootstrap-node#install-and-start) instead.
-It installs a systemd service; ordinary local nodes do not need one.
-:::
+| Run | Command | Use it for |
+|---|---|---|
+| **Normal node** | `./freedom-names` | Your own computer: DNS, HTTP API, and a foreground process. No systemd. |
+| **Bootstrap node** | `curl -fsSL https://raw.githubusercontent.com/FreedomNames/FreedomNames/main/scripts/install.sh \| sudo bash -s -- bootstrap` | A public Debian/Ubuntu server that helps other nodes join and starts on boot. |
 
-## 1. Download
+## Bootstrap node: install and start
+
+For a public bootstrap server, this one command downloads a verified release,
+installs the systemd service, and enables + starts it:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/FreedomNames/FreedomNames/main/scripts/install.sh | \
+  sudo bash -s -- bootstrap
+```
+
+It runs `freedom-names-bootstrap`, keeps its identity at
+`/home/freedom/.freedom/private.key`, and exposes its health endpoint only on
+the local machine:
+
+```sh
+curl --fail http://127.0.0.1:8430/health
+```
+
+A bootstrap node is not a resolver: it has no DNS listener. It is the
+long-running rendezvous server that normal nodes connect to. Open the required
+p2p ports and back up its identity key as described in [Run a bootstrap
+node](/examples/bootstrap-node).
+
+## Normal node: manual download, extract, run, and verify
+
+Normal nodes intentionally have no installer or systemd unit. Download the
+prebuilt archive, then run it in the foreground whenever you need it.
+
+### 1. Download
 
 Grab the prebuilt archive for your OS and architecture from either release page:
 
@@ -21,7 +47,7 @@ Grab the prebuilt archive for your OS and architecture from either release page:
 
 Builds are available for Linux, macOS, and Windows on both amd64 and arm64.
 
-## 2. Extract and run
+### 2. Extract and run
 
 On 64-bit Linux (replace `0.9.5` with the version you downloaded):
 
@@ -38,7 +64,7 @@ privileges are needed; the DNS server uses the unprivileged port `:8053`.
 
 Leave that terminal open; the CLI and your system resolver talk to it.
 
-## 3. Verify
+### 3. Verify
 
 In a second terminal, check the local HTTP API:
 

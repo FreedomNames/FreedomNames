@@ -124,7 +124,28 @@ FREEDOM_BCH_NETWORK=chipnet ./freedom-names
 FREEDOM_BCH_NETWORK=testnet4 ./freedom-names
 ```
 
-## Download and run Freedom Names
+## Install a bootstrap node
+
+For a public Debian or Ubuntu server that helps other nodes join, run the
+bootstrap installer:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/FreedomNames/FreedomNames/main/scripts/install.sh | \
+  sudo bash -s -- bootstrap
+```
+
+It detects the supported Linux architecture, downloads the latest release and
+its `SHA256SUMS`, verifies the archive, installs `freedom-names` to
+`/usr/local/bin`, and installs/enables/starts
+`freedom-names-bootstrap`. The service runs as the dedicated `freedom` user;
+its durable peer identity is `/home/freedom/.freedom/private.key`.
+
+This installer is intentionally for the long-running bootstrap-server profile
+only. For a normal foreground node, see the [two-path Quickstart](https://freedomnames.org/guide/quickstart).
+For manual service installation, firewall ports, identity backup, and upgrades,
+see the [bootstrap-node guide](https://freedomnames.org/examples/bootstrap-node).
+
+## Run a normal node manually
 
 Download the prebuilt archive for your operating system and architecture from
 [GitLab Releases](https://gitlab.melroy.org/freedom-names/freedom-names/-/releases)
@@ -163,20 +184,6 @@ A node runs several things at once:
   it (or bridge it to `:53`, see below) and `.fn` just works,
 - an **HTTP API** (default `127.0.0.1:8420`) for publishing, resolving, and
   content.
-
-Run a **bootstrap** (server) node that others can connect to. On Debian or
-Ubuntu, the installer verifies the release, installs the service, and starts it:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/FreedomNames/FreedomNames/main/scripts/install.sh | \
-  sudo bash -s -- bootstrap
-```
-
-A bootstrap node uses fixed p2p ports (`4020`/`4021`/`4022`), serves its HTTP API
-on `127.0.0.1:8430` instead of `8420`, and starts no DNS server. The installed
-binary is available as `freedom-names`; the service is
-`freedom-names-bootstrap`. See the [bootstrap-node guide](https://freedomnames.org/examples/bootstrap-node)
-for identity backup, firewall requirements, and upgrades.
 
 Nearby nodes discover each other with mDNS. Beyond the local network, a node
 dials the built-in default bootstrap peers; set `FREEDOM_BOOTSTRAP` to use your
