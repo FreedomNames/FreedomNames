@@ -34,6 +34,9 @@ On Debian or Ubuntu, install and run a normal node:
 ```sh
 curl -fsSL https://raw.githubusercontent.com/FreedomNames/FreedomNames/main/scripts/install.sh | \
   sudo bash -s -- normal
+```
+
+```sh
 freedom-names
 ```
 
