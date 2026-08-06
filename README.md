@@ -41,9 +41,11 @@ The normal node runs in the foreground; no service is created.
 
 ## Manual installation
 
-For other platforms, download the matching archive from [GitHub
-Releases](https://github.com/FreedomNames/FreedomNames/releases), verify it,
-then extract and run it. For example, on 64-bit Linux (replace `0.9.5`):
+For other platforms, download the matching archive from [GitLab
+Releases](https://gitlab.melroy.org/freedom-names/freedom-names/-/releases)
+(or [GitHub Releases](https://github.com/FreedomNames/FreedomNames/releases)),
+verify it, then extract and run it. For example, on 64-bit Linux (replace
+`0.9.5`):
 
 ```sh
 tar -xzf freedom-names-0.9.5-linux-amd64.tar.gz
