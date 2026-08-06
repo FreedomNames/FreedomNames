@@ -16,85 +16,48 @@ There are two kinds of name:
 
 For the technical model, see [How Freedom Names work](HOW_FREEDOM_NAMES_WORK.md).
 
-## Install a bootstrap node
+## Bootstrap node
 
-For a public Debian or Ubuntu server that helps other nodes join, run our
-`scripts/install.sh` bootstrap installer. From a checkout:
-
-```sh
-sudo ./scripts/install.sh bootstrap
-```
-
-Or run that same script directly from the repository:
+For a public Debian or Ubuntu server, run:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/FreedomNames/FreedomNames/main/scripts/install.sh | \
   sudo bash -s -- bootstrap
 ```
 
-It detects the supported Linux architecture, downloads the latest release and
-its `SHA256SUMS`, verifies the archive, installs `freedom-names` to
-`/usr/local/bin`, and installs/enables/starts
-`freedom-names-bootstrap`. The service runs as the dedicated `freedom` user;
-its durable peer identity is `/home/freedom/.freedom/private.key`.
+This installs and starts `freedom-names-bootstrap`.
 
-This installer is intentionally for the long-running bootstrap-server profile
-only. For a normal foreground node, see the [two-path Quickstart](https://freedomnames.org/guide/quickstart).
+## Normal node
 
-### Manual bootstrap installation
-
-If you prefer not to run the installer, download, verify, and unpack the
-release yourself. Replace `0.9.5` and `amd64` for the release and architecture
-you choose:
+On Debian or Ubuntu, install and run a normal node:
 
 ```sh
-VERSION=0.9.5
-ARCH=amd64
-curl -fLO "https://github.com/FreedomNames/FreedomNames/releases/download/${VERSION}/freedom-names-${VERSION}-linux-${ARCH}.tar.gz"
-curl -fLO "https://github.com/FreedomNames/FreedomNames/releases/download/${VERSION}/SHA256SUMS"
-sha256sum -c SHA256SUMS --ignore-missing
-tar -xzf "freedom-names-${VERSION}-linux-${ARCH}.tar.gz"
+curl -fsSL https://raw.githubusercontent.com/FreedomNames/FreedomNames/main/scripts/install.sh | \
+  sudo bash -s -- normal
+freedom-names
 ```
 
-Install the unpacked binary yourself:
+The normal node runs in the foreground; no service is created.
 
-```sh
-getent group freedom >/dev/null || sudo groupadd --system freedom
-id freedom >/dev/null 2>&1 || sudo useradd --system --gid freedom \
-  --create-home --home-dir /home/freedom --shell /usr/sbin/nologin freedom
-sudo install -m 755 freedom-names /usr/local/bin/freedom-names
-```
+## Manual installation
 
-Then follow the [manual bootstrap-service steps](https://freedomnames.org/examples/bootstrap-node#manual-installation)
-to inspect and copy the exact systemd unit, enable it, open the required p2p
-ports, and back up the identity key.
-
-## Run a normal node manually
-
-Download the prebuilt archive for your operating system and architecture from
-[GitLab Releases](https://gitlab.melroy.org/freedom-names/freedom-names/-/releases)
-(**Assets → Packages**) or [GitHub
-Releases](https://github.com/FreedomNames/FreedomNames/releases) (**Assets**).
-
-For example, the 64-bit Linux package extracts to the executable and the
-bootstrap systemd unit used by the installer. Replace
-`0.9.5` with the version you downloaded:
+For other platforms, download the matching archive from [GitHub
+Releases](https://github.com/FreedomNames/FreedomNames/releases), verify it,
+then extract and run it. For example, on 64-bit Linux (replace `0.9.5`):
 
 ```sh
 tar -xzf freedom-names-0.9.5-linux-amd64.tar.gz
 ./freedom-names
 ```
 
-Each release also ships a `SHA256SUMS` file covering every archive, so a
-download can be checked against it before you run it:
+Verify the archive with its release `SHA256SUMS` file:
 
 ```sh
 sha256sum -c SHA256SUMS --ignore-missing
 ```
 
-Choose `linux-arm64` for 64-bit ARM Linux, `darwin-amd64` for an Intel Mac,
-`darwin-arm64` for Apple Silicon, or the matching Windows `.zip`. On Windows,
-run `.\freedom-names.exe` in PowerShell.
+Choose the matching Linux, macOS, or Windows archive. On Windows, run
+`.\freedom-names.exe` in PowerShell.
 
 A node runs several things at once:
 

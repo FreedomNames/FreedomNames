@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Contract checks for the standalone, root-only bootstrap installer.
+# Contract checks for the standalone, root-only release installer.
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -8,7 +8,8 @@ installer="$script_dir/install.sh"
 bash -n "$installer"
 help_output="$(bash "$installer" --help)"
 [[ "$help_output" == *'raw.githubusercontent.com/FreedomNames/FreedomNames/main/scripts/install.sh'* ]]
-[[ "$help_output" == *'bootstrap-node release on Debian/Ubuntu systemd hosts'* ]]
+[[ "$help_output" == *'<bootstrap|normal>'* ]]
+[[ "$help_output" == *'bootstrap also installs and starts systemd'* ]]
 
 test_dir="$(mktemp -d)"
 trap 'rm -rf "$test_dir"' EXIT
@@ -43,4 +44,6 @@ grep -Fq 'freedom-names-bootstrap.service' "$installer"
 grep -Fq 'release archive predates the bootstrap systemd unit' "$installer"
 grep -Fq 'systemctl enable' "$installer"
 grep -Fq 'systemctl restart' "$installer"
+grep -Fq 'bootstrap|normal) main "$1"' "$installer"
+grep -Fq 'Freedom Names normal node is installed.' "$installer"
 grep -Fq 'missing mode' "$installer"

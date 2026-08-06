@@ -5,7 +5,7 @@ job:
 
 | Run | Command | Use it for |
 |---|---|---|
-| **Normal node** | `./freedom-names` | Your own computer: DNS, HTTP API, and a foreground process. No systemd. |
+| **Normal node** | `curl -fsSL https://raw.githubusercontent.com/FreedomNames/FreedomNames/main/scripts/install.sh \| sudo bash -s -- normal` | A Debian/Ubuntu computer: DNS, HTTP API, and a foreground process. No systemd. |
 | **Bootstrap node** | `curl -fsSL https://raw.githubusercontent.com/FreedomNames/FreedomNames/main/scripts/install.sh \| sudo bash -s -- bootstrap` | A public Debian/Ubuntu server that helps other nodes join and starts on boot. |
 
 ## Bootstrap node: install and start
@@ -31,10 +31,23 @@ long-running rendezvous server that normal nodes connect to. Open the required
 p2p ports and back up its identity key as described in [Run a bootstrap
 node](/examples/bootstrap-node).
 
-## Normal node: manual download, extract, run, and verify
+## Normal node: install and start
 
-Normal nodes intentionally have no installer or systemd unit. Download the
-prebuilt archive, then run it in the foreground whenever you need it.
+On Debian or Ubuntu, install the latest verified release, then run it in the
+foreground:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/FreedomNames/FreedomNames/main/scripts/install.sh | \
+  sudo bash -s -- normal
+freedom-names
+```
+
+The installer installs only the executable; it does not create a service.
+
+## Manual installation
+
+If you are not using Debian or Ubuntu, download the prebuilt archive and run it
+in the foreground whenever you need it.
 
 ### 1. Download
 

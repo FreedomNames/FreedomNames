@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Freedom Names bootstrap-server installer. It deliberately manages no normal nodes.
+# Freedom Names release installer. Bootstrap mode also installs a systemd service.
 set -euo pipefail
 
 readonly REPOSITORY='FreedomNames/FreedomNames'
@@ -83,6 +83,7 @@ verify_archive() {
 }
 
 main() {
+  local mode=$1
   require_root
   require_platform
   install_dependencies
@@ -94,14 +95,14 @@ main() {
   version="$(latest_version)"
   archive="freedom-names-${version}-linux-${arch}.tar.gz"
 
-  info "Installing Freedom Names ${version} bootstrap node for linux-${arch}"
+  info "Installing Freedom Names ${version} ${mode} node for linux-${arch}"
   download "https://github.com/${REPOSITORY}/releases/download/${version}/${archive}" "$work_dir/$archive" || error "could not download GitHub release ${version}"
   download "https://github.com/${REPOSITORY}/releases/download/${version}/SHA256SUMS" "$work_dir/SHA256SUMS" || error "could not download checksums for GitHub release ${version}"
   verify_archive "$archive" "$work_dir/SHA256SUMS"
   tar --no-same-owner -xzf "$work_dir/$archive" -C "$work_dir"
 
   [[ -x "$work_dir/freedom-names" ]] || error 'release archive does not contain freedom-names'
-  if [[ ! -f "$work_dir/deploy/$SERVICE_UNIT" ]]; then
+  if [[ "$mode" == bootstrap && ! -f "$work_dir/deploy/$SERVICE_UNIT" ]]; then
     # Releases before the installer shipped only the binary. Keep the new
     # installer useful against the current release while all future Linux
     # archives carry this unit alongside their verified binary.
@@ -111,12 +112,18 @@ main() {
   fi
   "$work_dir/freedom-names" --version >/dev/null || error 'release binary could not be executed'
 
+  install -D -m 0755 "$work_dir/freedom-names" "$INSTALL_DIR/freedom-names"
+  if [[ "$mode" == normal ]]; then
+    printf '\n%s\n' 'Freedom Names normal node is installed.'
+    printf '%s\n' '  Start: freedom-names'
+    return
+  fi
+
   getent group "$SERVICE_USER" >/dev/null || groupadd --system "$SERVICE_USER"
   id "$SERVICE_USER" >/dev/null 2>&1 || useradd --system --gid "$SERVICE_USER" --create-home --home-dir "$SERVICE_HOME" --shell /usr/sbin/nologin "$SERVICE_USER"
   install -d -o "$SERVICE_USER" -g "$SERVICE_USER" -m 0700 "$SERVICE_HOME/.freedom"
   chown "$SERVICE_USER:$SERVICE_USER" "$SERVICE_HOME"
 
-  install -D -m 0755 "$work_dir/freedom-names" "$INSTALL_DIR/freedom-names"
   install -D -m 0644 "$work_dir/deploy/$SERVICE_UNIT" "/etc/systemd/system/${SERVICE_NAME}.service"
   if systemctl is-active --quiet "$SERVICE_NAME"; then
     was_active=true
@@ -138,12 +145,12 @@ main() {
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   case "${1:-}" in
-    bootstrap) main ;;
+    bootstrap|normal) main "$1" ;;
     --help|-h)
-      printf '%s\n' 'Usage: curl -fsSL https://raw.githubusercontent.com/FreedomNames/FreedomNames/main/scripts/install.sh | sudo bash -s -- bootstrap'
-      printf '%s\n' 'Installs the latest bootstrap-node release on Debian/Ubuntu systemd hosts.'
+      printf '%s\n' 'Usage: curl -fsSL https://raw.githubusercontent.com/FreedomNames/FreedomNames/main/scripts/install.sh | sudo bash -s -- <bootstrap|normal>'
+      printf '%s\n' 'Installs the latest release on Debian/Ubuntu hosts; bootstrap also installs and starts systemd.'
       ;;
-    '') error 'missing mode (try: bootstrap)' ;;
-    *) error "unknown mode: $1 (try: bootstrap)" ;;
+    '') error 'missing mode (try: bootstrap or normal)' ;;
+    *) error "unknown mode: $1 (try: bootstrap or normal)" ;;
   esac
 fi
