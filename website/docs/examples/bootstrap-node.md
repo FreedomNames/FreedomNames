@@ -35,7 +35,7 @@ sudoedit /etc/systemd/system/freedom-names-bootstrap.service
 Copy this exact service definition into that editor. It is the same unit that
 the installer deploys and that new Linux release archives include:
 
-<<< @/../../deploy/freedom-names-bootstrap.service
+<<< @/../../deploy/freedom-names-bootstrap.service {ini}
 
 `WorkingDirectory=/home/freedom` keeps the peer identity in the service user's
 home rather than whichever directory an administrator happened to be in.
