@@ -126,8 +126,14 @@ FREEDOM_BCH_NETWORK=testnet4 ./freedom-names
 
 ## Install a bootstrap node
 
-For a public Debian or Ubuntu server that helps other nodes join, run the
-bootstrap installer:
+For a public Debian or Ubuntu server that helps other nodes join, run our
+`scripts/install.sh` bootstrap installer. From a checkout:
+
+```sh
+sudo ./scripts/install.sh bootstrap
+```
+
+Or run that same script directly from the repository:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/FreedomNames/FreedomNames/main/scripts/install.sh | \
@@ -142,8 +148,34 @@ its durable peer identity is `/home/freedom/.freedom/private.key`.
 
 This installer is intentionally for the long-running bootstrap-server profile
 only. For a normal foreground node, see the [two-path Quickstart](https://freedomnames.org/guide/quickstart).
-For manual service installation, firewall ports, identity backup, and upgrades,
-see the [bootstrap-node guide](https://freedomnames.org/examples/bootstrap-node).
+
+### Manual bootstrap installation
+
+If you prefer not to run the installer, download, verify, and unpack the
+release yourself. Replace `0.9.5` and `amd64` for the release and architecture
+you choose:
+
+```sh
+VERSION=0.9.5
+ARCH=amd64
+curl -fLO "https://github.com/FreedomNames/FreedomNames/releases/download/${VERSION}/freedom-names-${VERSION}-linux-${ARCH}.tar.gz"
+curl -fLO "https://github.com/FreedomNames/FreedomNames/releases/download/${VERSION}/SHA256SUMS"
+sha256sum -c SHA256SUMS --ignore-missing
+tar -xzf "freedom-names-${VERSION}-linux-${ARCH}.tar.gz"
+```
+
+Install the unpacked binary yourself:
+
+```sh
+getent group freedom >/dev/null || sudo groupadd --system freedom
+id freedom >/dev/null 2>&1 || sudo useradd --system --gid freedom \
+  --create-home --home-dir /home/freedom --shell /usr/sbin/nologin freedom
+sudo install -m 755 freedom-names /usr/local/bin/freedom-names
+```
+
+Then follow the [manual bootstrap-service steps](https://freedomnames.org/examples/bootstrap-node#manual-installation)
+to inspect and copy the exact systemd unit, enable it, open the required p2p
+ports, and back up the identity key.
 
 ## Run a normal node manually
 

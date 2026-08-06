@@ -26,8 +26,9 @@ release as described in [Run Freedom Names](/guide/running-a-node#download-a-rel
 then create the service account, install the binary, and open the unit file:
 
 ```sh
-sudo useradd --system --create-home --home-dir /home/freedom \
-  --shell /usr/sbin/nologin freedom
+getent group freedom >/dev/null || sudo groupadd --system freedom
+id freedom >/dev/null 2>&1 || sudo useradd --system --gid freedom \
+  --create-home --home-dir /home/freedom --shell /usr/sbin/nologin freedom
 sudo install -m 755 freedom-names /usr/local/bin/freedom-names
 sudoedit /etc/systemd/system/freedom-names-bootstrap.service
 ```
