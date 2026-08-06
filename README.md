@@ -25,7 +25,8 @@ curl -fsSL https://raw.githubusercontent.com/FreedomNames/FreedomNames/main/scri
   sudo bash -s -- bootstrap
 ```
 
-This installs and starts `freedom-names-bootstrap`.
+This installs and starts the `freedom-names-bootstrap` systemd service, which
+runs `freedom-names bootstrap`.
 
 ## Normal node
 
