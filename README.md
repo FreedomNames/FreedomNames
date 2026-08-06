@@ -1,35 +1,20 @@
 # Freedom Names
 
-Decentralized DNS built on a libp2p Kademlia DHT, written in Go.
+Freedom Names lets you publish and resolve `.fn` names without a central DNS
+provider. One node also gives you a local DNS resolver, HTTP API, and
+peer-to-peer content service.
 
 📖 **Full documentation: [freedomnames.org](https://freedomnames.org)**. Guides,
 CLI and HTTP API reference, and worked examples.
 
-Freedom Names lets anyone own a human-readable name and publish DNS-style records
-for it, with **no central authority**. There are two kinds of name:
+There are two kinds of name:
 
-- **Self-certifying names**: `label.<pubKeyID>.fn`, owned by whoever
-  holds the matching Ed25519 keypair. Records are cryptographically signed, so
-  nobody can overwrite a name they don't own, and **no consensus is needed**:
-  the key *is* the name.
-- **Bare names**: globally-unique short names (`mysite.fn`, no key suffix). Here
-  a claim is a CashTokens NFT on **Bitcoin Cash**, and global uniqueness is
-  settled by **BCH chain consensus** ("first confirmed claim wins").
+- **Self-certifying names**, such as `blog.<pubKeyID>.fn`, are owned by the
+  person with the matching key.
+- **Bare names**, such as `blog.fn`, are short globally-unique names backed by
+  Bitcoin Cash.
 
-Both give you a real name. A self-certifying name already carries a
-human-readable label you choose — it just also carries a key-derived suffix,
-which makes it long to share. Bare names drop the suffix, and *that* is what
-requires consensus. Note this is **not** a blockchain "layer 2": Bitcoin Cash
-scales on-chain and CashTokens are native on-chain primitives. Resolving a name
-only *reads* the chain; writes happen when you register or transfer one
-(`freedom claim` and `freedom adopt` broadcast transactions).
-
-Alongside both, a node runs a **peer-to-peer content network** so a name
-can point at an actual page, not just DNS records. This is what lets Freedom
-Names back a decentralized-web browser such as LibreWeb, replacing IPFS.
-
-For the technical model—self-certifying and bare names, the DHT, BCH registry,
-and content resolution—see [How Freedom Names work](HOW_FREEDOM_NAMES_WORK.md).
+For the technical model, see [How Freedom Names work](HOW_FREEDOM_NAMES_WORK.md).
 
 ## Install a bootstrap node
 
