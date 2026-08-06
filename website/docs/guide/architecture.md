@@ -39,7 +39,7 @@ Running `./freedom-names` starts all of these at once:
   involved in self-certifying-name resolution, and record data remains in the
   DHT rather than on-chain.
 
-A **bootstrap** node (`./freedom-names bootstrap`) is a server-mode peer that others
+A **bootstrap** node (`freedom-names bootstrap`) is a server-mode peer that others
 connect to in order to join the network. It listens on fixed p2p ports
 (`4020`/`4021`/`4022`), serves its HTTP API on `8430` rather than `8420` (so it
 can coexist with a normal node on one machine), and runs no DNS server: it is a

@@ -49,7 +49,17 @@ for platform in "${PLATFORMS[@]}"; do
     if [ "$GOOS" = "windows" ]; then
         (cd "$OUT_DIR" && zip -q "$base.zip" "$bin_name")
     else
-        (cd "$OUT_DIR" && tar -czf "$base.tar.gz" "$bin_name")
+        if [ "$GOOS" = "linux" ]; then
+            # The bootstrap installer consumes the unit from the same verified
+            # archive as the binary, avoiding an unversioned deployment file.
+            mkdir -p "$OUT_DIR/package/deploy"
+            mv "$OUT_DIR/$bin_name" "$OUT_DIR/package/$bin_name"
+            cp deploy/freedom-names-bootstrap.service "$OUT_DIR/package/deploy/"
+            (cd "$OUT_DIR/package" && tar -czf "../$base.tar.gz" "$bin_name" deploy)
+            rm -rf "$OUT_DIR/package"
+        else
+            (cd "$OUT_DIR" && tar -czf "$base.tar.gz" "$bin_name")
+        fi
     fi
     rm -f "$OUT_DIR/$bin_name"
 done

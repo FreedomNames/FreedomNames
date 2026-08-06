@@ -1,0 +1,14 @@
+[Unit]
+Description=Freedom Names bootstrap node
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=freedom
+WorkingDirectory=/home/freedom
+ExecStart=/usr/local/bin/freedom-names bootstrap
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

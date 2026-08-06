@@ -4,11 +4,20 @@ A **bootstrap** node is a server-mode libp2p peer that other nodes connect to in
 order to discover the rest of the network. If you're running Freedom Names across
 several machines, stand up at least one.
 
-## Start it
+## Install and start
+
+On a Debian or Ubuntu server, one command downloads a verified release, installs
+the binary and the provided systemd unit, creates the dedicated `freedom` user,
+and enables + starts the bootstrap service:
 
 ```sh
-./freedom-names bootstrap
+curl -fsSL https://raw.githubusercontent.com/FreedomNames/FreedomNames/main/scripts/install.sh | \
+  sudo bash -s -- bootstrap
 ```
+
+This is deliberately a **bootstrap-only** installer. A normal node is a local,
+foreground program and does not need systemd; use the [Quickstart](/guide/quickstart)
+to download and run one.
 
 A bootstrap node differs from a normal node in three ways:
 
@@ -88,74 +97,19 @@ configured to reach it, including anything compiled into a release, is pointing
 at a peer that no longer exists. The ID is derived from a private key on disk, so
 keeping it stable is an operational task, not something the node handles for you:
 
-- The key lives at **`~/.freedom/private.key`**. **Back it up.** Losing it means a
+- The installed service stores the key at
+  **`/home/freedom/.freedom/private.key`**. **Back it up.** Losing it means a
   new peer ID and a silently unreachable bootstrap node.
-- A `private.key` in the **current working directory takes precedence** over
-  `~/.freedom/private.key`. Always start the node from the same directory; a
-  stray key file in a different launch directory silently changes the node's
-  identity.
+- `WorkingDirectory=/home/freedom` is fixed in the shipped unit, so a stray
+  `private.key` in an operator's shell directory cannot replace that identity.
 - In a container, the key must live on a **mounted volume**. On an ephemeral
   filesystem every restart generates a fresh identity.
 - Confirm it survived a restart: the peer ID from `/info` must be unchanged.
 
-### Run it as a systemd service
-
-Run it under a service manager so it always starts from a fixed directory as a
-fixed user, and comes back after a reboot.
-
-**1. Create a dedicated user and install the binary.** The unit below runs as
-`freedom`, so the identity key ends up at `/home/freedom/.freedom/private.key`:
+## Check it came up
 
 ```sh
-sudo useradd --system --create-home --home-dir /home/freedom \
-     --shell /usr/sbin/nologin freedom
-sudo install -m 755 freedom-names /usr/local/bin/freedom-names
-```
-
-On non-Debian systems `nologin` may live at `/sbin/nologin` instead.
-
-**2. Write the unit file** to `/etc/systemd/system/freedom-names-bootstrap.service`.
-Unit files for units you add by hand belong in `/etc/systemd/system/`;
-`/lib/systemd/system/` is for packages and gets overwritten on upgrade:
-
-```sh
-sudo nano /etc/systemd/system/freedom-names-bootstrap.service
-```
-
-```ini
-[Unit]
-Description=Freedom Names bootstrap node
-Wants=network-online.target
-After=network-online.target
-
-[Service]
-User=freedom
-WorkingDirectory=/home/freedom
-ExecStart=/usr/local/bin/freedom-names bootstrap
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-`WorkingDirectory` is the part that matters most: it pins which `private.key` the
-node can pick up. `Wants=` is needed alongside `After=`, since `After=` on its own
-only orders against `network-online.target` without pulling it in.
-
-**3. Reload systemd, then enable and start it.** `daemon-reload` makes systemd
-notice the new file; `enable --now` both starts it immediately and sets it to
-start on boot:
-
-```sh
-sudo systemctl daemon-reload
-sudo systemctl enable --now freedom-names-bootstrap
-```
-
-**4. Check it came up:**
-
-```sh
-systemctl status freedom-names-bootstrap
+sudo systemctl status freedom-names-bootstrap
 sudo journalctl -u freedom-names-bootstrap -f
 ```
 
@@ -166,8 +120,9 @@ answers too:
 curl http://localhost:8430/info
 ```
 
-**5. Back up the identity key.** It is generated on first start, so it does not
-exist until now:
+## Back up the identity key
+
+It is generated on first start, so it does not exist until now:
 
 ```sh
 sudo cp /home/freedom/.freedom/private.key ~/freedom-bootstrap-key.backup
@@ -180,7 +135,8 @@ connect.
 Useful afterwards:
 
 ```sh
-sudo systemctl restart freedom-names-bootstrap   # after upgrading the binary
+curl -fsSL https://raw.githubusercontent.com/FreedomNames/FreedomNames/main/scripts/install.sh | \
+  sudo bash -s -- bootstrap                       # verified upgrade + restart
 sudo systemctl disable --now freedom-names-bootstrap
 ```
 

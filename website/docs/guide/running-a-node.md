@@ -15,11 +15,11 @@ arm64. Download the package matching your platform from either:
   **Assets**.
 
 For example, on 64-bit Linux, download
-`freedom-names-0.9.4-linux-amd64.tar.gz` and extract it. Replace `0.9.4` with
+`freedom-names-0.9.5-linux-amd64.tar.gz` and extract it. Replace `0.9.5` with
 the version shown on the release page when a newer release is available:
 
 ```sh
-tar -xzf freedom-names-0.9.4-linux-amd64.tar.gz
+tar -xzf freedom-names-0.9.5-linux-amd64.tar.gz
 ```
 
 Every release also publishes a `SHA256SUMS` file covering all the archives. The
@@ -31,7 +31,7 @@ sha256sum -c SHA256SUMS --ignore-missing
 ```
 
 On macOS use `shasum -a 256 -c SHA256SUMS --ignore-missing`; on Windows,
-`Get-FileHash freedom-names-0.9.4-windows-amd64.zip` and compare the printed
+`Get-FileHash freedom-names-0.9.5-windows-amd64.zip` and compare the printed
 hash with the line for that file.
 
 Choose `linux-arm64` for 64-bit ARM Linux, `darwin-amd64` for an Intel Mac,
@@ -79,17 +79,19 @@ UPnP do it) still gives the best results, and some NATs defeat the upgrade; see
 ## Run a bootstrap node
 
 A **bootstrap** node is a server-mode peer that others connect to in order to
-discover the network:
+discover the network. On a Debian or Ubuntu server, install it as a service:
 
 ```sh
-./freedom-names bootstrap
+curl -fsSL https://raw.githubusercontent.com/FreedomNames/FreedomNames/main/scripts/install.sh | \
+  sudo bash -s -- bootstrap
 ```
 
-It uses fixed p2p ports (`4020`/`4021`/`4022`), serves its HTTP API on
-`127.0.0.1:8430` instead of `8420`, and starts no DNS server. The different API
-port means a bootstrap node and a normal node can run on the same machine
-without either failing to bind. See
-[Run a bootstrap node](/examples/bootstrap-node) for the full walkthrough.
+The installer verifies the release archive, creates the dedicated `freedom`
+service account, preserves its peer identity across upgrades, and enables and
+starts `freedom-names-bootstrap`. It uses fixed p2p ports (`4020`/`4021`/`4022`),
+serves its HTTP API on `127.0.0.1:8430`, and starts no DNS server. See
+[Run a bootstrap node](/examples/bootstrap-node) for verification, identity
+backup, and firewall requirements.
 
 Point other Freedom Names instances at it with the `FREEDOM_BOOTSTRAP`
 environment variable (a comma-separated list of multiaddrs). See

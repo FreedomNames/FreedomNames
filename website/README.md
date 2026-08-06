@@ -42,6 +42,7 @@ download and extraction example easy to copy. When publishing a new release,
 update that version in:
 
 - `README.md` at the repository root,
+- `docs/guide/quickstart.md`,
 - `docs/guide/what-is-freedom-names.md`, and
 - `docs/guide/running-a-node.md`.
 

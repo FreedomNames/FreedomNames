@@ -45,6 +45,11 @@ go-test:
   script:
     - go test -race ./...
 
+installer:
+  stage: test
+  script:
+    - bash scripts/test-install.sh
+
 # Build-check the VitePress documentation site on branches that touch it, so a
 # broken docs change (dead link, bad config) fails the MR instead of the deploy
 # on main. VitePress link checking runs as part of the build.

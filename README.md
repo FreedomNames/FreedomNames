@@ -131,11 +131,12 @@ Download the prebuilt archive for your operating system and architecture from
 (**Assets → Packages**) or [GitHub
 Releases](https://github.com/FreedomNames/FreedomNames/releases) (**Assets**).
 
-For example, the 64-bit Linux package extracts to one executable. Replace
-`0.9.4` with the version you downloaded:
+For example, the 64-bit Linux package extracts to the executable and the
+bootstrap systemd unit used by the installer. Replace
+`0.9.5` with the version you downloaded:
 
 ```sh
-tar -xzf freedom-names-0.9.4-linux-amd64.tar.gz
+tar -xzf freedom-names-0.9.5-linux-amd64.tar.gz
 ./freedom-names
 ```
 
@@ -163,16 +164,19 @@ A node runs several things at once:
 - an **HTTP API** (default `127.0.0.1:8420`) for publishing, resolving, and
   content.
 
-Run a **bootstrap** (server) node that others can connect to:
+Run a **bootstrap** (server) node that others can connect to. On Debian or
+Ubuntu, the installer verifies the release, installs the service, and starts it:
 
 ```sh
-./freedom-names bootstrap
+curl -fsSL https://raw.githubusercontent.com/FreedomNames/FreedomNames/main/scripts/install.sh | \
+  sudo bash -s -- bootstrap
 ```
 
 A bootstrap node uses fixed p2p ports (`4020`/`4021`/`4022`), serves its HTTP API
-on `127.0.0.1:8430` instead of `8420`, and starts no DNS server. The different
-API port lets it run alongside a normal node on the same machine; both are still
-overridable via `FREEDOM_HTTP_ADDR`.
+on `127.0.0.1:8430` instead of `8420`, and starts no DNS server. The installed
+binary is available as `freedom-names`; the service is
+`freedom-names-bootstrap`. See the [bootstrap-node guide](https://freedomnames.org/examples/bootstrap-node)
+for identity backup, firewall requirements, and upgrades.
 
 Nearby nodes discover each other with mDNS. Beyond the local network, a node
 dials the built-in default bootstrap peers; set `FREEDOM_BOOTSTRAP` to use your
