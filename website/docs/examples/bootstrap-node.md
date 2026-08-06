@@ -19,6 +19,34 @@ This is deliberately a **bootstrap-only** installer. A normal node is a local,
 foreground program and does not need systemd; use the [Quickstart](/guide/quickstart)
 to download and run one.
 
+### Manual installation
+
+Prefer to inspect and install every file yourself? Download and verify the Linux
+release as described in [Run Freedom Names](/guide/running-a-node#download-a-release),
+then create the service account, install the binary, and open the unit file:
+
+```sh
+sudo useradd --system --create-home --home-dir /home/freedom \
+  --shell /usr/sbin/nologin freedom
+sudo install -m 755 freedom-names /usr/local/bin/freedom-names
+sudoedit /etc/systemd/system/freedom-names-bootstrap.service
+```
+
+Copy this exact service definition into that editor. It is the same unit that
+the installer deploys and that new Linux release archives include:
+
+<<< @/../../deploy/freedom-names-bootstrap.service
+
+`WorkingDirectory=/home/freedom` keeps the peer identity in the service user's
+home rather than whichever directory an administrator happened to be in.
+
+Save the file, then enable and start it:
+
+```sh
+sudo systemctl daemon-reload
+sudo systemctl enable --now freedom-names-bootstrap
+```
+
 A bootstrap node differs from a normal node in three ways:
 
 | | normal node | bootstrap node |
