@@ -234,7 +234,49 @@ header sniffed from the first bytes (e.g. `image/png`, `text/plain`), since the
 content-addressed store keeps no MIME metadata. Unrecognized bytes fall back to
 `application/octet-stream`.
 
-## Project structure
+## Troubleshooting
+
+To avoid QUIC receive-buffer warnings, increase the kernel limits:
+
+```sh
+sudo sysctl -w net.core.rmem_max=7500000
+sudo sysctl -w net.core.wmem_max=7500000
+```
+
+Make it permanent in `/etc/sysctl.conf`:
+
+```conf
+net.core.rmem_max=7500000
+net.core.wmem_max=7500000
+```
+
+---
+
+## Development
+
+Everything below this line is for contributors building, testing, or changing
+Freedom Names.
+
+Developers working from a source checkout can run the tests (including a live
+over-the-wire DNS server test):
+
+```sh
+go test -race ./...
+```
+
+Build a development binary (stamps the version from the nearest git tag):
+
+```sh
+./scripts/build.sh
+```
+
+Install [air](https://github.com/air-verse/air) for auto-recompile on changes:
+
+```sh
+air
+```
+
+### Project structure
 
 ```
 cmd/freedom-names/   the binary's entry point — wiring only
@@ -272,40 +314,3 @@ depending on its concrete type. `resolver` therefore avoids importing `node`;
 Tests live beside the code they cover, generally in the same package so they can
 exercise unexported implementation details; there is no separate test tree.
 Dependencies are managed by `go.mod`; there is no vendor directory.
-
-## Development
-
-Developers working from a source checkout can run the tests (including a live
-over-the-wire DNS server test):
-
-```sh
-go test -race ./...
-```
-
-Build a development binary (stamps the version from the nearest git tag):
-
-```sh
-./scripts/build.sh
-```
-
-Install [air](https://github.com/air-verse/air) for auto-recompile on changes:
-
-```sh
-air
-```
-
-## Troubleshooting
-
-To avoid QUIC receive-buffer warnings, increase the kernel limits:
-
-```sh
-sudo sysctl -w net.core.rmem_max=7500000
-sudo sysctl -w net.core.wmem_max=7500000
-```
-
-Make it permanent in `/etc/sysctl.conf`:
-
-```conf
-net.core.rmem_max=7500000
-net.core.wmem_max=7500000
-```
