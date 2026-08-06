@@ -13,7 +13,7 @@ before they reach any route, so a web page you merely visited cannot drive the
 node behind your back:
 
 - a `Host` header that is a **domain name** rather than `localhost` or an IP
-  literal (this is how DNS rebinding reaches a service on `localhost`) — add
+  literal (this is how DNS rebinding reaches a service on `localhost`). Add
   yours to `FREEDOM_HTTP_ALLOWED_HOSTS` if you front the API with a hostname
   (with or without the port: both are matched);
 - any request carrying `Sec-Fetch-Site: cross-site`, i.e. one another site
@@ -124,7 +124,7 @@ Response `200 OK`:
 `seq` and `expires` are Unix seconds. Publications are serialized per label;
 the chosen sequence is strictly higher than the current record even when two
 local clients publish during the same second. The request replaces the name's
-whole record set—it does not merge with records already on the network.
+whole record set; it does not merge with records already on the network.
 
 Errors are structured JSON: `400` malformed or invalid records, `404` no local
 owner key, `409` no newer sequence can be represented, `503` the DHT is not

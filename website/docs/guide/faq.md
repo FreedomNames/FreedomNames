@@ -70,7 +70,7 @@ Names node can act as your only resolver. See
 [Resolving from your system](/guide/resolving).
 
 Forwarding is done for clients on **your machine and your local network**, not
-for the whole internet — otherwise a node on a public IP would be an
+for the whole internet. Otherwise, a node on a public IP would be an
 [open resolver](/guide/configuration#who-the-dns-server-answers). `.fn` itself is
 answered for anyone who asks.
 

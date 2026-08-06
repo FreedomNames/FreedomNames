@@ -3,10 +3,10 @@
 Scripts that verify the three capabilities that only exercise with real peers
 connected, and cannot be proven by unit tests or a single node:
 
-1. **Self-certifying names** — DHT record replication across independent nodes.
-2. **Phase 3** — peer-to-peer content fetch (a node fetches a blob it never
+1. **Self-certifying names**: DHT record replication across independent nodes.
+2. **Phase 3**: peer-to-peer content fetch (a node fetches a blob it never
    stored, via DHT provider records).
-3. **Bare names** — a funded `claim` → `whois` cycle on a real BCH network,
+3. **Bare names**: a funded `claim` → `whois` cycle on a real BCH network,
    proving the pure-Go CashTokens transaction is accepted by real consensus.
 
 Legs 1 and 2 are **fully automated** (two nodes on one machine, isolated ports
@@ -33,7 +33,7 @@ kept under a `/tmp/fn-verify.XXXX` workdir printed at the end.
 
 - Go toolchain (to build), `bash`, `curl`.
 - `jq` optional (a grep fallback is used if it is missing).
-- For leg 3: a funded BCH address. Chipnet (the default) is free — see the
+- For leg 3: a funded BCH address. Chipnet (the default) is free. See the
   faucet links the script prints. Mainnet spends real (tiny) BCH.
 - Ports used on loopback: HTTP `18420`/`18421`, authoring `18422`, DNS
   `18053`/`18054`, libp2p `4020`
@@ -70,10 +70,10 @@ extra concern there is firewalling: the bootstrap's libp2p port must be reachabl
 
 ## What a pass means for v1.0
 
-- **Leg 1 PASS**: names replicate — self-certifying names work across nodes.
-- **Leg 2 PASS**: content transfers peer-to-peer — Phase 3 works across nodes.
+- **Leg 1 PASS**: names replicate; self-certifying names work across nodes.
+- **Leg 2 PASS**: content transfers peer-to-peer; Phase 3 works across nodes.
 - **Leg 3 PASS**: a real, funded claim was accepted by BCH consensus and
-  resolves — the highest-risk unknown is closed.
+  resolves; the highest-risk unknown is closed.
 
 All three passing on real machines is the bar to drop the "treat production as
 beta" caveat and cut v1.0.

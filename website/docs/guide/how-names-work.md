@@ -59,7 +59,7 @@ rather than becoming a payload the network has to haul around:
 | --- | --- | --- |
 | resource records per name | 32 | one name, one modest record set |
 | `label` length | 190 bytes | the label plus the `<pubKeyID>.fn` suffix has to fit a DNS name |
-| `TXT` value | 255 bytes | the DNS character-string limit — a longer value cannot be put on the wire at all |
+| `TXT` value | 255 bytes | the DNS character-string limit; a longer value cannot be put on the wire at all |
 | `CNAME` target | 253 bytes | the DNS name limit |
 
 Need more than 255 bytes of text? Stage [several `TXT`

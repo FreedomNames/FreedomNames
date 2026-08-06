@@ -20,7 +20,7 @@ follow the same on-chain rule: the earliest *confirmed* valid claim wins (ties
 broken by smaller txid), and ownership can only move by a transaction that
 actually spends the name's NFT UTXO, so metadata-only hijacks are rejected.
 
-End to end, resolving a name (say `melroy.fn`) to page bytes looks like this —
+End to end, resolving a name (say `melroy.fn`) to page bytes looks like this:
 note that no step ever addresses an IP or a server; the name commits to a key,
 the key signs records, and the content's *hash* is its address:
 
@@ -46,16 +46,16 @@ skinparam partition {
 
 start
 :Open <b>melroy.fn</b>; <<#37474F>>
-if (Name carries a <pubKeyID> suffix?) then (no — bare name)
-  partition "Bare names — BCH registry" {
+if (Name carries a <pubKeyID> suffix?) then (no, bare name)
+  partition "Bare names: BCH registry" {
     :Find the earliest confirmed claim: the name is a CashTokens NFT; <<#12805F>>
     :Walk the NFT's custody chain to its current UTXO; <<#12805F>>
     :Live token commitment reveals the owner's public key; <<#12805F>>
   }
-else (yes — self-certifying)
+else (yes, self-certifying)
   :Owner's public key is embedded in the name itself; <<#6D28D9>>
 endif
-partition "Self-certifying — DHT (naming)" {
+partition "Self-certifying: DHT (naming)" {
   :Derive the DHT key from the pubKeyID; <<#6D28D9>>
   :Fetch the signed record set (newest sequence wins); <<#6D28D9>>
   :Verify the signature against the owner's public key; <<#6D28D9>>

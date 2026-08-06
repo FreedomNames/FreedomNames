@@ -42,17 +42,17 @@ by a web page you merely visited:
   is how a DNS-rebinding attack reaches a service on `localhost`. `localhost`
   and IP literals (`127.0.0.1`, `[::1]`, a LAN address) are accepted; if you
   reach the API through a real hostname, list it in
-  `FREEDOM_HTTP_ALLOWED_HOSTS` (a port on the entry is fine — it is ignored when
+  `FREEDOM_HTTP_ALLOWED_HOSTS` (a port on the entry is fine; it is ignored when
   matching).
 - Requests a browser reports as coming from another site
   (`Sec-Fetch-Site: cross-site`) are refused with `403`, whatever the method.
   This one matters for reads too: `GET /content` fetches from the network on a
-  miss and keeps what it fetched, announcing this node as a provider — so
+  miss and keeps what it fetched, announcing this node as a provider. Without it,
   without it, a page you visited could pick what your node hosts and advertises
   just by embedding an `<img>`. Such a request carries no `Origin` at all, which
   is why the `Origin` check below cannot cover it.
 - Requests carrying an `Origin` header from another site are refused with `403`
-  — cross-site request forgery.
+  to prevent cross-site request forgery.
 
 `curl`, the CLI and an embedding app send none of these headers and are
 unaffected, as are a URL you typed yourself and a page served from this node.
@@ -88,7 +88,7 @@ the DHT and HTTP API are unaffected.
 The DNS listen address covers **every interface** by default, so it is worth
 being precise about what a stranger who reaches it can ask for:
 
-- **`.fn` queries: answered for anyone.** These are authoritative, public data —
+- **`.fn` queries: answered for anyone.** These are authoritative, public data;
   the same answer everyone gets, straight from the DHT.
 - **Everything else: forwarded only for local clients** (loopback, and private
   or link-local addresses). A node that forwarded arbitrary queries for the

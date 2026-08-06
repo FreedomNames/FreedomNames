@@ -68,7 +68,7 @@ To run discovery you control, stand up your own bootstrap node and set
   a lookup reads at most 512 history entries per address. Which end it reads
   depends on what it is looking for: the earliest entries decide the winning
   claim, while a custody transfer is by nature at the recent end. A name
-  deliberately spammed past the cap does not resolve to a stale or wrong owner —
+  deliberately spammed past the cap does not resolve to a stale or wrong owner.
   a scan that runs out of budget without an answer fails as inconclusive, is
   logged, and is *not* negative-cached, so the name resolves again once the
   history is back within reach. The name is still unresolvable while the flood
@@ -136,7 +136,7 @@ To run discovery you control, stand up your own bootstrap node and set
   this reason. Do not expose it on a untrusted network; anyone who can reach it
   can publish and fetch through your node. It rejects domain-name `Host`
   headers, requests a browser marks as cross-site, and cross-origin requests,
-  which stops a *web page* from driving it — but that is not authentication:
+  which stops a *web page* from driving it, but that is not authentication:
   anything that can open a socket to it still has full control. The cross-site
   check relies on `Sec-Fetch-Site`, which browsers older than roughly 2023 do
   not send; on those, an embedded `<img>` pointed at `/content` can still make
@@ -144,7 +144,7 @@ To run discovery you control, stand up your own bootstrap node and set
 - **DNS forwarding is limited to local clients.** `.fn` is answered for anyone;
   everything else is only forwarded for loopback and private/link-local
   addresses, so a public node is not an open resolver. The classification is by
-  address range alone — a spoofed source address in a private range is not
+  address range alone. A spoofed source address in a private range is not
   detected, so a node on a hostile LAN should sit behind a firewall rather than
   rely on this. `FREEDOM_DNS_RECURSION=any` disables the restriction entirely.
 - **A busy node sheds DNS load bluntly.** At most 64 `.fn` lookups walk the DHT

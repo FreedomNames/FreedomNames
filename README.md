@@ -120,7 +120,7 @@ standard `:53`. Options:
 - Or keep `:8053` and forward `:53 → :8053` with a local resolver
   (dnsmasq/systemd-resolved), or point a stub resolver at `127.0.0.1:8053`.
 
-`.fn` names are answered for anyone who can reach the listen address — that is
+`.fn` names are answered for anyone who can reach the listen address. That is
 public, authoritative data. Everything *else* is only forwarded upstream for
 clients on this machine or the local network, so a node on a public IP is not an
 open resolver that strangers can bounce traffic off. Set
@@ -283,7 +283,7 @@ air
 ### Project structure
 
 ```
-cmd/freedom-names/   the binary's entry point — wiring only
+cmd/freedom-names/   the binary's entry point, wiring only
 internal/            all implementation code, private to this module
   version/           build-stamped version string
   config/            FREEDOM_* environment configuration
@@ -310,7 +310,7 @@ explicit package boundaries. `content` sits near the bottom; `record` reuses its
 content-hash validation, and `config` reuses its content-size limit.
 
 Two interfaces are deliberately declared by their *consumer* rather than their
-implementer — `httpapi.FreedomDHT` and `resolver.RecordStore`. Go satisfies
+implementer: `httpapi.FreedomDHT` and `resolver.RecordStore`. Go satisfies
 interfaces structurally, so `node` implements both without those interfaces
 depending on its concrete type. `resolver` therefore avoids importing `node`;
 `httpapi` imports it separately for the content service.
