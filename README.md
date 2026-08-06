@@ -252,7 +252,7 @@ net.core.wmem_max=7500000
 
 ## License
 
-AGPL-3.0, © Melroy van den Berg
+[AGPL-3.0](LICENSE), © Melroy van den Berg
 
 ---
 
