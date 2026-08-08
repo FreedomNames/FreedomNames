@@ -22,6 +22,9 @@ cleanup() {
   if [[ -n "${work_dir:-}" && -d "$work_dir" ]]; then
     rm -rf "$work_dir"
   fi
+  if [[ -n "${validation_binary:-}" ]]; then
+    rm -f -- "$validation_binary"
+  fi
 }
 
 require_root() {
@@ -111,7 +114,12 @@ main() {
     mkdir -p "$work_dir/deploy"
     download "https://raw.githubusercontent.com/${REPOSITORY}/main/deploy/${SERVICE_UNIT}" "$work_dir/deploy/$SERVICE_UNIT" || error 'could not download the bootstrap systemd unit'
   fi
-  "$work_dir/freedom-names" --version >/dev/null || error 'release binary could not be executed'
+  # Validate from an executable filesystem: /tmp may be mounted noexec.
+  validation_binary="$INSTALL_DIR/.freedom-names-validation.$$"
+  install -D -m 0755 "$work_dir/freedom-names" "$validation_binary"
+  "$validation_binary" --version >/dev/null || error 'release binary could not be executed'
+  rm -f -- "$validation_binary"
+  validation_binary=''
 
   install -D -m 0755 "$work_dir/freedom-names" "$INSTALL_DIR/freedom-names"
   if [[ "$mode" == normal ]]; then
