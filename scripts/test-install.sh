@@ -46,7 +46,7 @@ if (
 fi
 
 grep -Fq 'freedom-names-bootstrap.service' "$installer"
-grep -Fq 'release archive predates the bootstrap systemd unit' "$installer"
+grep -Fq 'release archive does not contain the bootstrap systemd unit' "$installer"
 grep -Fq 'systemctl enable' "$installer"
 grep -Fq 'systemctl restart' "$installer"
 grep -Fq 'bootstrap|normal) main "$1"' "$installer"

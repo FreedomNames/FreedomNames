@@ -106,13 +106,8 @@ main() {
   tar --no-same-owner -xzf "$work_dir/$archive" -C "$work_dir"
 
   [[ -x "$work_dir/freedom-names" ]] || error 'release archive does not contain freedom-names'
-  if [[ "$mode" == bootstrap && ! -f "$work_dir/deploy/$SERVICE_UNIT" ]]; then
-    # Releases before the installer shipped only the binary. Keep the new
-    # installer useful against the current release while all future Linux
-    # archives carry this unit alongside their verified binary.
-    warn 'release archive predates the bootstrap systemd unit; downloading the current unit'
-    mkdir -p "$work_dir/deploy"
-    download "https://raw.githubusercontent.com/${REPOSITORY}/main/deploy/${SERVICE_UNIT}" "$work_dir/deploy/$SERVICE_UNIT" || error 'could not download the bootstrap systemd unit'
+  if [[ "$mode" == bootstrap ]]; then
+    [[ -f "$work_dir/deploy/$SERVICE_UNIT" ]] || error 'release archive does not contain the bootstrap systemd unit'
   fi
   # Validate from an executable filesystem: /tmp may be mounted noexec.
   validation_binary="$INSTALL_DIR/.freedom-names-validation.$$"

@@ -46,22 +46,25 @@ for platform in "${PLATFORMS[@]}"; do
         -o "$OUT_DIR/$bin_name" ./cmd/freedom-names
 
     base="freedom-names-$APP_VERSION-$GOOS-$GOARCH"
+    # Keep the release self-describing for users who download an archive
+    # directly. Linux additionally carries the bootstrap systemd unit.
+    mkdir -p "$OUT_DIR/package"
+    mv "$OUT_DIR/$bin_name" "$OUT_DIR/package/$bin_name"
+    cp README.md LICENSE "$OUT_DIR/package/"
     if [ "$GOOS" = "windows" ]; then
-        (cd "$OUT_DIR" && zip -q "$base.zip" "$bin_name")
+        (cd "$OUT_DIR/package" && zip -q "../$base.zip" "$bin_name" README.md LICENSE)
     else
         if [ "$GOOS" = "linux" ]; then
             # The bootstrap installer consumes the unit from the same verified
             # archive as the binary, avoiding an unversioned deployment file.
             mkdir -p "$OUT_DIR/package/deploy"
-            mv "$OUT_DIR/$bin_name" "$OUT_DIR/package/$bin_name"
             cp deploy/freedom-names-bootstrap.service "$OUT_DIR/package/deploy/"
-            (cd "$OUT_DIR/package" && tar -czf "../$base.tar.gz" "$bin_name" deploy)
-            rm -rf "$OUT_DIR/package"
+            (cd "$OUT_DIR/package" && tar -czf "../$base.tar.gz" "$bin_name" README.md LICENSE deploy)
         else
-            (cd "$OUT_DIR" && tar -czf "$base.tar.gz" "$bin_name")
+            (cd "$OUT_DIR/package" && tar -czf "../$base.tar.gz" "$bin_name" README.md LICENSE)
         fi
     fi
-    rm -f "$OUT_DIR/$bin_name"
+    rm -rf "$OUT_DIR/package"
 done
 
 # Checksums over the exact archives being published, so a download from either

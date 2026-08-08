@@ -137,6 +137,15 @@ go-release:
   script:
     - export APP_VERSION=${CI_COMMIT_TAG}
     - ./scripts/build-release.sh
+    # Smoke the exact Linux archive consumed by install.sh before publishing.
+    # This catches packaging drift: the bootstrap unit must be shipped beside
+    # the verified binary rather than fetched from an unversioned branch.
+    - |
+      ARCHIVE="freedom-names-${CI_COMMIT_TAG}-linux-amd64.tar.gz"
+      SMOKE_ROOT="$(mktemp -d)"
+      tar -xzf "build_release/${ARCHIVE}" -C "$SMOKE_ROOT"
+      test -x "$SMOKE_ROOT/freedom-names"
+      test -f "$SMOKE_ROOT/deploy/freedom-names-bootstrap.service"
   artifacts:
     name: "FreedomNames $CI_COMMIT_TAG binaries"
     expire_in: 1 month
