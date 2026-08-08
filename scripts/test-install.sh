@@ -11,6 +11,11 @@ help_output="$(bash "$installer" --help)"
 [[ "$help_output" == *'<bootstrap|normal>'* ]]
 [[ "$help_output" == *'bootstrap also installs and starts systemd'* ]]
 
+# Bash leaves BASH_SOURCE unset for scripts consumed from standard input.
+pipe_help_output="$(bash -s -- --help <"$installer")"
+[[ "$pipe_help_output" == *'raw.githubusercontent.com/FreedomNames/FreedomNames/main/scripts/install.sh'* ]]
+[[ "$pipe_help_output" == *'<bootstrap|normal>'* ]]
+
 test_dir="$(mktemp -d)"
 trap 'rm -rf "$test_dir"' EXIT
 

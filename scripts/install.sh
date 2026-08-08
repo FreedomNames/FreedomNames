@@ -143,7 +143,10 @@ main() {
   printf '%s\n' "  Identity: ${SERVICE_HOME}/.freedom/private.key (back this up)"
 }
 
-if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+# BASH_SOURCE is unset when Bash reads this script from standard input, which is
+# the documented curl | sudo bash invocation.  Fall back to $0 in that case,
+# while retaining the guard that prevents main from running when sourced.
+if [[ "${BASH_SOURCE[0]:-$0}" == "$0" ]]; then
   case "${1:-}" in
     bootstrap|normal) main "$1" ;;
     --help|-h)
